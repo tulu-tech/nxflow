@@ -1,26 +1,199 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface layers */
+  --bg-base: #0f0f13;
+  --bg-surface: #16161d;
+  --bg-elevated: #1c1c26;
+  --bg-hover: #22222f;
+  --bg-active: #2a2a3a;
+  --bg-selected: #1e1e36;
+
+  /* Borders */
+  --border-subtle: #252535;
+  --border-default: #2e2e42;
+  --border-strong: #3a3a52;
+
+  /* Text */
+  --text-primary: #e8e8f0;
+  --text-secondary: #9898b0;
+  --text-muted: #5a5a72;
+  --text-accent: #818cf8;
+
+  /* Accent */
+  --accent-primary: #6366f1;
+  --accent-hover: #4f52d8;
+
+  /* Row */
+  --row-height: 38px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── Scrollbars ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555570; }
+
+/* ─── Focus rings ─────────────────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 1px; }
+
+/* ─── Table ───────────────────────────────────────────────────── */
+.board-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.board-table th,
+.board-table td {
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.board-table th:last-child,
+.board-table td:last-child {
+  border-right: none;
+}
+
+.task-row {
+  height: var(--row-height);
+  transition: background 0.08s ease;
+}
+
+.task-row:hover {
+  background: var(--bg-hover) !important;
+}
+
+.task-row:hover .row-actions {
+  opacity: 1 !important;
+}
+
+.row-actions {
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+
+/* ─── Status pill ─────────────────────────────────────────────── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.1s ease;
+  width: 100%;
+  border: none;
+}
+
+.status-pill:hover {
+  filter: brightness(1.12);
+}
+
+/* ─── Timeline pill ───────────────────────────────────────────── */
+.timeline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 100px;
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  background: #1e2a4a;
+  color: #7eb4ff;
+  border: 1px solid #2a3d6e;
+  transition: background 0.1s ease;
+}
+
+.timeline-pill:hover {
+  background: #243358;
+}
+
+/* ─── Avatar ──────────────────────────────────────────────────── */
+.avatar-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  border: 2px solid var(--bg-surface);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.avatar-circle:hover {
+  transform: scale(1.1);
+  z-index: 10;
+}
+
+/* ─── Animations ──────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease forwards;
+}
+
+/* ─── Sidebar ─────────────────────────────────────────────────── */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background 0.1s ease, color 0.1s ease;
+  user-select: none;
+}
+
+.sidebar-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-item.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+/* ─── Add task row ────────────────────────────────────────────── */
+.add-task-row {
+  color: var(--text-muted);
+  transition: color 0.1s;
+  cursor: pointer;
+}
+
+.add-task-row:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover) !important;
 }
