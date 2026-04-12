@@ -150,8 +150,44 @@ export function Sidebar() {
         </span>
       </div>
 
+      {/* Product links */}
+      <div style={{ padding: '6px 8px 2px' }}>
+        <div
+          className="sidebar-item"
+          onClick={() => router.push('/seoagent')}
+          style={{ gap: 8 }}
+        >
+          <div style={{
+            width: 18, height: 18, borderRadius: 4,
+            background: 'linear-gradient(135deg, #059669, #10b981)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 8, fontWeight: 800, color: '#fff', flexShrink: 0,
+          }}>
+            SEO
+          </div>
+          <span>SEO Agent</span>
+        </div>
+        <div
+          className="sidebar-item"
+          onClick={() => router.push('/crm')}
+          style={{ gap: 8 }}
+        >
+          <div style={{
+            width: 18, height: 18, borderRadius: 4,
+            background: 'linear-gradient(135deg, #0891b2, #06b6d4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 8, fontWeight: 800, color: '#fff', flexShrink: 0,
+          }}>
+            CRM
+          </div>
+          <span>CRM</span>
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: 'var(--border-subtle)', margin: '2px 0' }} />
+
       {/* Top nav */}
-      <div style={{ padding: '8px 8px 4px' }}>
+      <div style={{ padding: '4px 8px 4px' }}>
         <div className="sidebar-item" onClick={handleHomeClick}>
           <Home size={14} />
           <span>Home</span>
