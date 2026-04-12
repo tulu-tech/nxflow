@@ -19,13 +19,11 @@ const PAGE_TYPES: { value: PageType; label: string }[] = [
 ];
 
 export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
-  const isValid = intake.brandName.trim() && intake.industry.trim() && intake.priorityTopic.trim();
+  const isValid = intake.brandName.trim();
 
   return (
     <div className="seo-form">
-      {/* Core Info */}
       <div className="seo-form-section">
-        <h3 className="seo-form-section-title">🏢 Core Info</h3>
         <div className="seo-form-row">
           <div className="seo-form-group">
             <label className="seo-label">Brand Name *</label>
@@ -48,15 +46,6 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
         </div>
         <div className="seo-form-row">
           <div className="seo-form-group">
-            <label className="seo-label">Industry / Niche *</label>
-            <input
-              className="seo-input"
-              value={intake.industry}
-              onChange={(e) => onChange('industry', e.target.value)}
-              placeholder="e.g. SaaS, E-commerce, Defense"
-            />
-          </div>
-          <div className="seo-form-group">
             <label className="seo-label">Business Type</label>
             <div className="seo-radio-group">
               {(['B2B', 'B2C', 'B2G', 'Both'] as BusinessType[]).map((t) => (
@@ -71,42 +60,6 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
               ))}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Content Direction */}
-      <div className="seo-form-section">
-        <h3 className="seo-form-section-title">🎯 Content Direction</h3>
-        <div className="seo-form-group full">
-          <label className="seo-label">Priority Topic / Keyword Focus *</label>
-          <input
-            className="seo-input"
-            value={intake.priorityTopic}
-            onChange={(e) => onChange('priorityTopic', e.target.value)}
-            placeholder="The main topic this content should target"
-          />
-        </div>
-        <div className="seo-form-row">
-          <div className="seo-form-group">
-            <label className="seo-label">Target Audience</label>
-            <input
-              className="seo-input"
-              value={intake.targetAudience}
-              onChange={(e) => onChange('targetAudience', e.target.value)}
-              placeholder="e.g. Marketing managers, CTOs, consumers"
-            />
-          </div>
-          <div className="seo-form-group">
-            <label className="seo-label">Target Language</label>
-            <input
-              className="seo-input"
-              value={intake.targetLanguage}
-              onChange={(e) => onChange('targetLanguage', e.target.value)}
-              placeholder="e.g. English, Turkish"
-            />
-          </div>
-        </div>
-        <div className="seo-form-row">
           <div className="seo-form-group">
             <label className="seo-label">Page Type</label>
             <select
@@ -119,36 +72,23 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
               ))}
             </select>
           </div>
+        </div>
+        <div className="seo-form-row">
           <div className="seo-form-group">
-            <label className="seo-label">Tone of Voice</label>
+            <label className="seo-label">Target Language</label>
             <input
               className="seo-input"
-              value={intake.toneOfVoice}
-              onChange={(e) => onChange('toneOfVoice', e.target.value)}
-              placeholder="e.g. Professional, Friendly, Technical"
+              value={intake.targetLanguage}
+              onChange={(e) => onChange('targetLanguage', e.target.value)}
+              placeholder="e.g. English, Turkish"
             />
           </div>
-        </div>
-        <div className="seo-form-group full">
-          <label className="seo-label">Business Goal</label>
-          <select
-            className="seo-select"
-            value={intake.businessGoal}
-            onChange={(e) => onChange('businessGoal', e.target.value)}
-          >
-            <option value="">Select goal…</option>
-            <option value="traffic">Increase Organic Traffic</option>
-            <option value="leads">Generate Leads</option>
-            <option value="sales">Drive Sales</option>
-            <option value="awareness">Brand Awareness</option>
-            <option value="authority">Thought Leadership</option>
-          </select>
+          <div className="seo-form-group" />
         </div>
       </div>
 
-      {/* Actions */}
       <div className="seo-actions-bar">
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>* Required fields</span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>* Required</span>
         <button
           className="seo-btn seo-btn-primary"
           disabled={!isValid}
