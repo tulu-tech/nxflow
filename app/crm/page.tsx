@@ -421,7 +421,7 @@ export default function CrmPage() {
       {/* ─── Sidebar ─── */}
       <div className="crm-sidebar">
         <div className="crm-sidebar-header">
-          <h1>GM CRM</h1>
+          <h1>NX CRM</h1>
           <p>Lead Management System</p>
         </div>
 

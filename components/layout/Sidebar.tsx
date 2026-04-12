@@ -8,7 +8,6 @@ import {
   Plus,
   Home,
   Settings,
-  Bell,
   Search,
   Zap,
   X,
@@ -26,7 +25,6 @@ export function Sidebar() {
   const [newBoardName, setNewBoardName] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showInbox, setShowInbox] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +42,6 @@ export function Sidebar() {
       }
       if (e.key === 'Escape') {
         setShowSearch(false);
-        setShowInbox(false);
         setShowSettings(false);
       }
     };
@@ -65,9 +62,7 @@ export function Sidebar() {
   };
 
   const handleHomeClick = () => {
-    if (activeBoardId) {
-      router.push(`/board/${activeBoardId}`);
-    }
+    router.push('/');
   };
 
   const handleSearchSelect = (boardId: string) => {
@@ -191,16 +186,6 @@ export function Sidebar() {
         <div className="sidebar-item" onClick={handleHomeClick}>
           <Home size={14} />
           <span>Home</span>
-        </div>
-        <div className="sidebar-item" onClick={() => setShowInbox(true)}>
-          <Bell size={14} />
-          <span>Inbox</span>
-          <span style={{
-            marginLeft: 'auto', background: '#e2445c', color: '#fff',
-            borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px', lineHeight: '14px',
-          }}>
-            3
-          </span>
         </div>
         <div className="sidebar-item" onClick={() => { setShowSearch(true); setTimeout(() => searchInputRef.current?.focus(), 50); }}>
           <Search size={14} />
@@ -365,36 +350,7 @@ export function Sidebar() {
         </div>
       </Modal>
 
-      {/* ═══ Inbox Modal ═══ */}
-      <Modal open={showInbox} onClose={() => setShowInbox(false)} title="Inbox">
-        <div style={{ padding: 16 }}>
-          {[
-            { time: '2 hours ago', text: 'Alex Rivera assigned you to "QA and regression testing"', color: '#7c3aed' },
-            { time: '5 hours ago', text: 'Sam Chen changed status of "CI/CD pipeline" to Done', color: '#0891b2' },
-            { time: 'Yesterday', text: 'Jordan Lee commented on "Design system v2"', color: '#059669' },
-          ].map((notif, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 8px',
-                borderBottom: i < 2 ? '1px solid var(--border-subtle)' : 'none',
-                cursor: 'pointer',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
-              onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)', flexShrink: 0, marginTop: 5 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.4 }}>{notif.text}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{notif.time}</div>
-              </div>
-            </div>
-          ))}
-          <div style={{ padding: '10px 8px 4px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
-            Notifications are simulated in this demo
-          </div>
-        </div>
-      </Modal>
+
 
       {/* ═══ Settings Modal ═══ */}
       <Modal open={showSettings} onClose={() => setShowSettings(false)} title="Settings">
