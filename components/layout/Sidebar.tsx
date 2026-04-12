@@ -11,9 +11,13 @@ import {
   Search,
   Zap,
   X,
+  Bell,
+  LogOut,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/lib/supabase/client';
 
 export function Sidebar() {
   const router = useRouter();
@@ -26,6 +30,11 @@ export function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<{id: string; message: string; created_at: string; read: boolean}[]>([]);
+
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const logout = useAuthStore((s) => s.logout);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +52,7 @@ export function Sidebar() {
       if (e.key === 'Escape') {
         setShowSearch(false);
         setShowSettings(false);
+        setShowNotifications(false);
       }
     };
     document.addEventListener('keydown', handler);
@@ -282,27 +292,100 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div style={{ borderTop: '1px solid var(--border-subtle)', padding: '8px' }}>
+        <div className="sidebar-item" onClick={() => setShowNotifications(true)}>
+          <Bell size={13} />
+          <span>Notifications</span>
+          {notifications.filter(n => !n.read).length > 0 && (
+            <span style={{
+              marginLeft: 'auto', background: '#e2445c', color: '#fff',
+              borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px', lineHeight: '14px',
+            }}>
+              {notifications.filter(n => !n.read).length}
+            </span>
+          )}
+        </div>
         <div className="sidebar-item" onClick={() => setShowSettings(true)}>
           <Settings size={13} />
           <span>Settings</span>
         </div>
+        <div style={{ height: 1, background: 'var(--border-subtle)', margin: '4px 0' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px' }}>
           <div
             style={{
               width: 26, height: 26, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: currentUser?.avatarColor || 'linear-gradient(135deg, #6366f1, #8b5cf6)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0,
             }}
           >
-            ME
+            {currentUser?.initials || '?'}
           </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>My Account</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>me@alba.com</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>
+              {currentUser?.name || 'User'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {currentUser?.email || ''}
+            </div>
           </div>
+          <button
+            onClick={logout}
+            title="Logout"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-muted)', padding: 2, borderRadius: 4,
+              display: 'flex', alignItems: 'center',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#e2445c'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+          >
+            <LogOut size={13} />
+          </button>
         </div>
       </div>
+
+      {/* ═══ Notifications Modal ═══ */}
+      <Modal open={showNotifications} onClose={() => setShowNotifications(false)} title="Notifications">
+        <div style={{ padding: 16 }}>
+          {notifications.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <Bell size={32} color="var(--text-muted)" style={{ marginBottom: 12, opacity: 0.4 }} />
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No notifications yet</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                You&apos;ll be notified when someone assigns a task to you
+              </div>
+            </div>
+          ) : (
+            notifications.map((notif) => (
+              <div
+                key={notif.id}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 8px',
+                  borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer',
+                  background: notif.read ? 'transparent' : 'rgba(99,102,241,0.05)',
+                  borderRadius: 6,
+                }}
+              >
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: notif.read ? 'transparent' : '#6366f1',
+                  flexShrink: 0, marginTop: 5,
+                  border: notif.read ? '1px solid var(--border-default)' : 'none',
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                    {notif.message}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {new Date(notif.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Modal>
 
       {/* ═══ Search Modal ═══ */}
       <Modal open={showSearch} onClose={() => { setShowSearch(false); setSearchQuery(''); }} title="Quick Search">
