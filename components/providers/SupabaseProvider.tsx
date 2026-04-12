@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase/client';
@@ -12,6 +12,19 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const isLoading = useWorkspaceStore((s) => s.isLoading);
   const isInitialized = useWorkspaceStore((s) => s.isInitialized);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  // Wait for Zustand persist to rehydrate from localStorage
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setHasHydrated(true);
+    });
+    // If already hydrated (e.g. sync storage), set immediately
+    if (useAuthStore.persist.hasHydrated()) {
+      setHasHydrated(true);
+    }
+    return unsub;
+  }, []);
 
   // Initialize data from Supabase when authenticated
   useEffect(() => {
@@ -86,12 +99,37 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isInitialized]);
 
+  // Waiting for persist rehydration
+  if (!hasHydrated) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          background: '#0f0f13',
+        }}
+      >
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid rgba(99, 102, 241, 0.2)',
+            borderTopColor: '#6366f1',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }}
+        />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   // Not authenticated → Login Screen
   if (!isAuthenticated) {
     return <LoginScreen />;
   }
-
-  // Loading data
   if (isLoading) {
     return (
       <div
