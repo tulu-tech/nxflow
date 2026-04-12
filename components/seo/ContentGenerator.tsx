@@ -45,23 +45,49 @@ export function ContentGenerator({ article, writingPrompt, brief, brandIntake, o
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Simple markdown to HTML (basic)
+  // Enhanced markdown to HTML renderer
   const renderMarkdown = (md: string) => {
     let html = md
+      // [IMAGE: description] markers → styled placeholder
+      .replace(/\[IMAGE:\s*([^\]]+)\]/g, (_: string, desc: string) => {
+        const d = desc.length > 80 ? desc.slice(0, 80) + '…' : desc;
+        return `<div class="seo-image-placeholder"><span class="seo-image-placeholder-icon">🖼️</span><span class="seo-image-placeholder-text">${d}</span></div>`;
+      })
+      // [LINK: anchor|url] markers → real links
+      .replace(/\[LINK:\s*([^|]+)\|([^\]]+)\]/g, (_: string, anchor: string, url: string) => {
+        return `<a href="${url.trim()}" target="_blank" rel="noopener noreferrer" class="seo-article-link">${anchor.trim()}</a>`;
+      })
+      // ![alt](src) → figure
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_: string, alt: string, src: string) => {
+        return `<figure class="seo-article-figure"><img src="${src}" alt="${alt}" loading="lazy" class="seo-article-img" />${alt ? `<figcaption>${alt}</figcaption>` : ''}</figure>`;
+      })
+      // [text](url) → link
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_: string, text: string, url: string) => {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="seo-article-link">${text}</a>`;
+      })
       .replace(/^### (.*$)/gm, '<h3>$1</h3>')
       .replace(/^## (.*$)/gm, '<h2>$1</h2>')
       .replace(/^# (.*$)/gm, '<h1>$1</h1>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>')
+      .replace(/^---$/gm, '<hr />')
       .replace(/^- (.*$)/gm, '<li>$1</li>')
       .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
       .replace(/\n\n/g, '</p><p>')
       .replace(/\n/g, '<br/>');
     html = '<p>' + html + '</p>';
-    html = html.replace(/<p><h/g, '<h').replace(/<\/h([1-3])><\/p>/g, '</h$1>');
+    html = html.replace(/<p><h([1-3])>/g, '<h$1>').replace(/<\/h([1-3])><\/p>/g, '</h$1>');
     html = html.replace(/<p><li>/g, '<ul><li>').replace(/<\/li><\/p>/g, '</li></ul>');
+    html = html.replace(/<p><blockquote>/g, '<blockquote>').replace(/<\/blockquote><\/p>/g, '</blockquote>');
+    html = html.replace(/<p><hr \/><\/p>/g, '<hr />');
+    html = html.replace(/<p>(<figure)/g, '$1').replace(/(<\/figure>)<\/p>/g, '$1');
+    html = html.replace(/<p>(<div class="seo-image-placeholder)/g, '$1').replace(/(<\/div>)<\/p>/g, '$1');
     return html;
   };
+
+
 
   return (
     <div>

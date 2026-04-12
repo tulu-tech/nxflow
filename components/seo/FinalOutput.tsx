@@ -106,13 +106,34 @@ export function FinalOutput({ project, onBack }: Props) {
       {/* Images */}
       {project.imagePrompts.length > 0 && (
         <div className="seo-card" style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>🖼️ Image Plan ({project.imagePrompts.length})</h3>
-          {project.imagePrompts.map((img) => (
-            <div key={img.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border-subtle)', fontSize: 13 }}>
-              <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{img.placement}</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Alt: {img.altText} · File: {img.fileName}</div>
-            </div>
-          ))}
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
+            🖼️ Images
+            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--text-muted)' }}>
+              {project.imagePrompts.filter(i => i.imageUrl).length}/{project.imagePrompts.length} generated
+            </span>
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+            {project.imagePrompts.map((img) => (
+              <div key={img.id} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                {img.imageUrl ? (
+                  <img
+                    src={img.imageUrl}
+                    alt={img.altText}
+                    style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: 100, background: 'rgba(129,140,248,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+                    🖼️
+                  </div>
+                )}
+                <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                  <div style={{ fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 2 }}>{img.placement}</div>
+                  <div>Alt: {img.altText}</div>
+                  {img.imageUrl && <div style={{ color: '#00c875', marginTop: 2 }}>✓ Generated</div>}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -134,8 +155,13 @@ export function FinalOutput({ project, onBack }: Props) {
           { label: 'Article generated', done: !!article },
           { label: 'Meta title & description set', done: !!article?.metaTitle },
           { label: 'URL slug defined', done: !!article?.slug },
-          { label: 'Image plan created', done: project.imagePrompts.length > 0 },
+          { label: `Image plans created (${project.imagePrompts.length})`, done: project.imagePrompts.length > 0 },
+          {
+            label: `Images generated (${project.imagePrompts.filter(i => i.imageUrl).length}/${project.imagePrompts.length})`,
+            done: project.imagePrompts.length > 0 && project.imagePrompts.every(i => i.imageUrl),
+          },
           { label: 'Link strategy defined', done: !!project.linkPlan },
+          { label: 'Links injected into article', done: !!project.linkPlan && !!article && !article.content.includes('[LINK:') },
           { label: 'Content reviewed & revised', done: project.revisionNotes.length > 0 },
           { label: 'Primary keyword selected', done: !!project.primaryKeyword },
         ].map((item, i) => (

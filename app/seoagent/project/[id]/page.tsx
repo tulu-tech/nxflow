@@ -170,6 +170,7 @@ export default function ProjectPage() {
             article={project.generatedArticle}
             brandIntake={project.brandIntake}
             onSetPrompts={(prompts) => setImagePrompts(id, prompts)}
+            onSetArticle={(article) => setGeneratedArticle(id, article)}
             onContinue={goNext}
             onBack={goBack}
           />
@@ -181,6 +182,7 @@ export default function ProjectPage() {
             article={project.generatedArticle}
             brandIntake={project.brandIntake}
             onSetPlan={(plan) => setLinkPlan(id, plan)}
+            onSetArticle={(article) => setGeneratedArticle(id, article)}
             onContinue={goNext}
             onBack={goBack}
           />
