@@ -232,7 +232,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
     }),
     {
-      name: 'orbit-workspace',
+      name: 'nxflow-workspace',
       version: 1,
     }
   )

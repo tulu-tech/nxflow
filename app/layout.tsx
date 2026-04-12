@@ -3,7 +3,7 @@ import './globals.css';
 import { AppShell } from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
-  title: 'Orbit — Work Management',
+  title: 'NXFlow — Work Management',
   description: 'Modern work management platform for high-performing teams',
 };
 
