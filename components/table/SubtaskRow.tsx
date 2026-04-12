@@ -119,20 +119,34 @@ export function SubtaskRow({ subtask, groupColor, colSpan }: Props) {
           )}
 
           <button
-            className="row-actions"
-            onClick={() => deleteSubtask(subtask.id)}
+            onClick={() => {
+              if (confirm(`Delete subtask "${subtask.name}"?`)) {
+                deleteSubtask(subtask.id);
+              }
+            }}
+            title="Delete subtask"
             style={{
               background: 'none',
               border: 'none',
               cursor: 'pointer',
               color: 'var(--text-muted)',
-              padding: 2,
+              padding: '2px 4px',
               display: 'flex',
               alignItems: 'center',
               borderRadius: 3,
+              opacity: 0.4,
+              transition: 'opacity 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.color = '#e2445c';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.4';
+              e.currentTarget.style.color = 'var(--text-muted)';
             }}
           >
-            <Trash2 size={11} />
+            <Trash2 size={12} />
           </button>
         </div>
       </td>
