@@ -4,8 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useSEOStore } from '@/store/seoStore';
 import { PhaseNav } from '@/components/seo/PhaseNav';
 import { BrandIntakeForm } from '@/components/seo/BrandIntakeForm';
-import { KeywordDiscovery } from '@/components/seo/KeywordDiscovery';
-import { SemrushValidation } from '@/components/seo/SemrushValidation';
+import { KeywordUpload } from '@/components/seo/KeywordUpload';
+import { KeywordReview } from '@/components/seo/KeywordReview';
 import { ContentBrief } from '@/components/seo/ContentBrief';
 import { WritingPrompt } from '@/components/seo/WritingPrompt';
 import { ContentGenerator } from '@/components/seo/ContentGenerator';
@@ -105,8 +105,7 @@ export default function ProjectPage() {
         )}
 
         {viewPhase === 2 && (
-          <KeywordDiscovery
-            brandIntake={project.brandIntake}
+          <KeywordUpload
             keywords={project.keywords}
             onUpdateKeywords={(kws) => updateKeywords(id, kws)}
             onContinue={goNext}
@@ -115,7 +114,7 @@ export default function ProjectPage() {
         )}
 
         {viewPhase === 3 && (
-          <SemrushValidation
+          <KeywordReview
             keywords={project.keywords}
             onUpdateKeywords={(kws) => updateKeywords(id, kws)}
             onSetPrimary={(kw) => setPrimaryKeyword(id, kw)}

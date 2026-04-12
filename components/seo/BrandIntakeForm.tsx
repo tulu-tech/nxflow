@@ -19,13 +19,13 @@ const PAGE_TYPES: { value: PageType; label: string }[] = [
 ];
 
 export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
-  const isValid = intake.brandName.trim() && intake.industry.trim() && intake.targetAudience.trim() && intake.priorityTopic.trim();
+  const isValid = intake.brandName.trim() && intake.industry.trim() && intake.priorityTopic.trim();
 
   return (
     <div className="seo-form">
-      {/* Business Basics */}
+      {/* Core Info */}
       <div className="seo-form-section">
-        <h3 className="seo-form-section-title">🏢 Business Basics</h3>
+        <h3 className="seo-form-section-title">🏢 Core Info</h3>
         <div className="seo-form-row">
           <div className="seo-form-group">
             <label className="seo-label">Brand Name *</label>
@@ -53,13 +53,13 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
               className="seo-input"
               value={intake.industry}
               onChange={(e) => onChange('industry', e.target.value)}
-              placeholder="e.g. SaaS, E-commerce, Healthcare"
+              placeholder="e.g. SaaS, E-commerce, Defense"
             />
           </div>
           <div className="seo-form-group">
             <label className="seo-label">Business Type</label>
             <div className="seo-radio-group">
-              {(['B2B', 'B2C', 'Both'] as BusinessType[]).map((t) => (
+              {(['B2B', 'B2C', 'B2G', 'Both'] as BusinessType[]).map((t) => (
                 <button
                   key={t}
                   className={`seo-radio-option ${intake.businessType === t ? 'selected' : ''}`}
@@ -74,63 +74,26 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
         </div>
       </div>
 
-      {/* Products & Services */}
+      {/* Content Direction */}
       <div className="seo-form-section">
-        <h3 className="seo-form-section-title">📦 Products & Services</h3>
+        <h3 className="seo-form-section-title">🎯 Content Direction</h3>
         <div className="seo-form-group full">
-          <label className="seo-label">All Products / Services</label>
-          <textarea
-            className="seo-textarea"
-            value={intake.products}
-            onChange={(e) => onChange('products', e.target.value)}
-            placeholder="List your products and services…"
-            rows={3}
-          />
-        </div>
-        <div className="seo-form-group full">
-          <label className="seo-label">Most Important Products / Services</label>
+          <label className="seo-label">Priority Topic / Keyword Focus *</label>
           <input
             className="seo-input"
-            value={intake.keyProducts}
-            onChange={(e) => onChange('keyProducts', e.target.value)}
-            placeholder="Top 2-3 products or services to focus on"
+            value={intake.priorityTopic}
+            onChange={(e) => onChange('priorityTopic', e.target.value)}
+            placeholder="The main topic this content should target"
           />
         </div>
-      </div>
-
-      {/* Target Audience */}
-      <div className="seo-form-section">
-        <h3 className="seo-form-section-title">🎯 Target Audience</h3>
         <div className="seo-form-row">
           <div className="seo-form-group">
-            <label className="seo-label">Target Audience *</label>
-            <textarea
-              className="seo-textarea"
-              value={intake.targetAudience}
-              onChange={(e) => onChange('targetAudience', e.target.value)}
-              placeholder="Who are your ideal customers?"
-              rows={3}
-            />
-          </div>
-          <div className="seo-form-group">
-            <label className="seo-label">Customer Pain Points</label>
-            <textarea
-              className="seo-textarea"
-              value={intake.painPoints}
-              onChange={(e) => onChange('painPoints', e.target.value)}
-              placeholder="What problems do they face?"
-              rows={3}
-            />
-          </div>
-        </div>
-        <div className="seo-form-row">
-          <div className="seo-form-group">
-            <label className="seo-label">Target Countries</label>
+            <label className="seo-label">Target Audience</label>
             <input
               className="seo-input"
-              value={intake.targetCountries.join(', ')}
-              onChange={(e) => onChange('targetCountries', e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean))}
-              placeholder="e.g. US, UK, Germany"
+              value={intake.targetAudience}
+              onChange={(e) => onChange('targetAudience', e.target.value)}
+              placeholder="e.g. Marketing managers, CTOs, consumers"
             />
           </div>
           <div className="seo-form-group">
@@ -139,31 +102,11 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
               className="seo-input"
               value={intake.targetLanguage}
               onChange={(e) => onChange('targetLanguage', e.target.value)}
-              placeholder="e.g. English"
+              placeholder="e.g. English, Turkish"
             />
           </div>
         </div>
-      </div>
-
-      {/* Content Strategy */}
-      <div className="seo-form-section">
-        <h3 className="seo-form-section-title">📋 Content Strategy</h3>
         <div className="seo-form-row">
-          <div className="seo-form-group">
-            <label className="seo-label">Business Goal</label>
-            <select
-              className="seo-select"
-              value={intake.businessGoal}
-              onChange={(e) => onChange('businessGoal', e.target.value)}
-            >
-              <option value="">Select goal…</option>
-              <option value="traffic">Increase Organic Traffic</option>
-              <option value="leads">Generate Leads</option>
-              <option value="sales">Drive Sales</option>
-              <option value="awareness">Brand Awareness</option>
-              <option value="authority">Thought Leadership</option>
-            </select>
-          </div>
           <div className="seo-form-group">
             <label className="seo-label">Page Type</label>
             <select
@@ -176,80 +119,30 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
               ))}
             </select>
           </div>
-        </div>
-        <div className="seo-form-group full">
-          <label className="seo-label">Priority Topic / Offer *</label>
-          <input
-            className="seo-input"
-            value={intake.priorityTopic}
-            onChange={(e) => onChange('priorityTopic', e.target.value)}
-            placeholder="The main topic this content should target"
-          />
-        </div>
-        <div className="seo-form-row">
           <div className="seo-form-group">
             <label className="seo-label">Tone of Voice</label>
             <input
               className="seo-input"
               value={intake.toneOfVoice}
               onChange={(e) => onChange('toneOfVoice', e.target.value)}
-              placeholder="e.g. Professional, Friendly, Authoritative"
-            />
-          </div>
-          <div className="seo-form-group">
-            <label className="seo-label">Article Style</label>
-            <input
-              className="seo-input"
-              value={intake.articleStyle}
-              onChange={(e) => onChange('articleStyle', e.target.value)}
-              placeholder="e.g. In-depth guide, Listicle, How-to"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Competitive & Technical */}
-      <div className="seo-form-section">
-        <h3 className="seo-form-section-title">⚙️ Competitive & Technical</h3>
-        <div className="seo-form-group full">
-          <label className="seo-label">Competitors</label>
-          <textarea
-            className="seo-textarea"
-            value={intake.competitors}
-            onChange={(e) => onChange('competitors', e.target.value)}
-            placeholder="Key competitors (URLs or names)…"
-            rows={2}
-          />
-        </div>
-        <div className="seo-form-row">
-          <div className="seo-form-group">
-            <label className="seo-label">Domain Authority / Maturity</label>
-            <input
-              className="seo-input"
-              value={intake.domainAuthority}
-              onChange={(e) => onChange('domainAuthority', e.target.value)}
-              placeholder="e.g. DA 35, New domain, Established"
-            />
-          </div>
-          <div className="seo-form-group">
-            <label className="seo-label">Special Focus / Campaign</label>
-            <input
-              className="seo-input"
-              value={intake.specialFocus}
-              onChange={(e) => onChange('specialFocus', e.target.value)}
-              placeholder="Any seasonal or campaign focus"
+              placeholder="e.g. Professional, Friendly, Technical"
             />
           </div>
         </div>
         <div className="seo-form-group full">
-          <label className="seo-label">Existing Internal Pages for Linking</label>
-          <textarea
-            className="seo-textarea"
-            value={intake.internalPages}
-            onChange={(e) => onChange('internalPages', e.target.value)}
-            placeholder="URLs of existing pages that could be linked from the new content…"
-            rows={2}
-          />
+          <label className="seo-label">Business Goal</label>
+          <select
+            className="seo-select"
+            value={intake.businessGoal}
+            onChange={(e) => onChange('businessGoal', e.target.value)}
+          >
+            <option value="">Select goal…</option>
+            <option value="traffic">Increase Organic Traffic</option>
+            <option value="leads">Generate Leads</option>
+            <option value="sales">Drive Sales</option>
+            <option value="awareness">Brand Awareness</option>
+            <option value="authority">Thought Leadership</option>
+          </select>
         </div>
       </div>
 
@@ -261,7 +154,7 @@ export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
           disabled={!isValid}
           onClick={onContinue}
         >
-          Save & Continue to Keywords →
+          Continue to Keyword Upload →
         </button>
       </div>
     </div>

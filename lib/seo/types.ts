@@ -1,6 +1,6 @@
 // ─── Enums & Literals ────────────────────────────────────────────────────────
 
-export type BusinessType = 'B2B' | 'B2C' | 'Both';
+export type BusinessType = 'B2B' | 'B2C' | 'B2G' | 'Both';
 export type ProjectStatus = 'draft' | 'in-progress' | 'completed';
 export type SearchIntent = 'informational' | 'navigational' | 'commercial' | 'transactional';
 export type FunnelStage = 'top' | 'middle' | 'bottom';
@@ -197,8 +197,8 @@ export interface PhaseConfig {
 
 export const PHASES: PhaseConfig[] = [
   { id: 1, label: 'Brand Discovery', shortLabel: 'Brand', icon: '🏢' },
-  { id: 2, label: 'Keyword Discovery', shortLabel: 'Keywords', icon: '🔍' },
-  { id: 3, label: 'Semrush Validation', shortLabel: 'Validate', icon: '✅' },
+  { id: 2, label: 'Keyword Upload', shortLabel: 'Upload', icon: '📁' },
+  { id: 3, label: 'Keyword Review', shortLabel: 'Review', icon: '✅' },
   { id: 4, label: 'Content Brief', shortLabel: 'Brief', icon: '📋' },
   { id: 5, label: 'Writing Prompt', shortLabel: 'Prompt', icon: '✍️' },
   { id: 6, label: 'Content Generation', shortLabel: 'Generate', icon: '📝' },
