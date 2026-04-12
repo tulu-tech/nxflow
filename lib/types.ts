@@ -37,6 +37,15 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface Subtask {
+  id: string;
+  taskId: string;
+  name: string;
+  completed: boolean;
+  position: number;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -119,6 +128,7 @@ export interface AppState {
   boards: Record<string, Board>;
   groups: Record<string, Group>;
   tasks: Record<string, Task>;
+  subtasks: Record<string, Subtask>;
   users: Record<string, User>;
   statusOptions: StatusOption[];
   activeWorkspaceId: string | null;

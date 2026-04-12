@@ -197,3 +197,16 @@ html, body {
   color: var(--text-secondary);
   background: var(--bg-hover) !important;
 }
+
+/* ─── Subtask rows ────────────────────────────────────────────── */
+.subtask-row td {
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.subtask-row:hover td {
+  background: var(--bg-hover) !important;
+}
+
+.subtask-row:hover .row-actions {
+  opacity: 1 !important;
+}

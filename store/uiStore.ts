@@ -13,6 +13,8 @@ interface UIState {
   setSort: (sort: SortState) => void;
   clearFilters: () => void;
   setFilterOpen: (open: boolean) => void;
+  expandedTaskIds: string[];
+  toggleTaskExpanded: (taskId: string) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -58,4 +60,12 @@ export const useUIStore = create<UIState>((set) => ({
     set({ filter: { assigneeIds: [], statusIds: [], searchQuery: '' }, sort: { field: null, direction: 'asc' } }),
 
   setFilterOpen: (open) => set({ isFilterOpen: open }),
+
+  expandedTaskIds: [],
+  toggleTaskExpanded: (taskId) =>
+    set((s) => ({
+      expandedTaskIds: s.expandedTaskIds.includes(taskId)
+        ? s.expandedTaskIds.filter((id) => id !== taskId)
+        : [...s.expandedTaskIds, taskId],
+    })),
 }));

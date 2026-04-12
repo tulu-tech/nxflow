@@ -146,7 +146,7 @@ export function Sidebar() {
           <Zap size={14} color="#fff" strokeWidth={2.5} />
         </div>
         <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>
-          Orbit
+          NXFlow
         </span>
       </div>
 
@@ -278,7 +278,7 @@ export function Sidebar() {
           </div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>My Account</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>me@orbit.app</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>me@alba.com</div>
           </div>
         </div>
       </div>
@@ -392,7 +392,7 @@ export function Sidebar() {
             <button
               onClick={() => {
                 if (typeof window !== 'undefined') {
-                  localStorage.removeItem('orbit-workspace');
+                  localStorage.removeItem('nxflow-workspace');
                   window.location.reload();
                 }
               }}

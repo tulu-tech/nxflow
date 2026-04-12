@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppShell } from '@/components/layout/AppShell';
+import { SupabaseProvider } from '@/components/providers/SupabaseProvider';
 
 export const metadata: Metadata = {
-  title: 'Orbit — Work Management',
+  title: 'NXFlow — Work Management',
   description: 'Modern work management platform for high-performing teams',
 };
 
@@ -15,7 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body>
-        <AppShell>{children}</AppShell>
+        <SupabaseProvider>
+          <AppShell>{children}</AppShell>
+        </SupabaseProvider>
       </body>
     </html>
   );

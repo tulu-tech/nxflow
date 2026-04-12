@@ -1,12 +1,14 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Fragment } from 'react';
 import { Group, Task, ColumnSchema } from '@/lib/types';
 import { useWorkspaceStore } from '@/store/workspaceStore';
+import { useUIStore } from '@/store/uiStore';
 import { GroupHeader } from './GroupHeader';
 import { TaskRow } from './TaskRow';
 import { TaskRowAdder } from './TaskRowAdder';
 import { ColumnHeader } from './ColumnHeader';
-import { GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import { SubtaskRow } from './SubtaskRow';
+import { SubtaskAdder } from './SubtaskAdder';
 
 interface Props {
   group: Group;
@@ -16,7 +18,8 @@ interface Props {
 }
 
 export function GroupSection({ group, columns, tasks, allTasks }: Props) {
-  const { reorderTasks } = useWorkspaceStore();
+  const { reorderTasks, subtasks } = useWorkspaceStore();
+  const { expandedTaskIds } = useUIStore();
   const [dragId, setDragId] = useState<string | null>(null);
 
   const moveTask = useCallback(
@@ -108,16 +111,38 @@ export function GroupSection({ group, columns, tasks, allTasks }: Props) {
 
             <tbody>
               {tasks.map((task, idx) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  columns={columns}
-                  groupColor={group.color}
-                  isFirst={idx === 0}
-                  isLast={idx === tasks.length - 1}
-                  onMoveUp={() => moveTask(task.id, 'up')}
-                  onMoveDown={() => moveTask(task.id, 'down')}
-                />
+                <Fragment key={task.id}>
+                  <TaskRow
+                    task={task}
+                    columns={columns}
+                    groupColor={group.color}
+                    isFirst={idx === 0}
+                    isLast={idx === tasks.length - 1}
+                    onMoveUp={() => moveTask(task.id, 'up')}
+                    onMoveDown={() => moveTask(task.id, 'down')}
+                  />
+                  {/* Subtask rows when expanded */}
+                  {expandedTaskIds.includes(task.id) && (
+                    <>
+                      {Object.values(subtasks)
+                        .filter((st) => st.taskId === task.id)
+                        .sort((a, b) => a.position - b.position)
+                        .map((subtask) => (
+                          <SubtaskRow
+                            key={subtask.id}
+                            subtask={subtask}
+                            groupColor={group.color}
+                            colSpan={columns.length + 1}
+                          />
+                        ))}
+                      <SubtaskAdder
+                        taskId={task.id}
+                        groupColor={group.color}
+                        colSpan={columns.length + 1}
+                      />
+                    </>
+                  )}
+                </Fragment>
               ))}
 
               {tasks.length === 0 && (

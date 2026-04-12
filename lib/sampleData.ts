@@ -2,11 +2,12 @@ import { AppState } from './types';
 import { DEFAULT_COLUMNS, STATUS_OPTIONS } from './columns';
 
 const USERS = {
-  'u1': { id: 'u1', name: 'Alex Rivera', initials: 'AR', avatarColor: '#7c3aed', email: 'alex@orbit.app' },
-  'u2': { id: 'u2', name: 'Sam Chen', initials: 'SC', avatarColor: '#0891b2', email: 'sam@orbit.app' },
-  'u3': { id: 'u3', name: 'Jordan Lee', initials: 'JL', avatarColor: '#059669', email: 'jordan@orbit.app' },
-  'u4': { id: 'u4', name: 'Morgan Kim', initials: 'MK', avatarColor: '#dc2626', email: 'morgan@orbit.app' },
-  'u5': { id: 'u5', name: 'Taylor Moss', initials: 'TM', avatarColor: '#d97706', email: 'taylor@orbit.app' },
+  'u1': { id: 'u1', name: 'Hazel', initials: 'HZ', avatarColor: '#7c3aed', email: 'hazel@alba.com' },
+  'u2': { id: 'u2', name: 'Batuhan', initials: 'BT', avatarColor: '#0891b2', email: 'batuhan@alba.com' },
+  'u3': { id: 'u3', name: 'Omer', initials: 'OM', avatarColor: '#059669', email: 'omer@alba.com' },
+  'u4': { id: 'u4', name: 'Sera', initials: 'SR', avatarColor: '#e11d48', email: 'sera@alba.com' },
+  'u5': { id: 'u5', name: 'Berat', initials: 'BR', avatarColor: '#d97706', email: 'berat@alba.com' },
+  'u6': { id: 'u6', name: 'Tulu', initials: 'TL', avatarColor: '#6366f1', email: 'tulu@alba.com' },
 };
 
 export const SAMPLE_DATA: AppState = {
@@ -18,7 +19,7 @@ export const SAMPLE_DATA: AppState = {
   workspaces: {
     'ws1': {
       id: 'ws1',
-      name: 'Acme Corp',
+      name: 'Alba',
       icon: 'A',
       boardIds: ['b1', 'b2', 'b3'],
     },
@@ -86,7 +87,7 @@ export const SAMPLE_DATA: AppState = {
       id: 't1', groupId: 'g1', boardId: 'b1', name: 'Define product requirements and PRD', order: 0,
       createdAt: '2024-03-01T00:00:00Z', updatedAt: '2024-03-10T00:00:00Z',
       cells: {
-        assignee: { type: 'assignee', userIds: ['u1', 'u2'] },
+        assignee: { type: 'assignee', userIds: ['u1', 'u2', 'u6'] },
         status: { type: 'status', statusId: 'done' },
         timeline: { type: 'timeline', start: '2024-03-01', end: '2024-03-08' },
         link: { type: 'link', url: 'https://notion.so/prd', label: 'PRD Doc' },
@@ -140,7 +141,7 @@ export const SAMPLE_DATA: AppState = {
         assignee: { type: 'assignee', userIds: ['u2'] },
         status: { type: 'status', statusId: 'done' },
         timeline: { type: 'timeline', start: '2024-03-01', end: '2024-03-10' },
-        link: { type: 'link', url: 'https://github.com/acme/ci', label: 'GitHub' },
+        link: { type: 'link', url: 'https://github.com/alba/ci', label: 'GitHub' },
       },
     },
     't7': {
@@ -167,7 +168,7 @@ export const SAMPLE_DATA: AppState = {
       id: 't9', groupId: 'g2', boardId: 'b1', name: 'Load testing — 10k concurrent users', order: 3,
       createdAt: '2024-03-20T00:00:00Z', updatedAt: '2024-03-20T00:00:00Z',
       cells: {
-        assignee: { type: 'assignee', userIds: ['u2'] },
+        assignee: { type: 'assignee', userIds: ['u2', 'u6'] },
         status: { type: 'status', statusId: 'not-started' },
         timeline: { type: 'timeline', start: '2024-04-05', end: '2024-04-10' },
         link: { type: 'link', url: '', label: '' },
