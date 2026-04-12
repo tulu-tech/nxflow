@@ -10,3 +10,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
   },
 });
+
+// Re-export for (auth) pages compatibility
+export { createClient } from '@supabase/supabase-js';

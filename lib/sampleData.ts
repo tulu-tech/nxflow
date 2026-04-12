@@ -12,6 +12,7 @@ const USERS = {
 
 export const SAMPLE_DATA: AppState = {
   users: USERS,
+  subtasks: {},
   statusOptions: STATUS_OPTIONS,
   activeWorkspaceId: 'ws1',
   activeBoardId: 'b1',

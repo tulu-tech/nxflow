@@ -1,15 +1,10 @@
 'use client';
-import { useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const loadWorkspace = useWorkspaceStore((s) => s.loadWorkspace);
   const isLoading = useWorkspaceStore((s) => s.isLoading);
 
-  useEffect(() => {
-    loadWorkspace();
-  }, [loadWorkspace]);
 
   return (
     <div
