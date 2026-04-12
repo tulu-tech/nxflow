@@ -458,19 +458,7 @@ export default function CrmPage() {
             ))}
           </div>
 
-          <div className="crm-nav-section">
-            <div className="crm-nav-section-label">By Status</div>
-            {STATUS_OPTIONS.map((s) => (
-              <button
-                key={s}
-                className={`crm-nav-item ${filters.status.includes(s) ? 'active' : ''}`}
-                onClick={() => toggleFilter('status', s)}
-              >
-                <FileText size={14} /> {s}
-                <span className="count">{leads.filter((l) => l.status === s).length}</span>
-              </button>
-            ))}
-          </div>
+
         </div>
 
         <Link href="/" className="crm-back-link">
@@ -527,15 +515,11 @@ export default function CrmPage() {
           </div>
           <div className="crm-stat">
             <div className="crm-stat-dot" style={{ background: '#818cf8' }} />
-            <strong>{stats.newLeads}</strong> New
-          </div>
-          <div className="crm-stat">
-            <div className="crm-stat-dot" style={{ background: '#fdab3d' }} />
-            <strong>{leads.filter((l) => l.status === 'Sent E-mail').length}</strong> Emailed
+            <strong>{leads.length}</strong> Total
           </div>
           <div className="crm-stat">
             <div className="crm-stat-dot" style={{ background: '#00c875' }} />
-            <strong>{leads.filter((l) => l.status === 'Called').length}</strong> Called
+            <strong>{stats.withDeals}</strong> With Deals
           </div>
         </div>
 
@@ -546,15 +530,24 @@ export default function CrmPage() {
               <tr>
                 <SortHeader field="name" label="Contact" width={180} />
                 <SortHeader field="lead_date" label="Date" width={110} />
-                <th style={{ width: 50 }}>Call</th>
                 <SortHeader field="deals" label="Deals" width={160} />
                 <SortHeader field="no_conversion_reason" label="No Conversion Reason" width={200} />
                 <SortHeader field="department" label="Department" width={200} />
                 <SortHeader field="job_title" label="Job Title" width={140} />
-                <SortHeader field="status" label="Status" width={110} />
                 <SortHeader field="company" label="Company" width={160} />
                 <SortHeader field="email" label="Email" width={200} />
                 <SortHeader field="phone" label="Phone" width={140} />
+                <SortHeader field="delivery_location" label="Delivery Location" width={160} />
+                <SortHeader field="delivery_timeline" label="Delivery Timeline" width={150} />
+                <SortHeader field="machine_model" label="Machine Model" width={200} />
+                <SortHeader field="machine_quantity" label="Quantity" width={80} />
+                <SortHeader field="location_type" label="Location Type" width={160} />
+                <SortHeader field="end_user_or_supplier" label="End User / Supplier" width={160} />
+                <SortHeader field="valuable_features" label="Valuable Features" width={220} />
+                <SortHeader field="challenges" label="Challenges" width={200} />
+                <SortHeader field="preferred_contact" label="Preferred Contact" width={140} />
+                <SortHeader field="how_heard" label="How Heard" width={140} />
+                <SortHeader field="additional_info" label="Additional Info" width={200} />
               </tr>
             </thead>
             <tbody>
@@ -566,17 +559,6 @@ export default function CrmPage() {
                 >
                   <td style={{ fontWeight: 600, color: '#e0e0e6' }}>{lead.name}</td>
                   <td>{formatDate(lead.lead_date)}</td>
-                  <td>
-                    <div
-                      className={`crm-call-check ${lead.call ? 'checked' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateLead(lead.id, { call: !lead.call });
-                      }}
-                    >
-                      {lead.call && <Check size={10} color="#fff" strokeWidth={3} />}
-                    </div>
-                  </td>
                   <td>{lead.deals || '—'}</td>
                   <td>
                     {lead.no_conversion_reason ? (
@@ -593,14 +575,20 @@ export default function CrmPage() {
                     ) : '—'}
                   </td>
                   <td>{lead.job_title || '—'}</td>
-                  <td>
-                    <span className={`crm-status ${getStatusClass(lead.status)}`}>
-                      {lead.status}
-                    </span>
-                  </td>
                   <td>{lead.company || '—'}</td>
                   <td>{lead.email || '—'}</td>
                   <td>{lead.phone || '—'}</td>
+                  <td>{lead.delivery_location || '—'}</td>
+                  <td>{lead.delivery_timeline || '—'}</td>
+                  <td>{lead.machine_model || '—'}</td>
+                  <td>{lead.machine_quantity || '—'}</td>
+                  <td>{lead.location_type || '—'}</td>
+                  <td>{lead.end_user_or_supplier || '—'}</td>
+                  <td>{lead.valuable_features || '—'}</td>
+                  <td>{lead.challenges || '—'}</td>
+                  <td>{lead.preferred_contact || '—'}</td>
+                  <td>{lead.how_heard || '—'}</td>
+                  <td>{lead.additional_info || '—'}</td>
                 </tr>
               ))}
             </tbody>
