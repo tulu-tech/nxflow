@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Task } from '@/lib/types';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useUIStore } from '@/store/uiStore';
@@ -11,8 +11,10 @@ interface Props {
 
 export function TaskNameCell({ task }: Props) {
   const { updateTaskName } = useWorkspaceStore();
-  const subtasks = useWorkspaceStore((s) =>
-    Object.values(s.subtasks).filter((st) => st.taskId === task.id)
+  const allSubtasks = useWorkspaceStore((s) => s.subtasks);
+  const subtasks = useMemo(
+    () => Object.values(allSubtasks).filter((st) => st.taskId === task.id),
+    [allSubtasks, task.id]
   );
   const expandedTaskIds = useUIStore((s) => s.expandedTaskIds);
   const toggleTaskExpanded = useUIStore((s) => s.toggleTaskExpanded);
