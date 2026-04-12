@@ -12,13 +12,15 @@ import {
   Search,
   Zap,
   X,
+  LogOut,
 } from 'lucide-react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useUIStore } from '@/store/uiStore';
+import { createClient } from '@/lib/supabase/client';
 
 export function Sidebar() {
   const router = useRouter();
-  const { workspaces, boards, activeWorkspaceId, activeBoardId, setActiveBoard, addBoard } =
+  const { workspaces, boards, activeWorkspaceId, activeBoardId, setActiveBoard, addBoard, currentUser } =
     useWorkspaceStore();
   const setSearch = useUIStore((s) => s.setSearch);
   const [workspaceExpanded, setWorkspaceExpanded] = useState(true);
@@ -32,6 +34,13 @@ export function Sidebar() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const workspace = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
   const workspaceBoards = workspace ? workspace.boardIds.map((id) => boards[id]).filter(Boolean) : [];
 
   // Keyboard shortcut ⌘K for search
@@ -269,17 +278,26 @@ export function Sidebar() {
           <div
             style={{
               width: 26, height: 26, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: currentUser?.avatarColor ? `linear-gradient(135deg, ${currentUser.avatarColor}, ${currentUser.avatarColor}99)` : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0,
             }}
           >
-            ME
+            {currentUser?.initials ?? 'ME'}
           </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>My Account</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>me@alba.com</div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser?.name ?? 'My Account'}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser?.email ?? ''}</div>
           </div>
+          <button
+            onClick={handleLogout}
+            title="Çıkış yap"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 4, flexShrink: 0 }}
+            onMouseOver={(e) => (e.currentTarget.style.color = '#f87171')}
+            onMouseOut={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+          >
+            <LogOut size={13} />
+          </button>
         </div>
       </div>
 
@@ -392,7 +410,6 @@ export function Sidebar() {
             <button
               onClick={() => {
                 if (typeof window !== 'undefined') {
-                  localStorage.removeItem('nxflow-workspace');
                   window.location.reload();
                 }
               }}
