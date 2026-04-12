@@ -18,6 +18,7 @@ import { useWorkspaceStore } from '@/store/workspaceStore';
 import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase/client';
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, DbNotification } from '@/lib/supabase/queries';
 
 export function Sidebar() {
   const router = useRouter();
@@ -31,12 +32,44 @@ export function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<{id: string; message: string; created_at: string; read: boolean}[]>([]);
+  const [notifications, setNotifications] = useState<DbNotification[]>([]);
 
   const currentUser = useAuthStore((s) => s.currentUser);
   const logout = useAuthStore((s) => s.logout);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch notifications on mount + poll every 30s
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    const load = async () => {
+      const data = await fetchNotifications(currentUser.id);
+      setNotifications(data);
+    };
+
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
+
+  // Reload notifications when panel opens
+  useEffect(() => {
+    if (showNotifications && currentUser?.id) {
+      fetchNotifications(currentUser.id).then(setNotifications);
+    }
+  }, [showNotifications, currentUser?.id]);
+
+  const handleMarkRead = async (id: string) => {
+    await markNotificationRead(id);
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!currentUser?.id) return;
+    await markAllNotificationsRead(currentUser.id);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
 
   const workspace = activeWorkspaceId ? workspaces[activeWorkspaceId] : null;
   const workspaceBoards = workspace ? workspace.boardIds.map((id) => boards[id]).filter(Boolean) : [];
@@ -348,6 +381,19 @@ export function Sidebar() {
       {/* ═══ Notifications Modal ═══ */}
       <Modal open={showNotifications} onClose={() => setShowNotifications(false)} title="Notifications">
         <div style={{ padding: 16 }}>
+          {notifications.length > 0 && notifications.some(n => !n.read) && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+              <button
+                onClick={handleMarkAllRead}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 11, color: '#818cf8', fontWeight: 600,
+                }}
+              >
+                Mark all as read
+              </button>
+            </div>
+          )}
           {notifications.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
               <Bell size={32} color="var(--text-muted)" style={{ marginBottom: 12, opacity: 0.4 }} />
@@ -357,32 +403,37 @@ export function Sidebar() {
               </div>
             </div>
           ) : (
-            notifications.map((notif) => (
-              <div
-                key={notif.id}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 8px',
-                  borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer',
-                  background: notif.read ? 'transparent' : 'rgba(99,102,241,0.05)',
-                  borderRadius: 6,
-                }}
-              >
-                <div style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: notif.read ? 'transparent' : '#6366f1',
-                  flexShrink: 0, marginTop: 5,
-                  border: notif.read ? '1px solid var(--border-default)' : 'none',
-                }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                    {notif.message}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                    {new Date(notif.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+              {notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  onClick={() => { if (!notif.read) handleMarkRead(notif.id); }}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 8px',
+                    borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer',
+                    background: notif.read ? 'transparent' : 'rgba(99,102,241,0.05)',
+                    borderRadius: 6, transition: 'background 0.15s',
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                  onMouseOut={(e) => (e.currentTarget.style.background = notif.read ? 'transparent' : 'rgba(99,102,241,0.05)')}
+                >
+                  <div style={{
+                    width: 8, height: 8, borderRadius: '50%',
+                    background: notif.read ? 'transparent' : '#6366f1',
+                    flexShrink: 0, marginTop: 5,
+                    border: notif.read ? '1px solid var(--border-default)' : 'none',
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                      {notif.message}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                      {new Date(notif.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </Modal>

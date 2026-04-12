@@ -18,6 +18,7 @@ import {
   deleteSubtaskDb,
   mapTask,
   mapGroup,
+  createNotification,
   mapBoard,
   mapSubtask,
 } from '../lib/supabase/queries';
@@ -306,8 +307,41 @@ export const useWorkspaceStore = create<WorkspaceStore>()((set, get) => ({
   },
 
   updateTaskCell: (taskId, columnId, value) => {
-    const task = get().tasks[taskId];
+    const state = get();
+    const task = state.tasks[taskId];
     if (!task) return;
+
+    // Detect assignee changes and send notifications
+    if (columnId === 'assignee' && value && typeof value === 'object' && 'userIds' in value) {
+      const oldCell = task.cells.assignee;
+      const oldUserIds: string[] = (oldCell && typeof oldCell === 'object' && 'userIds' in oldCell)
+        ? (oldCell as { userIds: string[] }).userIds
+        : [];
+      const newUserIds: string[] = (value as { userIds: string[] }).userIds || [];
+
+      // Find newly added users
+      const addedUsers = newUserIds.filter(uid => !oldUserIds.includes(uid));
+
+      // Get current user (who is doing the assigning)
+      const { useAuthStore } = require('@/store/authStore');
+      const currentUser = useAuthStore.getState().currentUser;
+      const assignerName = currentUser?.name || 'Someone';
+      const users = state.users;
+
+      addedUsers.forEach(uid => {
+        if (uid !== currentUser?.id) {
+          const assignedUser = users[uid];
+          if (assignedUser) {
+            createNotification(
+              uid,
+              `${assignerName} assigned you to "${task.name}"`,
+              { type: 'assignment', taskId: task.id }
+            );
+          }
+        }
+      });
+    }
+
     const newCells = { ...task.cells, [columnId]: value };
     set((s) => ({
       tasks: {

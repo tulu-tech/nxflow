@@ -270,3 +270,57 @@ export async function deleteSubtaskDb(id: string) {
   const { error } = await supabase.from('subtasks').delete().eq('id', id);
   if (error) console.error('[Supabase] deleteSubtask:', error);
 }
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export interface DbNotification {
+  id: string;
+  user_id: string;
+  message: string;
+  type: string;
+  task_id: string | null;
+  board_id: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export async function fetchNotifications(userId: string): Promise<DbNotification[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) { console.error('[Supabase] fetchNotifications:', error); return []; }
+  return (data || []) as DbNotification[];
+}
+
+export async function createNotification(
+  userId: string,
+  message: string,
+  opts?: { type?: string; taskId?: string; boardId?: string }
+) {
+  const { error } = await supabase.from('notifications').insert({
+    user_id: userId,
+    message,
+    type: opts?.type || 'assignment',
+    task_id: opts?.taskId || null,
+    board_id: opts?.boardId || null,
+  });
+  if (error) console.error('[Supabase] createNotification:', error);
+}
+
+export async function markNotificationRead(id: string) {
+  const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+  if (error) console.error('[Supabase] markNotificationRead:', error);
+}
+
+export async function markAllNotificationsRead(userId: string) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', userId)
+    .eq('read', false);
+  if (error) console.error('[Supabase] markAllNotificationsRead:', error);
+}
