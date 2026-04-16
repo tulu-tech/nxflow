@@ -1,0 +1,121 @@
+import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+
+async function mailchimpRequest(
+  serverPrefix: string,
+  apiKey: string,
+  path: string,
+  method: string,
+  body?: unknown
+) {
+  const url = `https://${serverPrefix}.api.mailchimp.com/3.0${path}`
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Basic ${Buffer.from(`anystring:${apiKey}`).toString("base64")}`,
+      "Content-Type": "application/json",
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  })
+  return res
+}
+
+export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("mailchimp_api_key, mailchimp_server_prefix")
+    .eq("id", user.id)
+    .single()
+
+  const { name, subject, body } = await req.json()
+
+  if (!name?.trim()) return NextResponse.json({ error: "Campaign name required" }, { status: 400 })
+
+  // If Mailchimp not configured, save as draft in DB only
+  if (!profile?.mailchimp_api_key || !profile?.mailchimp_server_prefix) {
+    const { data: campaign } = await supabase
+      .from("email_campaigns")
+      .insert({ user_id: user.id, name, subject, body, status: "draft", recipient_count: 0 })
+      .select()
+      .single()
+    return NextResponse.json({ campaign, warning: "Mailchimp not configured — saved as local draft." })
+  }
+
+  // Fetch the first available Mailchimp audience/list
+  const listsRes = await mailchimpRequest(
+    profile.mailchimp_server_prefix,
+    profile.mailchimp_api_key,
+    "/lists?count=1",
+    "GET"
+  )
+
+  let listId: string | null = null
+  if (listsRes.ok) {
+    const listsData = await listsRes.json()
+    listId = listsData.lists?.[0]?.id ?? null
+  }
+
+  if (!listId) {
+    return NextResponse.json(
+      { error: "No Mailchimp audience found. Create an audience at mailchimp.com first." },
+      { status: 400 }
+    )
+  }
+
+  // Create campaign in Mailchimp — with recipients list assigned
+  const createRes = await mailchimpRequest(
+    profile.mailchimp_server_prefix,
+    profile.mailchimp_api_key,
+    "/campaigns",
+    "POST",
+    {
+      type: "regular",
+      recipients: { list_id: listId },
+      settings: {
+        subject_line: subject ?? name,
+        title: name,
+        from_name: "Alba Collective",
+        reply_to: user.email,
+      },
+    }
+  )
+
+  if (!createRes.ok) {
+    const err = await createRes.json()
+    return NextResponse.json({ error: err.detail ?? "Mailchimp campaign creation failed" }, { status: 400 })
+  }
+
+  const mcCampaign = await createRes.json()
+
+  // Set campaign content
+  if (body) {
+    await mailchimpRequest(
+      profile.mailchimp_server_prefix,
+      profile.mailchimp_api_key,
+      `/campaigns/${mcCampaign.id}/content`,
+      "PUT",
+      { html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">${body.replace(/\n/g, "<br>")}</div>` }
+    )
+  }
+
+  // Save to DB
+  const { data: campaign } = await supabase
+    .from("email_campaigns")
+    .insert({
+      user_id: user.id,
+      name,
+      subject,
+      body,
+      mailchimp_campaign_id: mcCampaign.id,
+      status: "draft",
+      recipient_count: 0,
+    })
+    .select()
+    .single()
+
+  return NextResponse.json({ campaign })
+}
