@@ -202,19 +202,19 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-5">
+    <div className="p-6 max-w-5xl mx-auto space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Manage your account and integrations</p>
       </div>
 
-      <Tabs defaultValue="profile">
-        <TabsList className="h-9 flex-wrap">
-          <TabsTrigger value="profile" className="text-sm gap-1.5"><User className="h-3.5 w-3.5" /> Profile</TabsTrigger>
-          <TabsTrigger value="api" className="text-sm gap-1.5"><Key className="h-3.5 w-3.5" /> API & Credits</TabsTrigger>
-          <TabsTrigger value="scoring" className="text-sm gap-1.5"><BrainCircuit className="h-3.5 w-3.5" /> Scoring</TabsTrigger>
-          <TabsTrigger value="appearance" className="text-sm gap-1.5"><Palette className="h-3.5 w-3.5" /> Appearance</TabsTrigger>
-          <TabsTrigger value="password" className="text-sm gap-1.5"><Lock className="h-3.5 w-3.5" /> Password</TabsTrigger>
+      <Tabs defaultValue="profile" className="flex-col">
+        <TabsList className="h-10 w-full overflow-x-auto flex-nowrap justify-start">
+          <TabsTrigger value="profile" className="gap-1.5 shrink-0"><User className="h-4 w-4" /> Profile</TabsTrigger>
+          <TabsTrigger value="api" className="gap-1.5 shrink-0"><Key className="h-4 w-4" /> API & Credits</TabsTrigger>
+          <TabsTrigger value="scoring" className="gap-1.5 shrink-0"><BrainCircuit className="h-4 w-4" /> Scoring</TabsTrigger>
+          <TabsTrigger value="appearance" className="gap-1.5 shrink-0"><Palette className="h-4 w-4" /> Appearance</TabsTrigger>
+          <TabsTrigger value="password" className="gap-1.5 shrink-0"><Lock className="h-4 w-4" /> Password</TabsTrigger>
         </TabsList>
 
         {/* Profile */}

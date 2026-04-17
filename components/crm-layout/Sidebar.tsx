@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   Search,
@@ -10,15 +10,23 @@ import {
   MessageSquare,
   Settings,
   LogOut,
-  ChevronRight,
   GitBranch,
+  ArrowLeft,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback } from "@/components/ui-crm/avatar"
 
-const NAV_SECTIONS = [
+interface NavItem {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+}
+
+interface NavSection {
+  label: string | null
+  items: NavItem[]
+}
+
+const NAV_SECTIONS: NavSection[] = [
   {
     label: null,
     items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
@@ -65,73 +73,216 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
     : userEmail?.[0]?.toUpperCase() ?? "A"
 
   return (
-    <div className="flex h-full w-60 flex-col bg-sidebar text-sidebar-foreground">
+    <aside
+      style={{
+        width: "220px",
+        flexShrink: 0,
+        background: "var(--bg-base)",
+        borderRight: "1px solid var(--border-subtle)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        height: "100%",
+      }}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-5 border-b border-sidebar-border">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-          <ChevronRight className="h-4 w-4 text-white" strokeWidth={2.5} />
+      <div
+        style={{
+          padding: "14px 16px 10px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          borderBottom: "1px solid var(--border-subtle)",
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 7,
+            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Target size={14} color="#fff" strokeWidth={2.5} />
         </div>
-        <div>
-          <p className="text-sm font-semibold leading-tight text-sidebar-foreground">Alba Collective</p>
-          <p className="text-[10px] text-sidebar-foreground/50 leading-tight">CRM</p>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 13.5,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.2px",
+              lineHeight: 1.2,
+            }}
+          >
+            Alba Collective
+          </div>
+          <div
+            style={{
+              fontSize: 10,
+              color: "var(--text-muted)",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              lineHeight: 1.3,
+            }}
+          >
+            CRM
+          </div>
         </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+      {/* Back link */}
+      <div style={{ padding: "6px 8px 2px" }}>
+        <div
+          className="sidebar-item"
+          onClick={() => router.push("/")}
+          style={{ gap: 8, color: "var(--text-muted)", fontSize: 12 }}
+        >
+          <ArrowLeft size={13} />
+          <span>Back to NXFlow</span>
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: "var(--border-subtle)", margin: "4px 0" }} />
+
+      {/* Nav sections */}
+      <div style={{ flex: 1, overflow: "auto", padding: "8px 8px" }}>
         {NAV_SECTIONS.map((section, si) => (
-          <div key={si}>
+          <div key={si} style={{ marginBottom: section.label ? 14 : 6 }}>
             {section.label && (
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+              <div
+                style={{
+                  padding: "4px 10px 6px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "var(--text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}
+              >
                 {section.label}
-              </p>
+              </div>
             )}
-            <ul className="space-y-0.5">
-              {section.items.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(item.href + "/")
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
-                        active
-                          ? "bg-sidebar-accent text-sidebar-foreground font-medium"
-                          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
-                      )}
+            {section.items.map((item) => {
+              const active =
+                pathname === item.href || pathname.startsWith(item.href + "/")
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  style={{ textDecoration: "none" }}
+                >
+                  <div
+                    className={`sidebar-item${active ? " active" : ""}`}
+                    style={{ gap: 8 }}
+                  >
+                    <Icon size={14} style={{ flexShrink: 0 }} />
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
                     >
-                      <item.icon className="h-4 w-4 shrink-0" />
                       {item.label}
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
+                    </span>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         ))}
-      </nav>
+      </div>
 
       {/* User footer */}
-      <div className="border-t border-sidebar-border px-3 py-3">
-        <div className="flex items-center gap-2.5">
-          <Avatar className="h-7 w-7">
-            <AvatarFallback className="bg-primary text-xs text-white">{initials}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-sidebar-foreground truncate">{userName || userEmail}</p>
-            {userName && (
-              <p className="text-[10px] text-sidebar-foreground/50 truncate">{userEmail}</p>
+      <div
+        style={{
+          borderTop: "1px solid var(--border-subtle)",
+          padding: "8px",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 10px",
+          }}
+        >
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10,
+              fontWeight: 700,
+              color: "#fff",
+              flexShrink: 0,
+            }}
+          >
+            {initials}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {userName || userEmail || "User"}
+            </div>
+            {userName && userEmail && (
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "var(--text-muted)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {userEmail}
+              </div>
             )}
           </div>
           <button
             onClick={handleLogout}
-            className="text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors"
             title="Sign out"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--text-muted)",
+              padding: 2,
+              borderRadius: 4,
+              display: "flex",
+              alignItems: "center",
+              transition: "color 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#e2445c"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--text-muted)"
+            }}
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut size={13} />
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   )
 }

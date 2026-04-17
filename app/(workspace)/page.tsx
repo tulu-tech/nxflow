@@ -42,6 +42,16 @@ export default function HomePage() {
       stats: 'Lead Pipeline',
       onClick: () => router.push('/crm'),
     },
+    {
+      id: 'batuhan-crm',
+      name: "Batuhan's CRM",
+      desc: 'Prospecting, leadboard, sequences, AI scoring & email outreach.',
+      gradient: 'linear-gradient(135deg, #e11d48, #f43f5e)',
+      shadow: 'rgba(225,29,72,0.3)',
+      icon: '🎯',
+      stats: 'Alba Collective',
+      onClick: () => router.push('/dashboard'),
+    },
   ];
 
   return (
@@ -77,8 +87,8 @@ export default function HomePage() {
 
       {/* Product Cards */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 20, maxWidth: 900, width: '100%',
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 20, maxWidth: 1200, width: '100%',
       }}>
         {products.map((p) => (
           <div
@@ -150,7 +160,7 @@ export default function HomePage() {
         marginTop: 40, display: 'flex', gap: 32,
         fontSize: 12, color: 'var(--text-muted)',
       }}>
-        <span>🚀 3 products</span>
+        <span>🚀 4 products</span>
         <span>📊 {workspaceBoards.length} boards</span>
         <span>🌐 nxflow.app</span>
       </div>

@@ -220,6 +220,21 @@ export function Sidebar() {
           </div>
           <span>CRM</span>
         </div>
+        <div
+          className="sidebar-item"
+          onClick={() => router.push('/dashboard')}
+          style={{ gap: 8 }}
+        >
+          <div style={{
+            width: 18, height: 18, borderRadius: 4,
+            background: 'linear-gradient(135deg, #e11d48, #f43f5e)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 9, fontWeight: 800, color: '#fff', flexShrink: 0,
+          }}>
+            🎯
+          </div>
+          <span>Batuhan&apos;s CRM</span>
+        </div>
       </div>
 
       <div style={{ height: 1, background: 'var(--border-subtle)', margin: '2px 0' }} />

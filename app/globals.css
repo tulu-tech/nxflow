@@ -76,7 +76,7 @@
 html, body {
   height: 100%;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 13px;
+  font-size: 14.5px;
   background-color: var(--bg-base);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -253,38 +253,38 @@ html, body {
   opacity: 1 !important;
 }
 
-/* ── CRM dark-mode palette (always active in nxflow) ─── */
+/* ── CRM shadcn palette → nxflow hex paletine bağlı (tek kaynak, tutarlı renkler) ─── */
 :root {
-  --background: oklch(0.09 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.13 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.13 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.6 0.22 274.5);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.18 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.18 0 0);
-  --muted-foreground: oklch(0.55 0 0);
-  --accent: oklch(0.20 0.04 274.5);
-  --accent-foreground: oklch(0.7 0.18 274.5);
-  --destructive: oklch(0.65 0.22 27.325);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.6 0.22 274.5);
-  --chart-1: oklch(0.6 0.22 274.5);
-  --chart-2: oklch(0.5 0.15 274.5);
-  --chart-3: oklch(0.4 0.10 274.5);
-  --chart-4: oklch(0.3 0.06 274.5);
-  --chart-5: oklch(0.22 0.03 274.5);
-  --sidebar: oklch(0.07 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.6 0.22 274.5);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.13 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.16 0 0);
-  --sidebar-ring: oklch(0.6 0.22 274.5);
+  --background: #0f0f13;           /* nxflow --bg-base */
+  --foreground: #e8e8f0;           /* nxflow --text-primary */
+  --card: #16161d;                 /* nxflow --bg-surface */
+  --card-foreground: #e8e8f0;
+  --popover: #1c1c26;              /* nxflow --bg-elevated */
+  --popover-foreground: #e8e8f0;
+  --primary: #6366f1;              /* nxflow --accent-primary */
+  --primary-foreground: #ffffff;
+  --secondary: #1c1c26;            /* bg-elevated */
+  --secondary-foreground: #e8e8f0;
+  --muted: #1c1c26;
+  --muted-foreground: #9898b0;     /* nxflow --text-secondary */
+  --accent: #22222f;               /* nxflow --bg-hover */
+  --accent-foreground: #818cf8;    /* nxflow --text-accent */
+  --destructive: #e2445c;          /* nxflow red */
+  --border: #2e2e42;               /* nxflow --border-default */
+  --input: #2e2e42;
+  --ring: #6366f1;
+  --chart-1: #6366f1;
+  --chart-2: #8b5cf6;
+  --chart-3: #a358df;
+  --chart-4: #818cf8;
+  --chart-5: #4f52d8;
+  --sidebar: #0f0f13;              /* bg-base */
+  --sidebar-foreground: #e8e8f0;
+  --sidebar-primary: #6366f1;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2a2a3a;       /* nxflow --bg-active */
+  --sidebar-accent-foreground: #e8e8f0;
+  --sidebar-border: #252535;       /* nxflow --border-subtle */
+  --sidebar-ring: #6366f1;
   --radius: 0.5rem;
 }

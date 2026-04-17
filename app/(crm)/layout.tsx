@@ -17,14 +17,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .single()
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <aside className="hidden md:flex shrink-0">
-        <Sidebar
-          userEmail={user.email}
-          userName={profile?.full_name ?? undefined}
-        />
-      </aside>
-      <main className="flex-1 overflow-y-auto bg-background">
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        overflow: "hidden",
+        background: "var(--bg-base)",
+      }}
+    >
+      <Sidebar
+        userEmail={user.email}
+        userName={profile?.full_name ?? undefined}
+      />
+      <main
+        style={{
+          flex: 1,
+          overflow: "auto",
+          background: "var(--bg-surface)",
+        }}
+      >
         {children}
       </main>
     </div>

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
-import { ChevronRight, Loader2 } from "lucide-react"
+import { Zap, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -41,12 +41,18 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-8">
         {/* Logo */}
         <div className="text-center space-y-3">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <ChevronRight className="h-6 w-6 text-white" strokeWidth={2.5} />
+          <div
+            className="inline-flex h-14 w-14 items-center justify-center rounded-[18px]"
+            style={{
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              boxShadow: "0 12px 32px rgba(99,102,241,0.35)",
+            }}
+          >
+            <Zap className="h-6 w-6 text-white" strokeWidth={2.5} />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Alba Collective CRM</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Sign in to your workspace</p>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Alba Collective CRM</h1>
+            <p className="text-sm text-muted-foreground mt-1">Sign in to your workspace</p>
           </div>
         </div>
 

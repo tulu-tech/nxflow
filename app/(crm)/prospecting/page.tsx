@@ -7,7 +7,6 @@ import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
 import { Badge } from "@/components/ui-crm/badge"
 import { Card, CardContent } from "@/components/ui-crm/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui-crm/select"
 import { Checkbox } from "@/components/ui-crm/checkbox"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui-crm/avatar"
 import { Separator } from "@/components/ui-crm/separator"
@@ -32,20 +31,6 @@ const COMMON_JOB_TITLES = [
   "Content Marketing Manager","Digital Marketing Manager","Social Media Manager",
   "SEO Manager","Performance Marketing Manager","Demand Generation Manager",
   "Partnership Manager","Customer Success Manager","Account Executive",
-]
-
-const COMMON_TECHNOLOGIES = [
-  "Salesforce","HubSpot","Marketo","Pardot","Eloqua",
-  "React","Angular","Vue.js","Next.js","Node.js","TypeScript","Python","Java","Go","Ruby",
-  "AWS","Google Cloud","Azure","Kubernetes","Docker","Terraform",
-  "Snowflake","Databricks","dbt","Looker","Tableau","Power BI",
-  "Stripe","Twilio","Segment","Amplitude","Mixpanel","Intercom","Zendesk",
-  "Shopify","Magento","WooCommerce","BigCommerce",
-  "WordPress","Webflow","Contentful","Sanity",
-  "Slack","Notion","Asana","Jira","Confluence","Linear",
-  "GitHub","GitLab","Bitbucket","Jenkins","CircleCI",
-  "MySQL","PostgreSQL","MongoDB","Redis","Elasticsearch",
-  "Figma","Sketch","Adobe Creative Suite","InVision",
 ]
 
 // ── Lusha filter taxonomy ────────────────────────────────────────────────────
@@ -142,6 +127,10 @@ const EMPTY_FILTERS: LushaSearchFilters = {
   companyName: "", companyDomain: "", companySize: "",
   technologies: "", companyCountry: "",
 }
+
+// Helper: turn {label, value}[] into string[] for FilterCombobox
+const COMPANY_SIZE_LABELS = COMPANY_SIZES.map((s) => s.label)
+const SENIORITY_LABELS = SENIORITY_LEVELS.map((s) => s.label)
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -378,13 +367,13 @@ export default function ProspectingPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Seniority</Label>
-                  <Select value={filters.seniority ?? ""} onValueChange={(v) => set("seniority", v === "any" ? "" : v)}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Any seniority" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">Any seniority</SelectItem>
-                      {SENIORITY_LEVELS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <FilterCombobox
+                    options={SENIORITY_LABELS}
+                    value={filters.seniority ?? ""}
+                    onChange={(v) => set("seniority", v)}
+                    placeholder="Any seniority"
+                    multi
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Department</Label>
@@ -393,6 +382,7 @@ export default function ProspectingPage() {
                     value={filters.departments ?? ""}
                     onChange={(v) => set("departments", v)}
                     placeholder="Any department"
+                    multi
                   />
                 </div>
                 <div className="space-y-1.5 col-span-2 lg:col-span-3">
@@ -432,6 +422,7 @@ export default function ProspectingPage() {
                     value={filters.country ?? ""}
                     onChange={(v) => set("country", v)}
                     placeholder="e.g. United States"
+                    multi
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -464,21 +455,11 @@ export default function ProspectingPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Company Size</Label>
-                  <Select value={filters.companySize ?? ""} onValueChange={(v) => set("companySize", v === "any" ? "" : v)}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Any size" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="any">Any size</SelectItem>
-                      {COMPANY_SIZES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Technologies Used</Label>
                   <FilterCombobox
-                    options={COMMON_TECHNOLOGIES}
-                    value={filters.technologies ?? ""}
-                    onChange={(v) => set("technologies", v)}
-                    placeholder="React, AWS, Salesforce, …"
+                    options={COMPANY_SIZE_LABELS}
+                    value={filters.companySize ?? ""}
+                    onChange={(v) => set("companySize", v)}
+                    placeholder="Any size"
                     multi
                   />
                 </div>
@@ -489,6 +470,7 @@ export default function ProspectingPage() {
                     value={filters.companyCountry ?? ""}
                     onChange={(v) => set("companyCountry", v)}
                     placeholder="e.g. Japan"
+                    multi
                   />
                 </div>
               </div>
