@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
@@ -14,7 +15,7 @@ import { FilterCombobox } from "@/components/ui-crm/filter-combobox"
 import {
   Search, Loader2, Mail, ChevronDown, ChevronUp, Target, Zap,
   ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, Building2,
-  MapPin, Briefcase, Users, Filter, X, Phone, Globe,
+  MapPin, Briefcase, Users, Filter, X, Phone, Globe, Bookmark, BookmarkPlus,
 } from "lucide-react"
 import type { LushaContact, LushaSearchFilters } from "@/types"
 
@@ -136,6 +137,8 @@ const SENIORITY_LABELS = SENIORITY_LEVELS.map((s) => s.label)
 
 export default function ProspectingPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   const [filters, setFilters] = useState<LushaSearchFilters>(EMPTY_FILTERS)
   const [filtersOpen, setFiltersOpen] = useState(true)
@@ -148,6 +151,11 @@ export default function ProspectingPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentRequestId, setCurrentRequestId] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+
+  // Saved searches state
+  const [loadedSavedName, setLoadedSavedName] = useState<string | null>(null)
+  const [savingSearch, setSavingSearch] = useState(false)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
 
   // Per-card state
   const [fetchingEmail, setFetchingEmail] = useState<Record<string, boolean>>({})
@@ -171,6 +179,50 @@ export default function ProspectingPage() {
         })
     })
   }, [])
+
+  // Load saved search from ?saved=<id> query
+  useEffect(() => {
+    const savedId = searchParams.get("saved")
+    if (!savedId) return
+    fetch("/api/saved-searches").then((r) => r.json()).then((list) => {
+      const found = (list as Array<{ id: string; name: string; filters: LushaSearchFilters }>)
+        .find((s) => s.id === savedId)
+      if (found) {
+        setFilters({ ...EMPTY_FILTERS, ...found.filters })
+        setLoadedSavedName(found.name)
+      }
+    }).catch(() => { /* ignore */ })
+  }, [searchParams])
+
+  async function handleSaveSearch() {
+    const name = window.prompt("Name this search (e.g. 'Tech CMOs in US'):", loadedSavedName ?? "")
+    if (!name?.trim()) return
+    setSavingSearch(true)
+    setSaveMsg(null)
+    try {
+      const res = await fetch("/api/saved-searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), filters }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setLoadedSavedName(name.trim())
+      setSaveMsg("Saved ✓")
+      setTimeout(() => setSaveMsg(null), 2500)
+    } catch (e) {
+      setSaveMsg("Save failed: " + (e as Error).message)
+      setTimeout(() => setSaveMsg(null), 4000)
+    } finally {
+      setSavingSearch(false)
+    }
+  }
+
+  function handleClearSaved() {
+    setFilters(EMPTY_FILTERS)
+    setLoadedSavedName(null)
+    // Remove ?saved= from URL
+    router.replace("/prospecting")
+  }
 
   const set = (key: keyof LushaSearchFilters, value: unknown) =>
     setFilters((f) => ({ ...f, [key]: value }))
@@ -284,7 +336,22 @@ export default function ProspectingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Prospecting</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Search Lusha's 100M+ B2B contact database</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Search Lusha's 100M+ B2B contact database
+            {loadedSavedName && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-primary">
+                <Bookmark className="h-3 w-3" />
+                Loaded: <b>{loadedSavedName}</b>
+                <button
+                  onClick={handleClearSaved}
+                  className="ml-1 hover:text-destructive"
+                  title="Clear filters"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {(searchCredits !== null || emailCredits !== null) && (
@@ -476,13 +543,29 @@ export default function ProspectingPage() {
               </div>
             </div>
 
-            {/* Search button */}
+            {/* Search + Save buttons */}
             <div className="flex items-center justify-between pt-1">
-              <p className="text-xs text-muted-foreground">At least one filter is required to search</p>
-              <Button onClick={() => search(1)} disabled={searching} className="gap-2 px-6">
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {searching ? "Searching…" : "Search Lusha"}
-              </Button>
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-muted-foreground">At least one filter is required to search</p>
+                {saveMsg && (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400">{saveMsg}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleSaveSearch}
+                  disabled={savingSearch || activeFilterCount === 0}
+                  className="gap-1.5"
+                >
+                  {savingSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookmarkPlus className="h-4 w-4" />}
+                  {loadedSavedName ? "Update Saved" : "Save Search"}
+                </Button>
+                <Button onClick={() => search(1)} disabled={searching} className="gap-2 px-6">
+                  {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  {searching ? "Searching…" : "Search Lusha"}
+                </Button>
+              </div>
             </div>
           </div>
         )}

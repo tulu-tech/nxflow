@@ -12,6 +12,7 @@ import {
   LogOut,
   GitBranch,
   ArrowLeft,
+  Bookmark,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -35,6 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Prospecting",
     items: [
       { href: "/prospecting", label: "Prospecting", icon: Search },
+      { href: "/saved-searches", label: "Saved Searches", icon: Bookmark },
       { href: "/leadboard", label: "Leadboard", icon: Target },
     ],
   },
