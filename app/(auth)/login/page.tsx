@@ -2,9 +2,10 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useAuthStore, SUPABASE_PASSWORDS } from "@/store/authStore"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
@@ -13,11 +14,48 @@ import { Zap, Loader2 } from "lucide-react"
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
+  const currentUser = useAuthStore((s) => s.currentUser)
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [autoSigningIn, setAutoSigningIn] = useState(false)
+
+  // Auto sign-in fallback: if the user already has an nxflow PIN session
+  // and their Supabase password is mapped, sign them in silently and
+  // bounce to /dashboard. This catches the case where middleware redirected
+  // them here but they never actually needed to re-enter credentials.
+  useEffect(() => {
+    const userEmail = currentUser?.email
+    if (!userEmail) return
+    const pwd = SUPABASE_PASSWORDS[userEmail]
+    if (!pwd) return
+
+    let cancelled = false
+    setAutoSigningIn(true)
+    ;(async () => {
+      try {
+        const { data: existing } = await supabase.auth.getSession()
+        if (!existing.session) {
+          const { error } = await supabase.auth.signInWithPassword({
+            email: userEmail,
+            password: pwd,
+          })
+          if (error) throw error
+        }
+        if (cancelled) return
+        router.replace("/dashboard")
+        router.refresh()
+      } catch {
+        // Fall back to manual form
+        if (!cancelled) setAutoSigningIn(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [currentUser?.email, router, supabase])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -34,6 +72,18 @@ export default function LoginPage() {
 
     router.push("/dashboard")
     router.refresh()
+  }
+
+  // While auto-signing in, show a minimal loading state
+  if (autoSigningIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <p className="text-sm">Signing you in…</p>
+        </div>
+      </div>
+    )
   }
 
   return (
