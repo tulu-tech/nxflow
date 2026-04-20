@@ -8,7 +8,8 @@ import { createClient } from '../lib/supabase/client';
 // Populate this as each team member gets their Supabase auth account provisioned.
 // If an entry is missing for a given user, the nxflow PIN login still works,
 // but the CRM module will require a separate Supabase login.
-const SUPABASE_PASSWORDS: Record<string, string> = {
+// Exported so SupabaseProvider can re-sync the Supabase session on page load.
+export const SUPABASE_PASSWORDS: Record<string, string> = {
   'berat@alba.com': 'Berat100005!',
 };
 
@@ -92,6 +93,10 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
         currentUser: state.currentUser,
       }),
+      // NOTE: Supabase session rehydration on page load is handled by
+      // `SupabaseProvider`, which blocks rendering until the CRM session
+      // is ready. That removes the race condition where the user clicks
+      // the CRM card before signInWithPassword has set the cookie.
     }
   )
 );

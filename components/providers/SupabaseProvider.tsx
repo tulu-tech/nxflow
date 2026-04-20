@@ -2,17 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
-import { useAuthStore } from '@/store/authStore';
-import { supabase } from '@/lib/supabase/client';
+import { useAuthStore, SUPABASE_PASSWORDS } from '@/store/authStore';
+import { supabase, createClient } from '@/lib/supabase/client';
 import { LoginScreen } from '@/components/auth/LoginScreen';
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const currentUser = useAuthStore((s) => s.currentUser);
   const initialize = useWorkspaceStore((s) => s.initialize);
   const isLoading = useWorkspaceStore((s) => s.isLoading);
   const isInitialized = useWorkspaceStore((s) => s.isInitialized);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [supabaseReady, setSupabaseReady] = useState(false);
 
   // Wait for Zustand persist to rehydrate from localStorage
   useEffect(() => {
@@ -25,6 +27,43 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     }
     return unsub;
   }, []);
+
+  // After rehydration: make sure the Supabase session is in sync with the
+  // nxflow PIN session. If the user has a Supabase password mapped, ensure
+  // a Supabase session exists (create one via signInWithPassword if not).
+  // Rendering is blocked until this resolves, which prevents the CRM
+  // middleware from redirecting to /login due to a missing cookie.
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    const email = currentUser?.email;
+    const password = email ? SUPABASE_PASSWORDS[email] : undefined;
+
+    // No PIN user, or no password mapped → nothing to sync. Proceed.
+    if (!email || !password) {
+      setSupabaseReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const supaClient = createClient();
+        const { data } = await supaClient.auth.getSession();
+        if (!data.session) {
+          await supaClient.auth.signInWithPassword({ email, password });
+        }
+      } catch {
+        // Silent — nxflow workspace still works without the CRM session
+      } finally {
+        if (!cancelled) setSupabaseReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasHydrated, currentUser?.email]);
 
   // Initialize data from Supabase when authenticated
   useEffect(() => {
@@ -99,8 +138,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isInitialized]);
 
-  // Waiting for persist rehydration
-  if (!hasHydrated) {
+  // Waiting for persist rehydration + Supabase session sync
+  if (!hasHydrated || !supabaseReady) {
     return (
       <div
         style={{
