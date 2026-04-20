@@ -2,7 +2,7 @@
 
 import { ImagePrompt, GeneratedArticle, BrandIntake } from '@/lib/seo/types';
 import { useState } from 'react';
-import { Sparkles, Image, Loader2, CheckCircle2, AlertCircle, Zap } from 'lucide-react';
+import { Sparkles, Image, Loader2, CheckCircle2, Zap, Pencil, Download, ExternalLink } from 'lucide-react';
 
 interface Props {
   prompts: ImagePrompt[];
@@ -19,8 +19,9 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [generatingAll, setGeneratingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
 
-  // Step 1: Generate image plans (prompts)
   const generatePlans = async () => {
     setPlanGenerating(true);
     setError(null);
@@ -39,7 +40,6 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
     setPlanGenerating(false);
   };
 
-  // Step 2: Generate a single image
   const generateImage = async (prompt: ImagePrompt) => {
     setGeneratingIds((prev) => new Set(prev).add(prompt.id));
     try {
@@ -57,7 +57,6 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
         );
         onSetPrompts(updatedPrompts);
 
-        // Embed image into article content: replace [IMAGE: ...] marker with actual image
         if (article && onSetArticle) {
           const updatedContent = embedImageInArticle(article.content, prompt, data.imageUrl);
           if (updatedContent !== article.content) {
@@ -75,21 +74,15 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
     });
   };
 
-  // Replace [IMAGE: ...] marker in article with actual img tag
   const embedImageInArticle = (content: string, prompt: ImagePrompt, imageUrl: string): string => {
-    // Try to find [IMAGE: ...] marker matching this prompt's placement/description
     const imgMarkupMd = `![${prompt.altText}](${imageUrl})${prompt.caption ? `\n*${prompt.caption}*` : ''}`;
-
-    // Match any [IMAGE: ...] lines (take first one if multiple)
     const imageMarkerRegex = /\[IMAGE:[^\]]*\]/;
     if (imageMarkerRegex.test(content)) {
-      // Replace first unresolved marker
       return content.replace(imageMarkerRegex, imgMarkupMd);
     }
     return content;
   };
 
-  // Generate all images sequentially
   const generateAll = async () => {
     const pending = prompts.filter((p) => !p.imageUrl);
     if (pending.length === 0) return;
@@ -101,6 +94,38 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
     setGeneratingAll(false);
   };
 
+  const startEdit = (img: ImagePrompt) => {
+    setEditingId(img.id);
+    setEditDraft(img.description);
+  };
+
+  const saveEdit = (id: string) => {
+    const updated = prompts.map((p) =>
+      p.id === id ? { ...p, description: editDraft, imageUrl: undefined } : p
+    );
+    onSetPrompts(updated);
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const downloadImage = async (img: ImagePrompt) => {
+    if (!img.imageUrl) return;
+    try {
+      // Try fetch→blob for same-origin or CORS-enabled URLs
+      const res = await fetch(img.imageUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = img.fileName || `${img.id}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Fallback: open in new tab (DALL-E URLs may block cross-origin fetch)
+      window.open(img.imageUrl, '_blank');
+    }
+  };
+
   const generatedCount = prompts.filter((p) => p.imageUrl).length;
   const anyGenerating = generatingIds.size > 0 || generatingAll;
 
@@ -109,7 +134,7 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
       <div className="seo-ai-banner">
         <span className="seo-ai-banner-icon"><Image size={20} /></span>
         <div>
-          <strong>Image Generation</strong> — Plan visual assets, then generate actual images for your article. Generated images are automatically embedded into the article.
+          <strong>Image Generation</strong> — AI suggests image concepts. Edit any description before generating, then download your images.
         </div>
       </div>
 
@@ -129,7 +154,7 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
               Plan Image Concepts
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              AI analyzes your article and proposes visual assets with placement, alt text, and DALL-E prompt
+              AI proposes image concepts — you can edit any description before generating
             </div>
           </div>
         </div>
@@ -174,7 +199,7 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
                   </span>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  Generate individual images or all at once — they'll be embedded into your article automatically
+                  Edit descriptions first if needed, then generate individually or all at once
                 </div>
               </div>
               {prompts.some((p) => !p.imageUrl) && (
@@ -185,12 +210,11 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
                   style={{ flexShrink: 0 }}
                 >
                   <Zap size={14} />
-                  {generatingAll ? `Generating ${generatingIds.size}/${prompts.length - generatedCount}…` : 'Generate All'}
+                  {generatingAll ? `Generating…` : 'Generate All'}
                 </button>
               )}
             </div>
 
-            {/* Progress bar */}
             {prompts.length > 0 && (
               <div style={{ height: 4, background: 'var(--border-subtle)', borderRadius: 99, overflow: 'hidden', marginBottom: 4 }}>
                 <div style={{
@@ -209,6 +233,7 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
             {prompts.map((img) => {
               const isGenerating = generatingIds.has(img.id);
               const isDone = !!img.imageUrl;
+              const isEditing = editingId === img.id;
 
               return (
                 <div key={img.id} className="seo-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -244,7 +269,6 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
                       </div>
                     )}
 
-                    {/* Status badge */}
                     {isDone && (
                       <div style={{
                         position: 'absolute', top: 8, right: 8,
@@ -258,28 +282,83 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
                     )}
                   </div>
 
-                  {/* Info */}
+                  {/* Info + controls */}
                   <div style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>
                         {img.placement}
                       </span>
-                      {!isDone && (
-                        <button
-                          className="seo-btn seo-btn-secondary seo-btn-sm"
-                          onClick={() => generateImage(img)}
-                          disabled={isGenerating || generatingAll}
-                          style={{ flexShrink: 0, fontSize: 11 }}
-                        >
-                          {isGenerating ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={11} />}
-                          {isGenerating ? 'Generating…' : 'Generate'}
-                        </button>
-                      )}
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        {!isDone && !isEditing && (
+                          <button
+                            className="seo-btn seo-btn-ghost seo-btn-sm"
+                            onClick={() => startEdit(img)}
+                            style={{ fontSize: 11, padding: '3px 7px' }}
+                            title="Edit prompt"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                        )}
+                        {!isDone && !isEditing && (
+                          <button
+                            className="seo-btn seo-btn-secondary seo-btn-sm"
+                            onClick={() => generateImage(img)}
+                            disabled={isGenerating || generatingAll}
+                            style={{ fontSize: 11 }}
+                          >
+                            {isGenerating ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={11} />}
+                            {isGenerating ? 'Generating…' : 'Generate'}
+                          </button>
+                        )}
+                        {isDone && (
+                          <button
+                            className="seo-btn seo-btn-secondary seo-btn-sm"
+                            onClick={() => downloadImage(img)}
+                            style={{ fontSize: 11 }}
+                            title="Download image"
+                          >
+                            <Download size={11} /> PNG
+                          </button>
+                        )}
+                        {isDone && img.imageUrl && (
+                          <button
+                            className="seo-btn seo-btn-ghost seo-btn-sm"
+                            onClick={() => window.open(img.imageUrl!, '_blank')}
+                            style={{ fontSize: 11, padding: '3px 7px' }}
+                            title="Open in new tab"
+                          >
+                            <ExternalLink size={11} />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.5 }}>
-                      {img.description.length > 100 ? img.description.slice(0, 100) + '…' : img.description}
-                    </p>
+                    {/* Editable description */}
+                    {isEditing ? (
+                      <div style={{ marginBottom: 8 }}>
+                        <textarea
+                          className="seo-input"
+                          rows={3}
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          style={{ fontSize: 12, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+                          placeholder="Describe the image you want — style, subject, colors, mood…"
+                          autoFocus
+                        />
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                          <button className="seo-btn seo-btn-primary seo-btn-sm" onClick={() => saveEdit(img.id)} style={{ fontSize: 11 }}>
+                            Save
+                          </button>
+                          <button className="seo-btn seo-btn-ghost seo-btn-sm" onClick={() => setEditingId(null)} style={{ fontSize: 11 }}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.5 }}>
+                        {img.description.length > 120 ? img.description.slice(0, 120) + '…' : img.description}
+                      </p>
+                    )}
 
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <div><strong>Alt:</strong> {img.altText}</div>
@@ -304,7 +383,7 @@ export function ImageGenerator({ prompts, article, brandIntake, onSetPrompts, on
           <div className="seo-empty-state-icon">🖼️</div>
           <div className="seo-empty-state-title">No images planned yet</div>
           <div className="seo-empty-state-desc">
-            Generate image concepts based on your article content, then generate the actual images.
+            Generate image concepts — then edit descriptions to match your exact vision before generating.
           </div>
         </div>
       )}

@@ -25,8 +25,8 @@ export default function ProjectPage() {
   const {
     updateBrandIntake, setPhase, updateKeywords,
     setPrimaryKeyword, setSecondaryKeywords,
-    updateContentBrief, setWritingPrompt,
-    setGeneratedArticle, setImagePrompts,
+    setUserBriefInput, updateContentBrief, setArticleOutline,
+    setWritingPrompt, setGeneratedArticle, setImagePrompts,
     setLinkPlan, updateRevisionNotes,
   } = useSEOStore();
 
@@ -133,6 +133,8 @@ export default function ProjectPage() {
             primaryKeyword={project.primaryKeyword}
             secondaryKeywords={project.secondaryKeywords}
             keywords={project.keywords}
+            userBriefInput={project.userBriefInput ?? ''}
+            onSetUserBriefInput={(v) => setUserBriefInput(id, v)}
             onUpdateBrief={(brief) => updateContentBrief(id, brief)}
             onContinue={goNext}
             onBack={goBack}
@@ -155,10 +157,15 @@ export default function ProjectPage() {
         {viewPhase === 6 && (
           <ContentGenerator
             article={project.generatedArticle}
+            articleOutline={project.articleOutline ?? null}
             writingPrompt={project.writingPrompt}
             brief={project.contentBrief}
             brandIntake={project.brandIntake}
+            primaryKeyword={project.primaryKeyword}
+            secondaryKeywords={project.secondaryKeywords}
+            userBriefInput={project.userBriefInput ?? ''}
             onSetArticle={(article) => setGeneratedArticle(id, article)}
+            onSetOutline={(outline) => setArticleOutline(id, outline)}
             onContinue={goNext}
             onBack={goBack}
           />

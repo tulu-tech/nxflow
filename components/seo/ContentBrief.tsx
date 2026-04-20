@@ -10,12 +10,14 @@ interface Props {
   primaryKeyword: string | null;
   secondaryKeywords: string[];
   keywords: KeywordEntry[];
+  userBriefInput: string;
+  onSetUserBriefInput: (v: string) => void;
   onUpdateBrief: (brief: ContentBriefType) => void;
   onContinue: () => void;
   onBack: () => void;
 }
 
-export function ContentBrief({ brief, brandIntake, primaryKeyword, secondaryKeywords, keywords, onUpdateBrief, onContinue, onBack }: Props) {
+export function ContentBrief({ brief, brandIntake, primaryKeyword, secondaryKeywords, keywords, userBriefInput, onSetUserBriefInput, onUpdateBrief, onContinue, onBack }: Props) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +28,7 @@ export function ContentBrief({ brief, brandIntake, primaryKeyword, secondaryKeyw
       const res = await fetch('/api/seo/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'brief', brandIntake, primaryKeyword, secondaryKeywords, keywords }),
+        body: JSON.stringify({ action: 'brief', brandIntake, primaryKeyword, secondaryKeywords, keywords, userBriefInput }),
       });
       if (!res.ok) throw new Error('Failed to generate brief');
       const data = await res.json();
@@ -42,8 +44,27 @@ export function ContentBrief({ brief, brandIntake, primaryKeyword, secondaryKeyw
       <div className="seo-ai-banner">
         <span className="seo-ai-banner-icon"><Sparkles size={20} /></span>
         <div>
-          <strong>AI Content Brief</strong> — Generate a strategic content brief based on your brand context and validated keywords.
+          <strong>AI Content Brief</strong> — Add your custom instructions below, then generate a strategic content brief based on your brand context and validated keywords.
         </div>
+      </div>
+
+      {/* User Instructions */}
+      <div className="seo-card" style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+          📝 Your Instructions
+          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>optional</span>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
+          Tell the AI how to angle this article — e.g. tone, specific topics to cover, audience nuance, competitor differentiation, what to avoid, or any custom direction.
+        </div>
+        <textarea
+          className="seo-input"
+          rows={4}
+          value={userBriefInput}
+          onChange={(e) => onSetUserBriefInput(e.target.value)}
+          placeholder="e.g. Focus on mid-market B2B SaaS companies. Emphasize ROI over features. Avoid mentioning pricing. Include a section on implementation timeline. Tone: direct and data-driven."
+          style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }}
+        />
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>

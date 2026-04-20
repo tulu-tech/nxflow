@@ -12,6 +12,60 @@ function isHomepageUrl(url: string): boolean {
   }
 }
 
+// ─── Business Type Context Prompts ───────────────────────────────────────────
+
+const BUSINESS_TYPE_CONTEXT: Record<string, string> = {
+  B2B: `BUSINESS TYPE CONTEXT: B2B (Business-to-Business)
+  Writing strategy for B2B audiences:
+  • Decision-making is rational, committee-driven, and ROI-focused — every claim must tie to business outcomes (revenue, efficiency, risk reduction)
+  • Buyer journey is long (weeks to months); content must support multiple stakeholders (end user, manager, C-suite, procurement)
+  • Lead with business pain points and industry-specific challenges, not product features
+  • Use data, case studies, and proof points prominently — B2B buyers demand evidence before trust
+  • Tone: professional, expert, peer-to-peer — never patronizing or sales-y
+  • Avoid consumer-style language ("you'll love", "amazing", "life-changing") — use business language ("improves efficiency by X%", "reduces operational cost", "scales with your organization")
+  • Include ROI framing: "companies that implement X see Y within Z months"
+  • Feature comparison tables and implementation complexity notes (B2B buyers evaluate fit, not just features)
+  • CTAs should be low-friction: "schedule a demo", "request a consultation", "download the whitepaper" — not "buy now"
+  • Reference industry frameworks, compliance requirements, or integration ecosystems where relevant`,
+
+  B2C: `BUSINESS TYPE CONTEXT: B2C (Business-to-Consumer)
+  Writing strategy for B2C audiences:
+  • Decision-making is emotional, individual, and benefit-driven — lead with how the product improves the reader's life
+  • Buyer journey is short (hours to days); create urgency and desire without pressure tactics
+  • Use vivid, sensory language that helps the reader picture the outcome
+  • Tone: warm, conversational, relatable — the brand feels like a trusted friend, not a corporation
+  • Lead with lifestyle benefits over technical specs; features support the emotional promise
+  • Social proof is powerful: reviews, before/after, community, influencer alignment
+  • Price sensitivity and value framing matter — address the "is it worth it?" question proactively
+  • CTAs should be direct and benefit-led: "get yours today", "start your free trial", "shop the collection"
+  • Use "you" frequently and write in second person to create personal connection
+  • Address common objections (shipping, returns, trust) within the content naturally`,
+
+  B2G: `BUSINESS TYPE CONTEXT: B2G (Business-to-Government)
+  Writing strategy for B2G audiences:
+  • Decision-making is process-driven, compliance-focused, and multi-approval — content must establish regulatory alignment and procedural fit
+  • Emphasize certifications, compliance standards, security protocols, and audit trails
+  • Tone: formal, factual, precise — government procurement readers are evaluating against strict criteria
+  • ROI framing shifts to: taxpayer value, operational efficiency, risk mitigation, and public benefit
+  • Reference applicable standards (FedRAMP, FISMA, ISO, GDPR equivalent, etc.) where relevant to topic
+  • Avoid marketing hype entirely — every claim must be verifiable and conservative
+  • Procurement language matters: use terms like "scalable solution", "interoperability", "lifecycle cost", "vendor accountability"
+  • CTAs: "request an RFP response", "schedule a capabilities briefing", "download the compliance overview"
+  • Case studies from other government or public sector clients are the most powerful proof
+  • Content should anticipate due diligence questions: security, support SLAs, data sovereignty`,
+
+  Both: `BUSINESS TYPE CONTEXT: Dual B2B + B2C Audience
+  Writing strategy for mixed B2B and B2C audiences:
+  • Structure content to serve both audiences — use H2 sections or callout boxes that explicitly address each segment
+  • Lead with the universal value proposition (the problem solved for everyone), then bifurcate into B2B and consumer applications
+  • B2B signals: ROI language, case studies, integration capabilities, procurement considerations
+  • B2C signals: lifestyle benefits, ease of use, social proof, emotional outcomes
+  • Tone: accessible yet credible — reads like a knowledgeable friend who also understands business
+  • CTAs should offer two paths: one B2B ("talk to our enterprise team") and one B2C ("start free today")
+  • Avoid language that alienates either segment — no jargon that confuses consumers, no oversimplification that dismisses business buyers
+  • Comparison tables can serve both: include both "personal use" and "business/team use" columns`,
+};
+
 // ─── Mock AI responses ────────────────────────────────────────────────────────
 
 function mockKeywords(brandIntake: Record<string, unknown>) {
@@ -34,9 +88,13 @@ function mockKeywords(brandIntake: Record<string, unknown>) {
 
 function mockBrief(data: Record<string, unknown>) {
   const primaryKw = (data.primaryKeyword as string) || 'topic';
+  const userBriefInput = (data.userBriefInput as string || '').trim();
+  const intentNote = userBriefInput
+    ? `Users searching for "${primaryKw}" are looking for comprehensive guidance. Additional focus per user instructions: ${userBriefInput.slice(0, 120)}.`
+    : `Users searching for "${primaryKw}" are looking for comprehensive, actionable guidance they can implement immediately.`;
   return {
     finalKeywords: [primaryKw, ...(data.secondaryKeywords as string[] || [])],
-    searchIntentSummary: `Users searching for "${primaryKw}" are looking for comprehensive, actionable guidance they can implement immediately.`,
+    searchIntentSummary: intentNote,
     targetPersona: (data.brandIntake as Record<string, unknown>)?.targetAudience as string || 'Business professionals',
     funnelStage: 'middle',
     contentGoal: 'Establish authority and drive qualified leads through in-depth, valuable content',
@@ -393,15 +451,18 @@ function mockImagePrompts(data: Record<string, unknown>) {
 
 function mockLinkPlan(data: Record<string, unknown>) {
   const brand = data.brandIntake as Record<string, unknown> | null;
+  const article = data.article as Record<string, unknown> | null;
   const rawUrl = (brand?.websiteUrl as string) || 'https://example.com';
   const baseUrl = rawUrl.replace(/\/$/, '');
+  const industry = (brand?.industry as string) || 'industry';
+  const primaryKw = (article?.title as string) || (data.primaryKeyword as string) || 'topic';
 
   const internalLinks = [
     {
       type: 'internal',
       url: `${baseUrl}/blog`,
       anchorText: 'our resource library',
-      context: 'Introduction section — after establishing the stakes',
+      context: 'Introduction — after establishing the stakes',
       placement: 'Paragraph 3 of introduction',
       reason: 'Drive readers to related content hub, reduces bounce rate',
     },
@@ -431,50 +492,78 @@ function mockLinkPlan(data: Record<string, unknown>) {
     },
   ].filter(link => !isHomepageUrl(link.url));
 
+  // External links are generated based on the actual article topic/industry
+  // rather than hardcoded SEO-generic URLs
+  const topicSlug = primaryKw.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+  const industrySlug = industry.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 30);
+
   const externalLinks = [
     {
       type: 'external',
-      url: 'https://developers.google.com/search/docs/fundamentals/how-search-works',
-      anchorText: 'learn more about search engine algorithms',
-      context: 'Definition section — after introducing core concept',
-      placement: 'What Is section, paragraph 2',
-      reason: 'Official Google source — maximum trust signal',
+      url: `https://www.statista.com/topics/${industrySlug}/`,
+      anchorText: `${industry} industry statistics`,
+      context: 'Statistics section — data citation',
+      placement: 'Why It Matters section, after key stat',
+      reason: 'Statista is a tier-1 data source; adds authority to statistics claims',
     },
     {
       type: 'external',
-      url: 'https://backlinko.com/search-engine-ranking',
-      anchorText: "Backlinko's content length study",
-      context: 'Content depth argument',
-      placement: 'Step 3: Content Creation section',
-      reason: 'Authoritative SEO research, widely cited',
+      url: `https://hbr.org/search?term=${encodeURIComponent(topicSlug)}`,
+      anchorText: 'research-backed insights',
+      context: 'Expert perspectives section',
+      placement: 'After practitioner insight callout',
+      reason: 'Harvard Business Review lends academic authority',
     },
     {
       type: 'external',
-      url: 'https://www.hubspot.com/marketing-statistics',
-      anchorText: '3x more leads',
-      context: 'Statistics / Why It Matters section',
-      placement: 'Bullet point in statistics section',
-      reason: 'HubSpot data is trusted and familiar to target audience',
+      url: `https://www.mckinsey.com/search?q=${encodeURIComponent(topicSlug)}`,
+      anchorText: 'industry analysis',
+      context: 'Why It Matters — supporting major claim',
+      placement: 'Statistics bullet 2',
+      reason: 'McKinsey is highly trusted for business/industry data',
     },
     {
       type: 'external',
-      url: 'https://pagespeed.web.dev',
-      anchorText: 'Check your Core Web Vitals',
-      context: 'Common Mistakes section — Mistake #3',
-      placement: 'After Core Web Vitals mention',
-      reason: 'Direct actionable link, immediately useful to reader',
+      url: `https://www.gartner.com/en/search?q=${encodeURIComponent(topicSlug)}`,
+      anchorText: 'analyst report',
+      context: 'Tools section or advanced tactics',
+      placement: 'Paragraph after tools table',
+      reason: 'Gartner Magic Quadrant citations are trusted in B2B/enterprise contexts',
     },
     {
       type: 'external',
-      url: 'https://moz.com/learn/seo/local',
-      anchorText: 'Local SEO guide for small businesses',
-      context: 'FAQ — small business question',
-      placement: 'FAQ answer about small businesses',
-      reason: 'Moz is authoritative; adds value to FAQ answer',
+      url: `https://www.forrester.com/search/?N=10001&range=504005&D=10001&q=${encodeURIComponent(topicSlug)}`,
+      anchorText: 'market research',
+      context: 'FAQ answer — ROI or timeline question',
+      placement: 'FAQ section, relevant answer',
+      reason: 'Forrester research adds credibility to ROI and adoption claims',
     },
   ];
 
   return { internalLinks, externalLinks };
+}
+
+function mockOutline(data: Record<string, unknown>) {
+  const brief = data.brief as Record<string, unknown> | null;
+  const primaryKw = (data.primaryKeyword as string) || 'topic';
+  const year = new Date().getFullYear();
+
+  const h1 = (brief?.h1 as string) || `The Ultimate Guide to ${primaryKw} (${year})`;
+  const outline = (brief?.outline as Array<{ level: string; text: string }>) || [
+    { level: 'h2', text: `What Is ${primaryKw}?` },
+    { level: 'h3', text: 'Key Definitions and Context' },
+    { level: 'h2', text: `Why ${primaryKw} Matters in ${year}` },
+    { level: 'h3', text: 'Industry Statistics and Trends' },
+    { level: 'h2', text: `Step-by-Step ${primaryKw} Strategy` },
+    { level: 'h3', text: 'Step 1: Research and Planning' },
+    { level: 'h3', text: 'Step 2: Implementation' },
+    { level: 'h3', text: 'Step 3: Measurement and Optimization' },
+    { level: 'h2', text: `Common ${primaryKw} Mistakes to Avoid` },
+    { level: 'h2', text: `Best Tools for ${primaryKw} in ${year}` },
+    { level: 'h2', text: `FAQ: ${primaryKw}` },
+  ];
+
+  return { h1, outline };
 }
 
 // ─── MASTER WRITING PROMPT ────────────────────────────────────────────────────
@@ -557,6 +646,8 @@ SECTION 3 — READER PSYCHOLOGY & PERSONA
 
   SEARCH INTENT CONTEXT:
   ${brief?.searchIntentSummary || `Readers searching "${primaryKw}" want comprehensive, actionable guidance they can implement immediately. They are likely comparing options or trying to improve an existing approach.`}
+
+  ${BUSINESS_TYPE_CONTEXT[(brand?.businessType as string) || 'B2C'] || BUSINESS_TYPE_CONTEXT['B2C']}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SECTION 4 — CONTENT ARCHITECTURE & STRUCTURE
@@ -810,6 +901,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ imagePrompts: mockImagePrompts(body) });
         case 'image-generate':
           return NextResponse.json(mockGeneratedImage(body));
+        case 'outline':
+          return NextResponse.json(mockOutline(body));
         case 'links':
           return NextResponse.json({ linkPlan: mockLinkPlan(body) });
         case 'inject-links':
@@ -941,9 +1034,14 @@ function buildSystemPrompt(action: string, body: Record<string, unknown>): strin
 Return JSON: { "keywords": [{ "id": "kw1", "keyword": "...", "searchIntent": "informational|navigational|commercial|transactional", "funnelStage": "top|middle|bottom", "businessRelevance": 1-10, "conversionValue": 1-10, "contentOpportunity": "specific brief description", "category": "primary|secondary|supporting", "validationStatus": "pending" }] }
 Prioritize by: intent fit × business relevance × achievability × commercial value × content opportunity.`;
 
-    case 'brief':
-      return `You are a senior SEO content strategist at a Tier-1 digital marketing agency. Generate a comprehensive, actionable content brief based on the brand data and keywords provided.
+    case 'brief': {
+      const userBriefInput = (body.userBriefInput as string || '').trim();
+      const userInstructions = userBriefInput
+        ? `\n\nUSER INSTRUCTIONS (must be honored):\n${userBriefInput}`
+        : '';
+      return `You are a senior SEO content strategist at a Tier-1 digital marketing agency. Generate a comprehensive, actionable content brief based on the brand data and keywords provided.${userInstructions}
 Return JSON: { "brief": { "finalKeywords": [], "searchIntentSummary": "", "targetPersona": "", "funnelStage": "top|middle|bottom", "contentGoal": "", "pageType": "", "contentAngle": "", "differentiationAngle": "", "titleIdeas": [], "h1": "", "outline": [{"level": "h2|h3", "text": ""}], "faqOpportunities": [], "richSnippetOpportunities": [], "internalLinkOpportunities": [], "externalSourceOpportunities": [], "ctaDirection": "", "conversionGoal": "" } }`;
+    }
 
     case 'prompt':
       return `You are a master-level SEO writing prompt architect. Build the most comprehensive, detailed internal writing prompt possible. It must encode: E-E-A-T requirements, semantic keyword strategy, content architecture, tone directives, engagement mechanics, featured snippet optimization, image placement markers [IMAGE:], link placement markers [LINK: anchor|url], schema markup notes, and quality gates.
@@ -974,11 +1072,32 @@ Return JSON: { "article": { "title": "", "metaTitle": "", "metaDescription": "",
 For each image, provide a DALL-E 3 ready description (specific, detailed, professional, no text overlays unless it's a mockup screenshot).
 Return JSON: { "imagePrompts": [{ "id": "img1", "description": "detailed DALL-E 3 ready description", "placement": "exact section name and position", "altText": "SEO-optimized alt text", "fileName": "kebab-case-filename.webp", "caption": "optional caption or null", "imageUrl": null }] }`;
 
-    case 'links':
-      return `You are an expert SEO link strategist. Generate a comprehensive internal and external link plan. 
-CRITICAL: Never recommend linking to a homepage (root URL with no path). Every internal link must point to a specific page path.
-External links must be to genuinely authoritative sources: Google, HubSpot, Backlinko, Semrush, Moz, Ahrefs, HBR, Statista, etc.
+    case 'links': {
+      const articleContent = (body.article as Record<string, unknown>)?.content as string || '';
+      const articleSnippet = articleContent.slice(0, 2000);
+      return `You are an expert SEO link strategist. Generate a comprehensive internal and external link plan that is SPECIFIC to the article topic and industry provided.
+CRITICAL RULES:
+- Never recommend linking to a homepage (root URL with no path). Every internal link must point to a specific page path.
+- External links must be DIRECTLY relevant to the article topic and industry — do NOT use generic SEO tool links (Backlinko, HubSpot, Moz, Semrush) unless the article is specifically about SEO/marketing.
+- Choose external sources based on the article's subject matter: medical articles → PubMed/NIH/Mayo Clinic; finance → Forbes/Bloomberg/SEC; tech → official docs/IEEE; industry research → Statista/Gartner/Forrester/IBISWorld; legal → government sites.
+- Each external link should cite actual data, research, or authoritative reference USED in the article content.
+
+ARTICLE CONTENT SNIPPET (for context):
+${articleSnippet}
+
 Return JSON: { "linkPlan": { "internalLinks": [{ "type": "internal", "url": "full URL with path", "anchorText": "", "context": "", "placement": "", "reason": "" }], "externalLinks": [...same format...] } }`;
+    }
+
+    case 'outline': {
+      const userBriefInput = (body.userBriefInput as string || '').trim();
+      const userInstructions = userBriefInput
+        ? `\n\nUSER CUSTOM INSTRUCTIONS (must be honored in outline structure):\n${userBriefInput}`
+        : '';
+      return `You are a senior SEO content strategist. Generate an article outline (H1 + H2/H3 structure) based on the brand profile, primary keyword, content brief, and any user instructions.
+The outline should be publication-ready and reflect the correct information architecture for this topic and business type.${userInstructions}
+Return JSON: { "h1": "exact H1 title", "outline": [{ "level": "h2|h3", "text": "section heading" }] }
+Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The outline should cover: intro hook, definition, why it matters, core methodology/how-to (3-4 H3s), common mistakes, tools/resources, FAQ, conclusion.`;
+    }
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';

@@ -5,6 +5,7 @@ import {
   BrandIntake,
   KeywordEntry,
   ContentBrief,
+  OutlineItem,
   GeneratedArticle,
   ImagePrompt,
   LinkPlan,
@@ -53,7 +54,9 @@ interface SEOState {
   updateKeywords: (id: string, keywords: KeywordEntry[]) => void;
   setPrimaryKeyword: (id: string, keyword: string) => void;
   setSecondaryKeywords: (id: string, keywords: string[]) => void;
+  setUserBriefInput: (id: string, text: string) => void;
   updateContentBrief: (id: string, brief: ContentBrief) => void;
+  setArticleOutline: (id: string, outline: OutlineItem[]) => void;
   setWritingPrompt: (id: string, prompt: string) => void;
   setGeneratedArticle: (id: string, article: GeneratedArticle) => void;
   setImagePrompts: (id: string, prompts: ImagePrompt[]) => void;
@@ -101,7 +104,9 @@ export const useSEOStore = create<SEOState>()(
           keywordClusters: [],
           primaryKeyword: null,
           secondaryKeywords: [],
+          userBriefInput: '',
           contentBrief: null,
+          articleOutline: null,
           writingPrompt: null,
           generatedArticle: null,
           imagePrompts: [],
@@ -155,8 +160,14 @@ export const useSEOStore = create<SEOState>()(
       setSecondaryKeywords: (id, keywords) =>
         set((s) => patchProject(s, id, { secondaryKeywords: keywords })),
 
+      setUserBriefInput: (id, text) =>
+        set((s) => patchProject(s, id, { userBriefInput: text })),
+
       updateContentBrief: (id, brief) =>
         set((s) => patchProject(s, id, { contentBrief: brief })),
+
+      setArticleOutline: (id, outline) =>
+        set((s) => patchProject(s, id, { articleOutline: outline })),
 
       setWritingPrompt: (id, prompt) =>
         set((s) => patchProject(s, id, { writingPrompt: prompt })),

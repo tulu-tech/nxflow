@@ -175,7 +175,9 @@ export interface SEOProject {
   keywordClusters: KeywordCluster[];
   primaryKeyword: string | null;
   secondaryKeywords: string[];
+  userBriefInput: string;
   contentBrief: ContentBrief | null;
+  articleOutline: OutlineItem[] | null;
   writingPrompt: string | null;
   generatedArticle: GeneratedArticle | null;
   imagePrompts: ImagePrompt[];
