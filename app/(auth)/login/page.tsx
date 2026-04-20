@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { useAuthStore, SUPABASE_PASSWORDS } from "@/store/authStore"
+import { useAuthStore, CRM_SHARED_EMAIL, CRM_SHARED_PASSWORD } from "@/store/authStore"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
@@ -22,15 +22,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [autoSigningIn, setAutoSigningIn] = useState(false)
 
-  // Auto sign-in fallback: if the user already has an nxflow PIN session
-  // and their Supabase password is mapped, sign them in silently and
-  // bounce to /dashboard. This catches the case where middleware redirected
-  // them here but they never actually needed to re-enter credentials.
+  // Auto sign-in fallback: if the user already has an nxflow PIN session,
+  // sign into the shared CRM Supabase identity silently and bounce to
+  // /dashboard. Catches the case where middleware redirected here.
   useEffect(() => {
-    const userEmail = currentUser?.email
-    if (!userEmail) return
-    const pwd = SUPABASE_PASSWORDS[userEmail]
-    if (!pwd) return
+    if (!currentUser) return
 
     let cancelled = false
     setAutoSigningIn(true)
@@ -38,24 +34,32 @@ export default function LoginPage() {
       try {
         const { data: existing } = await supabase.auth.getSession()
         if (!existing.session) {
-          const { error } = await supabase.auth.signInWithPassword({
-            email: userEmail,
-            password: pwd,
+          const { error: signErr } = await supabase.auth.signInWithPassword({
+            email: CRM_SHARED_EMAIL,
+            password: CRM_SHARED_PASSWORD,
           })
-          if (error) throw error
+          if (signErr) {
+            if (!cancelled) {
+              setError(`SSO failed: ${signErr.message}`)
+              setAutoSigningIn(false)
+            }
+            return
+          }
         }
         if (cancelled) return
         router.replace("/dashboard")
         router.refresh()
-      } catch {
-        // Fall back to manual form
-        if (!cancelled) setAutoSigningIn(false)
+      } catch (e) {
+        if (!cancelled) {
+          setError(`SSO error: ${(e as Error).message}`)
+          setAutoSigningIn(false)
+        }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [currentUser?.email, router, supabase])
+  }, [currentUser, router, supabase])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()

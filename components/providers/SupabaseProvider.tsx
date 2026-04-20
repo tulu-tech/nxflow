@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '@/store/workspaceStore';
-import { useAuthStore, SUPABASE_PASSWORDS } from '@/store/authStore';
+import { useAuthStore, CRM_SHARED_EMAIL, CRM_SHARED_PASSWORD } from '@/store/authStore';
 import { supabase, createClient } from '@/lib/supabase/client';
 import { LoginScreen } from '@/components/auth/LoginScreen';
 
@@ -28,19 +28,14 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
-  // After rehydration: make sure the Supabase session is in sync with the
-  // nxflow PIN session. If the user has a Supabase password mapped, ensure
-  // a Supabase session exists (create one via signInWithPassword if not).
-  // Rendering is blocked until this resolves, which prevents the CRM
-  // middleware from redirecting to /login due to a missing cookie.
+  // After rehydration: make sure the Supabase session exists. Every PIN
+  // user signs in as the shared CRM identity, so the CRM module doesn't
+  // redirect to /login. Rendering is blocked until this resolves.
   useEffect(() => {
     if (!hasHydrated) return;
 
-    const email = currentUser?.email;
-    const password = email ? SUPABASE_PASSWORDS[email] : undefined;
-
-    // No PIN user, or no password mapped → nothing to sync. Proceed.
-    if (!email || !password) {
+    // No PIN user → nothing to sync. Proceed to show LoginScreen.
+    if (!currentUser) {
       setSupabaseReady(true);
       return;
     }
@@ -51,7 +46,10 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         const supaClient = createClient();
         const { data } = await supaClient.auth.getSession();
         if (!data.session) {
-          await supaClient.auth.signInWithPassword({ email, password });
+          await supaClient.auth.signInWithPassword({
+            email: CRM_SHARED_EMAIL,
+            password: CRM_SHARED_PASSWORD,
+          });
         }
       } catch {
         // Silent — nxflow workspace still works without the CRM session
@@ -63,7 +61,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [hasHydrated, currentUser?.email]);
+  }, [hasHydrated, currentUser]);
 
   // Initialize data from Supabase when authenticated
   useEffect(() => {
