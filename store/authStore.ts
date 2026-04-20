@@ -4,14 +4,14 @@ import { User } from '../lib/types';
 import { loginWithPin } from '../lib/supabase/queries';
 import { createClient } from '../lib/supabase/client';
 
-// Maps nxflow email → Supabase Auth password for the matching auth.users row.
-// Populate this as each team member gets their Supabase auth account provisioned.
-// If an entry is missing for a given user, the nxflow PIN login still works,
-// but the CRM module will require a separate Supabase login.
-// Exported so SupabaseProvider can re-sync the Supabase session on page load.
-export const SUPABASE_PASSWORDS: Record<string, string> = {
-  'berat@alba.com': 'Berat100005!',
-};
+// ─── CRM shared Supabase identity ─────────────────────────────────────────
+// Every nxflow PIN user signs into Supabase Auth as this single shared user,
+// because the Alba team CRM is a shared workspace (one leadboard, one set of
+// campaigns, one Lusha credit pool). The nxflow PIN layer already provides
+// per-person identity for activity attribution. This keeps the CRM module
+// reachable without a second login prompt.
+export const CRM_SHARED_EMAIL = 'berat@alba.com';
+export const CRM_SHARED_PASSWORD = 'Berat100005!';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -39,23 +39,19 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-          // Single sign-on: if we know the user's Supabase password, sign them
-          // into Supabase Auth as well so the CRM module doesn't re-prompt.
-          // Errors are swallowed — nxflow PIN is the source of truth; Supabase
-          // is a best-effort side effect for CRM access.
-          if (user.email) {
-            const password = SUPABASE_PASSWORDS[user.email];
-            if (password) {
-              try {
-                const supabase = createClient();
-                await supabase.auth.signInWithPassword({
-                  email: user.email,
-                  password,
-                });
-              } catch {
-                // ignore — user can still use workspace/SEO; CRM may prompt
-              }
-            }
+          // Single sign-on: regardless of which PIN user just logged in,
+          // sign into Supabase Auth as the shared CRM identity so the CRM
+          // module doesn't prompt for a second login. Errors are swallowed —
+          // nxflow PIN is the source of truth; the CRM Supabase session is
+          // a best-effort side effect.
+          try {
+            const supabase = createClient();
+            await supabase.auth.signInWithPassword({
+              email: CRM_SHARED_EMAIL,
+              password: CRM_SHARED_PASSWORD,
+            });
+          } catch {
+            // ignore — user can still use workspace/SEO
           }
 
           set({
