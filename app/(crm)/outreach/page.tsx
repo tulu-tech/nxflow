@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui-crm/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui-crm/select"
 import {
   Send, Loader2, Search, CheckCircle2, AlertCircle,
-  Clock, Users, Mail
+  Clock, Users, Mail, Tag
 } from "lucide-react"
 import type { LeadboardEntry, EmailCampaign, LeadStatus } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
@@ -40,6 +40,10 @@ export default function OutreachPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
   const [minScore, setMinScore] = useState(0)
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("new")
+  const [segments, setSegments] = useState<{ id: string; name: string; color: string }[]>([])
+  const [segmentFilter, setSegmentFilter] = useState<string>("all")
+  const [segmentMemberIds, setSegmentMemberIds] = useState<Set<string>>(new Set())
+  const [loadingSegment, setLoadingSegment] = useState(false)
   const [campName, setCampName] = useState("")
   const [campSubject, setCampSubject] = useState("")
   const [campBody, setCampBody] = useState("")
@@ -51,12 +55,15 @@ export default function OutreachPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [{ data: l }, { data: c }] = await Promise.all([
+    const [{ data: l }, { data: c }, segsRes] = await Promise.all([
       supabase.from("leadboard").select("*").order("relevance_score", { ascending: false }),
       supabase.from("email_campaigns").select("*").order("created_at", { ascending: false }),
+      fetch("/api/segments"),
     ])
     setLeads((l as LeadboardEntry[]) ?? [])
     setCampaigns((c as EmailCampaign[]) ?? [])
+    const segs = segsRes.ok ? await segsRes.json() : []
+    setSegments(segs ?? [])
     setLoading(false)
   }, [supabase])
 
@@ -92,8 +99,31 @@ export default function OutreachPage() {
     }
   }
 
-  // Mass campaign
+  // Mass campaign — segment handler
+  async function handleSegmentChange(segId: string) {
+    setSegmentFilter(segId)
+    if (segId === "all") {
+      setSegmentMemberIds(new Set())
+      setSelectedLeadIds(new Set())
+      return
+    }
+    setLoadingSegment(true)
+    try {
+      const res = await fetch(`/api/segments/${segId}/members`)
+      const ids: string[] = res.ok ? await res.json() : []
+      const idSet = new Set(ids)
+      setSegmentMemberIds(idSet)
+      // auto-select all segment members visible in the filtered list
+      setSelectedLeadIds(new Set(ids.filter((id) =>
+        leads.some((l) => l.id === id)
+      )))
+    } finally {
+      setLoadingSegment(false)
+    }
+  }
+
   const massLeads = leads.filter((l) => {
+    if (segmentFilter !== "all" && !segmentMemberIds.has(l.id)) return false
     if (statusFilter !== "all" && l.status !== statusFilter) return false
     if (l.relevance_score < minScore) return false
     return true
@@ -273,6 +303,39 @@ export default function OutreachPage() {
                 <CardTitle className="text-sm">Select Recipients</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {/* Segment filter */}
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Tag className="h-3 w-3" /> Segment
+                    {loadingSegment && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
+                  </Label>
+                  <Select value={segmentFilter} onValueChange={(v) => handleSegmentChange(v ?? "all")}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="All Leads" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Leads</SelectItem>
+                      {segments.map((seg) => (
+                        <SelectItem key={seg.id} value={seg.id}>
+                          <span className="flex items-center gap-2">
+                            <span
+                              className="inline-block w-2 h-2 rounded-full shrink-0"
+                              style={{ background: seg.color }}
+                            />
+                            {seg.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {segments.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No segments yet — create one in <a href="/prospecting" className="underline">Prospecting</a>.
+                    </p>
+                  )}
+                </div>
+
+                {/* Status + Score filters */}
                 <div className="flex items-center gap-2">
                   <div className="space-y-1 flex-1">
                     <Label className="text-xs">Status Filter</Label>
