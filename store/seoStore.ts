@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import {
   SEOProject,
   BrandIntake,
+  BriefSelections,
   KeywordEntry,
   ContentBrief,
   OutlineItem,
@@ -54,6 +55,7 @@ interface SEOState {
   updateKeywords: (id: string, keywords: KeywordEntry[]) => void;
   setPrimaryKeyword: (id: string, keyword: string) => void;
   setSecondaryKeywords: (id: string, keywords: string[]) => void;
+  setBriefSelections: (id: string, selections: BriefSelections) => void;
   setUserBriefInput: (id: string, text: string) => void;
   updateContentBrief: (id: string, brief: ContentBrief) => void;
   setArticleOutline: (id: string, outline: OutlineItem[]) => void;
@@ -104,6 +106,7 @@ export const useSEOStore = create<SEOState>()(
           keywordClusters: [],
           primaryKeyword: null,
           secondaryKeywords: [],
+          briefSelections: { contentTopics: [], targetOrganizations: [], targetJobTitles: [], contentFormat: [] },
           userBriefInput: '',
           contentBrief: null,
           articleOutline: null,
@@ -159,6 +162,9 @@ export const useSEOStore = create<SEOState>()(
 
       setSecondaryKeywords: (id, keywords) =>
         set((s) => patchProject(s, id, { secondaryKeywords: keywords })),
+
+      setBriefSelections: (id, selections) =>
+        set((s) => patchProject(s, id, { briefSelections: selections })),
 
       setUserBriefInput: (id, text) =>
         set((s) => patchProject(s, id, { userBriefInput: text })),

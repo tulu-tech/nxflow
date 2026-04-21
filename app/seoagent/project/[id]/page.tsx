@@ -25,7 +25,7 @@ export default function ProjectPage() {
   const {
     updateBrandIntake, setPhase, updateKeywords,
     setPrimaryKeyword, setSecondaryKeywords,
-    setUserBriefInput, updateContentBrief, setArticleOutline,
+    setBriefSelections, setUserBriefInput, updateContentBrief, setArticleOutline,
     setWritingPrompt, setGeneratedArticle, setImagePrompts,
     setLinkPlan, updateRevisionNotes,
   } = useSEOStore();
@@ -49,13 +49,15 @@ export default function ProjectPage() {
   }
 
   const goNext = () => {
-    const next = Math.max(project.currentPhase, viewPhase + 1);
+    const nextPhase = viewPhase === 4 ? 6 : viewPhase + 1;
+    const next = Math.max(project.currentPhase, nextPhase);
     setPhase(id, next);
-    setViewPhase(viewPhase + 1);
+    setViewPhase(nextPhase);
   };
 
   const goBack = () => {
-    setViewPhase(Math.max(1, viewPhase - 1));
+    const prevPhase = viewPhase === 6 ? 4 : Math.max(1, viewPhase - 1);
+    setViewPhase(prevPhase);
   };
 
   const handleIntakeChange = (field: keyof BrandIntake, value: unknown) => {
@@ -133,6 +135,8 @@ export default function ProjectPage() {
             primaryKeyword={project.primaryKeyword}
             secondaryKeywords={project.secondaryKeywords}
             keywords={project.keywords}
+            briefSelections={project.briefSelections ?? { contentTopics: [], targetOrganizations: [], targetJobTitles: [], contentFormat: [] }}
+            onSetBriefSelections={(s) => setBriefSelections(id, s)}
             userBriefInput={project.userBriefInput ?? ''}
             onSetUserBriefInput={(v) => setUserBriefInput(id, v)}
             onUpdateBrief={(brief) => updateContentBrief(id, brief)}
@@ -166,6 +170,7 @@ export default function ProjectPage() {
             userBriefInput={project.userBriefInput ?? ''}
             onSetArticle={(article) => setGeneratedArticle(id, article)}
             onSetOutline={(outline) => setArticleOutline(id, outline)}
+            onSetWritingPrompt={(prompt) => setWritingPrompt(id, prompt)}
             onContinue={goNext}
             onBack={goBack}
           />

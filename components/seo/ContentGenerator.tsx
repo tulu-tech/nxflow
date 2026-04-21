@@ -15,6 +15,7 @@ interface Props {
   userBriefInput: string;
   onSetArticle: (article: GeneratedArticle) => void;
   onSetOutline: (outline: OutlineItem[]) => void;
+  onSetWritingPrompt: (prompt: string) => void;
   onContinue: () => void;
   onBack: () => void;
 }
@@ -22,7 +23,7 @@ interface Props {
 export function ContentGenerator({
   article, articleOutline, writingPrompt, brief, brandIntake,
   primaryKeyword, secondaryKeywords, userBriefInput,
-  onSetArticle, onSetOutline, onContinue, onBack,
+  onSetArticle, onSetOutline, onSetWritingPrompt, onContinue, onBack,
 }: Props) {
   const [generatingOutline, setGeneratingOutline] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -39,6 +40,21 @@ export function ContentGenerator({
     setGeneratingOutline(true);
     setError(null);
     try {
+      // Auto-generate writing prompt silently if not yet created
+      let activePrompt = writingPrompt;
+      if (!activePrompt) {
+        const promptRes = await fetch('/api/seo/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'prompt', brief, brandIntake, primaryKeyword, secondaryKeywords }),
+        });
+        if (promptRes.ok) {
+          const promptData = await promptRes.json();
+          activePrompt = promptData.prompt || null;
+          if (activePrompt) onSetWritingPrompt(activePrompt);
+        }
+      }
+
       const res = await fetch('/api/seo/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,10 +77,23 @@ export function ContentGenerator({
     setGenerating(true);
     setError(null);
     try {
+      let activePrompt = writingPrompt;
+      if (!activePrompt) {
+        const promptRes = await fetch('/api/seo/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'prompt', brief, brandIntake, primaryKeyword, secondaryKeywords }),
+        });
+        if (promptRes.ok) {
+          const promptData = await promptRes.json();
+          activePrompt = promptData.prompt || null;
+          if (activePrompt) onSetWritingPrompt(activePrompt);
+        }
+      }
       const res = await fetch('/api/seo/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'article', writingPrompt, brief, brandIntake }),
+        body: JSON.stringify({ action: 'article', writingPrompt: activePrompt, brief, brandIntake }),
       });
       if (!res.ok) throw new Error('Failed to generate article');
       const data = await res.json();
@@ -247,7 +276,7 @@ export function ContentGenerator({
             <button
               className="seo-btn seo-btn-primary"
               onClick={generateArticle}
-              disabled={generating || !writingPrompt || !displayOutline}
+              disabled={generating || !displayOutline}
             >
               <Sparkles size={14} />
               {generating ? 'Writing…' : article ? 'Regenerate Article' : 'Generate Article'}

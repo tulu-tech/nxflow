@@ -1,8 +1,205 @@
 'use client';
 
-import { ContentBrief as ContentBriefType, BrandIntake, KeywordEntry } from '@/lib/seo/types';
+import { ContentBrief as ContentBriefType, BrandIntake, KeywordEntry, BriefSelections } from '@/lib/seo/types';
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Check } from 'lucide-react';
+
+const BRIEF_OPTIONS = {
+  contentTopics: [
+    'Interactive Product Demonstrations',
+    'Video Tutorials',
+    'Completed Project Case Studies',
+    'Project Highlights',
+    'Maintenance Tips Series',
+    'Infographic Guides',
+    'Latest News on Military Trucks',
+    'Maintenance Innovations',
+    'Important International Contracts',
+    'Repost of Educational Blog Content',
+    'Technical Insights from the Industry',
+    'Overview of Services',
+    'Custom Solution Spotlights',
+    'Client Testimonials',
+    'Endorsements from Industry Leaders',
+    'Industry Partnership Announcements',
+  ],
+  targetOrganizations: [
+    'National Defense Departments',
+    'Land Forces Command',
+    'Government Procurement Agencies',
+    'Defense Contractors',
+    'Military Vehicle Manufacturers',
+    'Military Equipment Supplier Companies',
+    'Logistics and Transportation Companies',
+    'Private Security Firms',
+    'Police Departments',
+  ],
+  targetJobTitles: [
+    'Procurement Officers',
+    'Military Project Managers',
+    'Compliance and Regulatory Officers',
+    'Business Development Managers',
+    'Product Managers',
+    'Quality Assurance Managers',
+    'Logistic Coordinators',
+    'Supply Chain Managers',
+    'Technical Consultants',
+    'Sales Executives',
+    'Maintenance Supervisors',
+    'Operations Managers',
+    'Strategy Advisors',
+    'Chief Executive Officers',
+    'General Managers',
+  ],
+  contentFormat: [
+    'Text Posts',
+    'Image Posts',
+    'Short Videos',
+    'Long-Form Videos',
+    'Instagram/Facebook Stories',
+    'LinkedIn Stories',
+    'Static Infographics',
+    'Multi-Image Carousels',
+    'Multi-Page PDF Carousels',
+    'Article/Blogs in-depth content',
+    'Polls and Quizzes',
+    'Q&A Sessions',
+    'Comments on Target Posts',
+  ],
+};
+
+const SECTION_LABELS: Record<keyof typeof BRIEF_OPTIONS, string> = {
+  contentTopics: 'Content Topics',
+  targetOrganizations: 'Target Organizations',
+  targetJobTitles: 'Target Job Titles',
+  contentFormat: 'Content Format',
+};
+
+const SECTION_ICONS: Record<keyof typeof BRIEF_OPTIONS, string> = {
+  contentTopics: '📌',
+  targetOrganizations: '🏢',
+  targetJobTitles: '👤',
+  contentFormat: '📄',
+};
+
+function formatSelectionsAsInstructions(selections: BriefSelections): string {
+  const parts: string[] = [];
+  if (selections.contentTopics.length > 0)
+    parts.push(`Content Topics: ${selections.contentTopics.join(', ')}`);
+  if (selections.targetOrganizations.length > 0)
+    parts.push(`Target Organizations: ${selections.targetOrganizations.join(', ')}`);
+  if (selections.targetJobTitles.length > 0)
+    parts.push(`Target Job Titles: ${selections.targetJobTitles.join(', ')}`);
+  if (selections.contentFormat.length > 0)
+    parts.push(`Content Format: ${selections.contentFormat.join(', ')}`);
+  return parts.join('. ');
+}
+
+interface MultiSelectProps {
+  sectionKey: keyof typeof BRIEF_OPTIONS;
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}
+
+function MultiSelectSection({ sectionKey, selected, onChange }: MultiSelectProps) {
+  const [open, setOpen] = useState(false);
+  const options = BRIEF_OPTIONS[sectionKey];
+  const label = SECTION_LABELS[sectionKey];
+  const icon = SECTION_ICONS[sectionKey];
+
+  const toggle = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((s) => s !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  return (
+    <div className="seo-card" style={{ padding: 0, overflow: 'hidden', marginBottom: 12 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '12px 16px',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <span style={{ fontSize: 16 }}>{icon}</span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+          {label}
+        </span>
+        {selected.length > 0 && (
+          <span style={{
+            fontSize: 11, fontWeight: 700,
+            background: 'var(--accent)', color: '#fff',
+            borderRadius: 10, padding: '2px 8px',
+          }}>
+            {selected.length} selected
+          </span>
+        )}
+        {open ? <ChevronUp size={16} color="var(--text-muted)" /> : <ChevronDown size={16} color="var(--text-muted)" />}
+      </button>
+
+      {open && (
+        <div style={{
+          borderTop: '1px solid var(--border)',
+          padding: '12px 16px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+        }}>
+          {options.map((option) => {
+            const isSelected = selected.includes(option);
+            return (
+              <button
+                key={option}
+                onClick={() => toggle(option)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: isSelected ? 600 : 400,
+                  border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                  background: isSelected ? 'rgba(129,140,248,0.15)' : 'transparent',
+                  color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {isSelected && <Check size={11} />}
+                {option}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!open && selected.length > 0 && (
+        <div style={{ padding: '0 16px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {selected.map((s) => (
+            <span key={s} style={{
+              fontSize: 11, padding: '2px 8px', borderRadius: 4,
+              background: 'rgba(129,140,248,0.12)', color: 'var(--accent)',
+              border: '1px solid rgba(129,140,248,0.25)',
+            }}>
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   brief: ContentBriefType | null;
@@ -10,6 +207,8 @@ interface Props {
   primaryKeyword: string | null;
   secondaryKeywords: string[];
   keywords: KeywordEntry[];
+  briefSelections: BriefSelections;
+  onSetBriefSelections: (selections: BriefSelections) => void;
   userBriefInput: string;
   onSetUserBriefInput: (v: string) => void;
   onUpdateBrief: (brief: ContentBriefType) => void;
@@ -17,13 +216,24 @@ interface Props {
   onBack: () => void;
 }
 
-export function ContentBrief({ brief, brandIntake, primaryKeyword, secondaryKeywords, keywords, userBriefInput, onSetUserBriefInput, onUpdateBrief, onContinue, onBack }: Props) {
+export function ContentBrief({
+  brief, brandIntake, primaryKeyword, secondaryKeywords, keywords,
+  briefSelections, onSetBriefSelections, onSetUserBriefInput,
+  onUpdateBrief, onContinue, onBack,
+}: Props) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const updateSection = (key: keyof BriefSelections, values: string[]) => {
+    const updated = { ...briefSelections, [key]: values };
+    onSetBriefSelections(updated);
+    onSetUserBriefInput(formatSelectionsAsInstructions(updated));
+  };
 
   const generate = async () => {
     setGenerating(true);
     setError(null);
+    const userBriefInput = formatSelectionsAsInstructions(briefSelections);
     try {
       const res = await fetch('/api/seo/generate', {
         method: 'POST',
@@ -39,33 +249,38 @@ export function ContentBrief({ brief, brandIntake, primaryKeyword, secondaryKeyw
     setGenerating(false);
   };
 
+  const totalSelected =
+    briefSelections.contentTopics.length +
+    briefSelections.targetOrganizations.length +
+    briefSelections.targetJobTitles.length +
+    briefSelections.contentFormat.length;
+
   return (
     <div>
       <div className="seo-ai-banner">
         <span className="seo-ai-banner-icon"><Sparkles size={20} /></span>
         <div>
-          <strong>AI Content Brief</strong> — Add your custom instructions below, then generate a strategic content brief based on your brand context and validated keywords.
+          <strong>AI Content Brief</strong> — Select your content parameters below, then generate a strategic content brief tailored to your audience and format.
         </div>
       </div>
 
-      {/* User Instructions */}
-      <div className="seo-card" style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-          📝 Your Instructions
-          <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>optional</span>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-          Tell the AI how to angle this article — e.g. tone, specific topics to cover, audience nuance, competitor differentiation, what to avoid, or any custom direction.
-        </div>
-        <textarea
-          className="seo-input"
-          rows={4}
-          value={userBriefInput}
-          onChange={(e) => onSetUserBriefInput(e.target.value)}
-          placeholder="e.g. Focus on mid-market B2B SaaS companies. Emphasize ROI over features. Avoid mentioning pricing. Include a section on implementation timeline. Tone: direct and data-driven."
-          style={{ resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }}
-        />
+      {/* Selection panels */}
+      <div style={{ marginBottom: 20 }}>
+        {(Object.keys(BRIEF_OPTIONS) as Array<keyof typeof BRIEF_OPTIONS>).map((key) => (
+          <MultiSelectSection
+            key={key}
+            sectionKey={key}
+            selected={briefSelections[key]}
+            onChange={(vals) => updateSection(key, vals)}
+          />
+        ))}
       </div>
+
+      {totalSelected === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, padding: '8px 12px', borderRadius: 6, background: 'rgba(129,140,248,0.05)', border: '1px solid var(--border)' }}>
+          Select at least one option above to guide the AI brief generation.
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
         <button className="seo-btn seo-btn-primary" onClick={generate} disabled={generating || !primaryKeyword}>
@@ -156,7 +371,7 @@ export function ContentBrief({ brief, brandIntake, primaryKeyword, secondaryKeyw
       <div className="seo-actions-bar">
         <button className="seo-btn seo-btn-secondary" onClick={onBack}>← Back</button>
         <button className="seo-btn seo-btn-primary" disabled={!brief} onClick={onContinue}>
-          Continue to Writing Prompt →
+          Continue to Content Generation →
         </button>
       </div>
     </div>

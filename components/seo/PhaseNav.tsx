@@ -8,10 +8,12 @@ interface Props {
   onSelectPhase: (phase: number) => void;
 }
 
+const VISIBLE_PHASES = PHASES.filter((p) => p.id !== 5);
+
 export function PhaseNav({ currentPhase, onSelectPhase }: Props) {
   return (
     <div className="seo-phase-nav">
-      {PHASES.map((phase, idx) => {
+      {VISIBLE_PHASES.map((phase, idx) => {
         const isActive = phase.id === currentPhase;
         const isCompleted = phase.id < currentPhase;
 
@@ -29,7 +31,7 @@ export function PhaseNav({ currentPhase, onSelectPhase }: Props) {
               </span>
               <span>{phase.shortLabel}</span>
             </button>
-            {idx < PHASES.length - 1 && <div className="seo-phase-connector" />}
+            {idx < VISIBLE_PHASES.length - 1 && <div className="seo-phase-connector" />}
           </div>
         );
       })}

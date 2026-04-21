@@ -66,6 +66,15 @@ export interface KeywordCluster {
   keywordIds: string[];
 }
 
+// ─── Brief Selections ────────────────────────────────────────────────────────
+
+export interface BriefSelections {
+  contentTopics: string[];
+  targetOrganizations: string[];
+  targetJobTitles: string[];
+  contentFormat: string[];
+}
+
 // ─── Content Brief ───────────────────────────────────────────────────────────
 
 export interface OutlineItem {
@@ -175,6 +184,7 @@ export interface SEOProject {
   keywordClusters: KeywordCluster[];
   primaryKeyword: string | null;
   secondaryKeywords: string[];
+  briefSelections: BriefSelections;
   userBriefInput: string;
   contentBrief: ContentBrief | null;
   articleOutline: OutlineItem[] | null;
