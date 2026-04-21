@@ -36,6 +36,10 @@ export default function OutreachPage() {
   const [sendSuccess, setSendSuccess] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
 
+  // HTML editor modes
+  const [indHtmlMode, setIndHtmlMode] = useState(false)
+  const [campHtmlMode, setCampHtmlMode] = useState(false)
+
   // Mass campaign tab
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
   const [minScore, setMinScore] = useState(0)
@@ -267,8 +271,37 @@ export default function OutreachPage() {
                 <Input className="h-9 text-sm" placeholder="Email subject" value={indSubject} onChange={(e) => setIndSubject(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Message</Label>
-                <Textarea className="text-sm resize-none" rows={8} placeholder="Write your personalized email..." value={indBody} onChange={(e) => setIndBody(e.target.value)} />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Message</Label>
+                  <div className="flex rounded border overflow-hidden text-xs h-5">
+                    <button
+                      onClick={() => setIndHtmlMode(false)}
+                      className={cn("px-2", !indHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                    >Plain</button>
+                    <button
+                      onClick={() => setIndHtmlMode(true)}
+                      className={cn("px-2", indHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                    >HTML</button>
+                  </div>
+                </div>
+                {indHtmlMode ? (
+                  <div className="grid grid-cols-2 gap-2" style={{ height: 240 }}>
+                    <Textarea
+                      className="text-xs font-mono resize-none h-full"
+                      value={indBody}
+                      onChange={(e) => setIndBody(e.target.value)}
+                      placeholder={"<p>Hello,</p>\n<p>Your message here...</p>"}
+                    />
+                    <iframe
+                      srcDoc={indBody || "<p style='color:#aaa;font-family:sans-serif;padding:12px'>Preview appears here...</p>"}
+                      className="border rounded-md bg-white w-full h-full"
+                      sandbox="allow-same-origin"
+                      title="Email Preview"
+                    />
+                  </div>
+                ) : (
+                  <Textarea className="text-sm resize-none" rows={8} placeholder="Write your personalized email..." value={indBody} onChange={(e) => setIndBody(e.target.value)} />
+                )}
               </div>
 
               {sendSuccess && (
@@ -311,7 +344,17 @@ export default function OutreachPage() {
                   </Label>
                   <Select value={segmentFilter} onValueChange={(v) => handleSegmentChange(v ?? "all")}>
                     <SelectTrigger className="h-8 text-sm">
-                      <SelectValue placeholder="All Leads" />
+                      {segmentFilter === "all" ? (
+                        <span className="text-muted-foreground text-sm">All Leads</span>
+                      ) : (() => {
+                        const seg = segments.find(s => s.id === segmentFilter)
+                        return seg ? (
+                          <span className="flex items-center gap-2 text-sm">
+                            <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
+                            {seg.name}
+                          </span>
+                        ) : <span className="text-muted-foreground text-sm">All Leads</span>
+                      })()}
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Leads</SelectItem>
@@ -409,8 +452,37 @@ export default function OutreachPage() {
                   <Input className="h-8 text-sm" value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder="Email subject" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Email Body</Label>
-                  <Textarea className="text-sm resize-none" rows={6} value={campBody} onChange={(e) => setCampBody(e.target.value)} placeholder="Write your campaign email..." />
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Email Body</Label>
+                    <div className="flex rounded border overflow-hidden text-xs h-5">
+                      <button
+                        onClick={() => setCampHtmlMode(false)}
+                        className={cn("px-2", !campHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                      >Plain</button>
+                      <button
+                        onClick={() => setCampHtmlMode(true)}
+                        className={cn("px-2", campHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                      >HTML</button>
+                    </div>
+                  </div>
+                  {campHtmlMode ? (
+                    <div className="grid grid-cols-2 gap-2" style={{ height: 200 }}>
+                      <Textarea
+                        className="text-xs font-mono resize-none h-full"
+                        value={campBody}
+                        onChange={(e) => setCampBody(e.target.value)}
+                        placeholder={"<p>Hello,</p>\n<p>Your campaign message...</p>"}
+                      />
+                      <iframe
+                        srcDoc={campBody || "<p style='color:#aaa;font-family:sans-serif;padding:12px'>Preview appears here...</p>"}
+                        className="border rounded-md bg-white w-full h-full"
+                        sandbox="allow-same-origin"
+                        title="Campaign Email Preview"
+                      />
+                    </div>
+                  ) : (
+                    <Textarea className="text-sm resize-none" rows={6} value={campBody} onChange={(e) => setCampBody(e.target.value)} placeholder="Write your campaign email..." />
+                  )}
                 </div>
 
                 {campError && (

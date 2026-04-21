@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Bookmark,
   Newspaper,
+  Smartphone,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -45,6 +46,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: "Outreach",
     items: [
       { href: "/outreach", label: "Outreach", icon: Send },
+      { href: "/sms", label: "SMS Campaigns", icon: Smartphone },
       { href: "/outreach/sequences", label: "Sequences", icon: GitBranch },
       { href: "/responses", label: "Responses", icon: MessageSquare },
     ],
