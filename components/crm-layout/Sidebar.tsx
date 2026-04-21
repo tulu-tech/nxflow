@@ -13,6 +13,7 @@ import {
   GitBranch,
   ArrowLeft,
   Bookmark,
+  Newspaper,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -47,6 +48,10 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/outreach/sequences", label: "Sequences", icon: GitBranch },
       { href: "/responses", label: "Responses", icon: MessageSquare },
     ],
+  },
+  {
+    label: "Intelligence",
+    items: [{ href: "/news", label: "News Feed", icon: Newspaper }],
   },
   {
     label: "System",
