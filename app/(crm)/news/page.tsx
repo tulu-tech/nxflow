@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
   Newspaper,
@@ -15,6 +15,12 @@ import {
   Loader2,
   AlertCircle,
   Inbox,
+  Rss,
+  Plus,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
+  X,
 } from 'lucide-react';
 
 interface NewsArticle {
@@ -30,6 +36,14 @@ interface NewsArticle {
   image_url: string | null;
   ai_summary: string | null;
   relevance_score: number | null;
+}
+
+interface NewsSource {
+  id: string;
+  name: string;
+  url: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 const KEYWORD_COLORS: Record<string, { bg: string; text: string }> = {
@@ -113,7 +127,6 @@ function ArticleCard({
       onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
     >
       <div style={{ display: 'flex', gap: 12, padding: '14px 16px' }}>
-        {/* Image */}
         {article.image_url && (
           <div style={{ flexShrink: 0, width: 72, height: 72, borderRadius: 6, overflow: 'hidden' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -125,15 +138,9 @@ function ArticleCard({
             />
           </div>
         )}
-
-        {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Source + time + score */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, color: 'var(--primary)',
-              textTransform: 'uppercase', letterSpacing: '0.05em',
-            }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {article.source_name}
             </span>
             <span style={{ color: 'var(--border)', fontSize: 10 }}>·</span>
@@ -144,7 +151,6 @@ function ArticleCard({
             <ScoreBadge score={article.relevance_score} />
           </div>
 
-          {/* Title */}
           <a
             href={article.url}
             target="_blank"
@@ -159,7 +165,6 @@ function ArticleCard({
             {article.title}
           </a>
 
-          {/* Description */}
           {article.description && (
             <p style={{
               fontSize: 12, color: 'var(--muted-foreground)', margin: '0 0 6px',
@@ -170,7 +175,6 @@ function ArticleCard({
             </p>
           )}
 
-          {/* AI Summary */}
           {article.ai_summary && (
             <div style={{
               fontSize: 12, color: 'var(--foreground)',
@@ -184,13 +188,11 @@ function ArticleCard({
             </div>
           )}
 
-          {/* Keywords + actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <Tag size={10} color="var(--muted-foreground)" />
             {article.keywords_matched.map((kw) => (
               <KeywordBadge key={kw} kw={kw} />
             ))}
-
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
               <a
                 href={article.url}
@@ -200,8 +202,7 @@ function ArticleCard({
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   fontSize: 11, color: 'var(--muted-foreground)',
                   textDecoration: 'none', padding: '3px 8px', borderRadius: 5,
-                  border: '1px solid var(--border)', background: 'transparent',
-                  cursor: 'pointer',
+                  border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--foreground)')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted-foreground)')}
@@ -237,6 +238,246 @@ function ArticleCard({
   );
 }
 
+// ─── Sources Panel ─────────────────────────────────────────────────────────────
+
+function SourcesPanel() {
+  const [sources, setSources] = useState<NewsSource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [addName, setAddName] = useState('');
+  const [addUrl, setAddUrl] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  const loadSources = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const res = await fetch('/api/news/sources');
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setError(d.error ?? 'Failed to load sources');
+    } else {
+      setSources(await res.json());
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadSources(); }, [loadSources]);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setAddError(null);
+    setAdding(true);
+    const res = await fetch('/api/news/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: addName.trim(), url: addUrl.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setAddError(data.error ?? 'Failed to add source');
+    } else {
+      setSources((prev) => [...prev, data]);
+      setAddName('');
+      setAddUrl('');
+      nameRef.current?.focus();
+    }
+    setAdding(false);
+  }
+
+  async function handleToggle(id: string, current: boolean) {
+    setTogglingId(id);
+    const res = await fetch('/api/news/sources', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, is_active: !current }),
+    });
+    if (res.ok) {
+      setSources((prev) => prev.map((s) => s.id === id ? { ...s, is_active: !current } : s));
+    }
+    setTogglingId(null);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Remove this source?')) return;
+    setDeletingId(id);
+    const res = await fetch(`/api/news/sources?id=${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setSources((prev) => prev.filter((s) => s.id !== id));
+    }
+    setDeletingId(null);
+  }
+
+  const activeCount = sources.filter(s => s.is_active).length;
+
+  return (
+    <div style={{
+      background: 'var(--card)',
+      border: '1px solid var(--border)',
+      borderRadius: 10,
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '12px 16px', borderBottom: '1px solid var(--border)',
+        background: 'rgba(99,102,241,0.04)',
+      }}>
+        <Rss size={14} color="var(--primary)" />
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>RSS Sources</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
+          background: 'rgba(99,102,241,0.15)', color: 'var(--primary)',
+        }}>
+          {activeCount} active
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--muted-foreground)', flex: 1 }}>
+          — sources used when fetching news
+        </span>
+      </div>
+
+      {/* Source list */}
+      <div style={{ padding: '12px 16px' }}>
+        {error && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', borderRadius: 7,
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+            color: '#f87171', fontSize: 12, marginBottom: 12,
+          }}>
+            <AlertCircle size={13} /> {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: 'var(--muted-foreground)', fontSize: 12 }}>
+            <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Loading sources…
+          </div>
+        ) : sources.length === 0 ? (
+          <p style={{ fontSize: 12, color: 'var(--muted-foreground)', margin: '0 0 12px' }}>
+            No sources yet. Add one below.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginBottom: 14 }}>
+            {sources.map((src) => (
+              <div key={src.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 7,
+                background: src.is_active ? 'transparent' : 'rgba(0,0,0,0.02)',
+                opacity: src.is_active ? 1 : 0.55,
+                transition: 'opacity 0.15s',
+              }}>
+                {/* Toggle */}
+                <button
+                  onClick={() => handleToggle(src.id, src.is_active)}
+                  disabled={togglingId === src.id}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: src.is_active ? 'var(--primary)' : 'var(--muted-foreground)' }}
+                  title={src.is_active ? 'Disable source' : 'Enable source'}
+                >
+                  {togglingId === src.id
+                    ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    : src.is_active
+                      ? <ToggleRight size={16} />
+                      : <ToggleLeft size={16} />
+                  }
+                </button>
+
+                {/* Name + URL */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--foreground)' }}>{src.name}</span>
+                  <span style={{
+                    fontSize: 11, color: 'var(--muted-foreground)', marginLeft: 8,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    maxWidth: 340, display: 'inline-block', verticalAlign: 'bottom',
+                  }}>
+                    {src.url}
+                  </span>
+                </div>
+
+                {/* Delete */}
+                <button
+                  onClick={() => handleDelete(src.id)}
+                  disabled={deletingId === src.id}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--muted-foreground)', padding: '2px 4px', borderRadius: 4, display: 'flex',
+                  }}
+                  title="Remove source"
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted-foreground)')}
+                >
+                  {deletingId === src.id
+                    ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <Trash2 size={13} />
+                  }
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add source form */}
+        <form onSubmit={handleAdd} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <div style={{ flex: '0 0 160px' }}>
+            <input
+              ref={nameRef}
+              value={addName}
+              onChange={(e) => setAddName(e.target.value)}
+              placeholder="Source name"
+              required
+              style={{
+                width: '100%', padding: '6px 10px', borderRadius: 6, fontSize: 12,
+                border: '1px solid var(--border)', background: 'var(--background)',
+                color: 'var(--foreground)', outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <input
+              value={addUrl}
+              onChange={(e) => setAddUrl(e.target.value)}
+              placeholder="https://example.com/feed/"
+              required
+              type="url"
+              style={{
+                width: '100%', padding: '6px 10px', borderRadius: 6, fontSize: 12,
+                border: addError ? '1px solid #ef4444' : '1px solid var(--border)',
+                background: 'var(--background)', color: 'var(--foreground)',
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={adding || !addName.trim() || !addUrl.trim()}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+              background: 'var(--primary)', color: '#fff', border: 'none',
+              cursor: adding ? 'not-allowed' : 'pointer',
+              opacity: adding ? 0.7 : 1, flexShrink: 0,
+            }}
+          >
+            {adding ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={12} />}
+            Add
+          </button>
+        </form>
+
+        {addError && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, color: '#f87171', fontSize: 12 }}>
+            <X size={12} /> {addError}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
+
 export default function NewsPage() {
   const [todayArticles, setTodayArticles] = useState<NewsArticle[]>([]);
   const [archiveArticles, setArchiveArticles] = useState<NewsArticle[]>([]);
@@ -244,6 +485,7 @@ export default function NewsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [lastFetch, setLastFetch] = useState<string | null>(null);
 
   const loadNews = useCallback(async () => {
@@ -253,13 +495,21 @@ export default function NewsPage() {
         fetch('/api/news?view=today'),
         fetch('/api/news?view=archive'),
       ]);
-      if (!todayRes.ok || !archiveRes.ok) throw new Error('Failed to load news');
+
+      // Extract real error from response body
+      if (!todayRes.ok) {
+        const d = await todayRes.json().catch(() => ({}));
+        throw new Error(d.error ?? `News API error (${todayRes.status})`);
+      }
+      if (!archiveRes.ok) {
+        const d = await archiveRes.json().catch(() => ({}));
+        throw new Error(d.error ?? `Archive API error (${archiveRes.status})`);
+      }
+
       const [today, archive] = await Promise.all([todayRes.json(), archiveRes.json()]);
       setTodayArticles(today);
       setArchiveArticles(archive);
-      if (today.length > 0) {
-        setLastFetch(today[0].fetched_at);
-      }
+      if (today.length > 0) setLastFetch(today[0].fetched_at);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error loading news');
     }
@@ -273,9 +523,12 @@ export default function NewsPage() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // Trigger the cron endpoint manually
-      await fetch('/api/cron/news');
+      const res = await fetch('/api/cron/news');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Fetch failed');
       await loadNews();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Fetch failed');
     } finally {
       setRefreshing(false);
     }
@@ -287,7 +540,6 @@ export default function NewsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, is_archived: archived }),
     });
-    // Move article between lists locally
     if (archived) {
       const article = todayArticles.find((a) => a.id === id);
       if (article) {
@@ -324,40 +576,69 @@ export default function NewsPage() {
           )}
         </div>
 
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 13, fontWeight: 500,
-            padding: '8px 14px', borderRadius: 7,
-            background: 'var(--primary)', color: '#fff',
-            border: 'none', cursor: refreshing ? 'not-allowed' : 'pointer',
-            opacity: refreshing ? 0.7 : 1, flexShrink: 0,
-          }}
-        >
-          <RefreshCw size={13} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-          {refreshing ? 'Fetching…' : 'Fetch Now'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button
+            onClick={() => setSourcesOpen((v) => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 13, fontWeight: 500,
+              padding: '8px 14px', borderRadius: 7,
+              background: sourcesOpen ? 'rgba(99,102,241,0.12)' : 'transparent',
+              color: sourcesOpen ? 'var(--primary)' : 'var(--muted-foreground)',
+              border: '1px solid var(--border)', cursor: 'pointer',
+            }}
+          >
+            <Rss size={13} />
+            Sources
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 13, fontWeight: 500,
+              padding: '8px 14px', borderRadius: 7,
+              background: 'var(--primary)', color: '#fff',
+              border: 'none', cursor: refreshing ? 'not-allowed' : 'pointer',
+              opacity: refreshing ? 0.7 : 1,
+            }}
+          >
+            <RefreshCw size={13} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+            {refreshing ? 'Fetching…' : 'Fetch Now'}
+          </button>
+        </div>
       </div>
 
-      {error && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px',
-          borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-          color: '#f87171', fontSize: 13, marginBottom: 20,
-        }}>
-          <AlertCircle size={15} />
-          {error}
+      {/* Sources panel */}
+      {sourcesOpen && (
+        <div style={{ marginBottom: 24 }}>
+          <SourcesPanel />
         </div>
       )}
 
-      {/* ── Today's Feed ─────────────────────────────────────────── */}
+      {/* Error */}
+      {error && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px',
+          borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+          color: '#f87171', fontSize: 13, marginBottom: 20,
+        }}>
+          <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <p style={{ margin: 0, fontWeight: 600 }}>{error}</p>
+            {(error.includes('does not exist') || error.includes('relation')) && (
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#fca5a5' }}>
+                The <code>news_articles</code> table is missing. Run <code>supabase/news_articles.sql</code> and <code>supabase/news_sources.sql</code> in your Supabase SQL Editor.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Today's Feed */}
       <section style={{ marginBottom: 32 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
-            Today's Feed
-          </h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Today&apos;s Feed</h2>
           {!loading && (
             <span style={{
               fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
@@ -387,7 +668,7 @@ export default function NewsPage() {
           }}>
             <Inbox size={28} strokeWidth={1.5} />
             <span style={{ fontSize: 14, fontWeight: 500 }}>No matching news in the last 24 hours</span>
-            <span style={{ fontSize: 12 }}>Click "Fetch Now" to pull the latest articles from all sources.</span>
+            <span style={{ fontSize: 12 }}>Click &quot;Fetch Now&quot; to pull the latest articles from all sources.</span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -398,7 +679,7 @@ export default function NewsPage() {
         )}
       </section>
 
-      {/* ── Archive ──────────────────────────────────────────────── */}
+      {/* Archive */}
       <section>
         <button
           onClick={() => setArchiveOpen((v) => !v)}
@@ -408,9 +689,7 @@ export default function NewsPage() {
             padding: '10px 0', marginBottom: archiveOpen ? 14 : 0,
           }}
         >
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>
-            Archive
-          </h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Archive</h2>
           {archiveArticles.length > 0 && (
             <span style={{
               fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,

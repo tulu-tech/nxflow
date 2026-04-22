@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { RSS_SOURCES, fetchSource } from '@/lib/news/rss';
 
+// Load active sources from DB; fall back to hardcoded if empty
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadSources(supabase: any): Promise<{ name: string; url: string }[]> {
+  const { data } = await supabase
+    .from('news_sources')
+    .select('name, url')
+    .eq('is_active', true);
+  if (data && data.length > 0) return data as { name: string; url: string }[];
+  return RSS_SOURCES; // fallback
+}
+
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
@@ -87,9 +98,10 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  // 1. Fetch all RSS sources in parallel
+  // 1. Fetch all active RSS sources in parallel (from DB, fallback to hardcoded)
+  const activeSources = await loadSources(supabase);
   const results = await Promise.allSettled(
-    RSS_SOURCES.map((source) => fetchSource(source)),
+    activeSources.map((source) => fetchSource(source)),
   );
   const allArticles = results.flatMap((r) =>
     r.status === 'fulfilled' ? r.value : [],
