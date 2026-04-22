@@ -80,7 +80,7 @@ export default function SettingsPage() {
 
     const [keysRes, gmailRes, twilioRes, creditRes, historyRes, rulesRes] = await Promise.all([
       fetch("/api/settings/api-keys"),
-      supabase.from("gmail_tokens").select("id, email").order("created_at", { ascending: true }),
+      supabase.from("gmail_tokens").select("id, email").order("updated_at", { ascending: true }),
       fetch("/api/settings/twilio"),
       supabase.from("credit_usage").select("type, amount").gte("created_at", monthStart),
       supabase.from("credit_usage").select("*").order("created_at", { ascending: false }).limit(20),

@@ -285,7 +285,7 @@ export default function OutreachPage() {
       supabase.from("leadboard").select("*").order("relevance_score", { ascending: false }),
       supabase.from("email_campaigns").select("*").order("created_at", { ascending: false }),
       fetch("/api/segments"),
-      supabase.from("gmail_tokens").select("id, email").order("created_at", { ascending: true }),
+      supabase.from("gmail_tokens").select("id, email").order("updated_at", { ascending: true }),
     ])
     setLeads((l as LeadboardEntry[]) ?? [])
     setCampaigns((c as EmailCampaign[]) ?? [])
