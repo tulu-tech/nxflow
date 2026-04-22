@@ -43,3 +43,8 @@ CREATE POLICY "Authenticated users can archive news"
   ON public.news_articles FOR UPDATE
   USING (auth.role() = 'authenticated')
   WITH CHECK (auth.role() = 'authenticated');
+
+-- Migration: add AI columns if table was created without them
+ALTER TABLE public.news_articles
+  ADD COLUMN IF NOT EXISTS ai_summary      text,
+  ADD COLUMN IF NOT EXISTS relevance_score integer;

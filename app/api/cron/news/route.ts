@@ -93,10 +93,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl) {
+    return NextResponse.json(
+      { error: 'Missing env var: NEXT_PUBLIC_SUPABASE_URL — add it to .env.local' },
+      { status: 500 },
+    );
+  }
+  if (!serviceRoleKey) {
+    return NextResponse.json(
+      { error: 'Missing env var: SUPABASE_SERVICE_ROLE_KEY — get it from Supabase Dashboard → Settings → API → service_role key, then add to .env.local' },
+      { status: 500 },
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   // 1. Fetch all active RSS sources in parallel (from DB, fallback to hardcoded)
   const activeSources = await loadSources(supabase);
