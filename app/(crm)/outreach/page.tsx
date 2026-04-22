@@ -435,7 +435,12 @@ export default function OutreachPage() {
       const res = await fetch("/api/mailchimp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaignId: campaignDraft.id }),
+        body: JSON.stringify({
+          campaignId: campaignDraft.id,
+          recipientIds: Array.from(selectedLeadIds),
+          fromEmail: campFromEmail || undefined,
+          isHtml: campEmailFormat === "html",
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
