@@ -119,12 +119,12 @@ export default function SMSPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">Send SMS campaigns to your leads via Twilio</p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" asChild>
-          <a href="/settings">
+        <a href="/settings">
+          <Button variant="outline" size="sm" className="gap-2">
             <Settings className="h-4 w-4" />
             Connect Twilio
-          </a>
-        </Button>
+          </Button>
+        </a>
       </div>
 
       {/* Twilio not connected warning */}
