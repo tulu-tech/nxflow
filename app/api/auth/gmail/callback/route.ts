@@ -33,11 +33,17 @@ export async function GET(req: NextRequest) {
   const tokens = await tokenRes.json()
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
 
-  // Get Gmail email address
+  // Get Gmail email address (requires userinfo.email scope)
   const profileRes = await fetch("https://www.googleapis.com/userinfo/v2/me", {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   })
   const gmailProfile = profileRes.ok ? await profileRes.json() : {}
+  const email = gmailProfile.email ?? null
+
+  // If we couldn't get the email address, abort — null emails create duplicate rows
+  if (!email) {
+    return NextResponse.redirect(new URL("/settings?tab=api&error=gmail_no_email", req.url))
+  }
 
   // Upsert token — conflict on (user_id, email) to support multiple accounts
   await supabase.from("gmail_tokens").upsert({
@@ -45,7 +51,7 @@ export async function GET(req: NextRequest) {
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
     expires_at: expiresAt,
-    email: gmailProfile.email ?? null,
+    email,
     updated_at: new Date().toISOString(),
   }, { onConflict: "user_id,email" })
 
