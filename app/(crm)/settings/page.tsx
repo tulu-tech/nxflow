@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   User, Key, BrainCircuit, Palette, Lock,
   Loader2, CheckCircle2, AlertCircle, Eye, EyeOff,
-  Zap, Mail, BarChart3, Plus, Trash2
+  Zap, Mail, BarChart3, Plus, Trash2, Smartphone
 } from "lucide-react"
 import { setTheme, getStoredTheme, type Theme } from "@/lib/theme"
 import type { ScoringRule, CreditUsage } from "@/types"
@@ -39,7 +39,19 @@ export default function SettingsPage() {
   const [savingKeys, setSavingKeys] = useState(false)
   const [keysSuccess, setKeysSuccess] = useState(false)
   const [keysError, setKeysError] = useState<string | null>(null)
-  const [gmailConnected, setGmailConnected] = useState(false)
+  const [gmailAccounts, setGmailAccounts] = useState<{ id: string; email: string }[]>([])
+  const [removingGmailId, setRemovingGmailId] = useState<string | null>(null)
+
+  // Twilio
+  const [twilioAccountSid, setTwilioAccountSid] = useState("")
+  const [twilioAuthToken, setTwilioAuthToken] = useState("")
+  const [twilioPhone, setTwilioPhone] = useState("")
+  const [twilioConnected, setTwilioConnected] = useState(false)
+  const [showTwilioSid, setShowTwilioSid] = useState(false)
+  const [showTwilioToken, setShowTwilioToken] = useState(false)
+  const [savingTwilio, setSavingTwilio] = useState(false)
+  const [twilioSuccess, setTwilioSuccess] = useState(false)
+  const [twilioError, setTwilioError] = useState<string | null>(null)
 
   // Credits
   const [credits, setCredits] = useState<{ lusha: number; claude: number; mailchimp: number }>({ lusha: 0, claude: 0, mailchimp: 0 })
@@ -66,9 +78,10 @@ export default function SettingsPage() {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-    const [keysRes, gmailRes, creditRes, historyRes, rulesRes] = await Promise.all([
+    const [keysRes, gmailRes, twilioRes, creditRes, historyRes, rulesRes] = await Promise.all([
       fetch("/api/settings/api-keys"),
-      supabase.from("gmail_tokens").select("id").limit(1),
+      supabase.from("gmail_tokens").select("id, email").order("created_at", { ascending: true }),
+      fetch("/api/settings/twilio"),
       supabase.from("credit_usage").select("type, amount").gte("created_at", monthStart),
       supabase.from("credit_usage").select("*").order("created_at", { ascending: false }).limit(20),
       supabase.from("scoring_rules").select("*").order("created_at", { ascending: false }),
@@ -82,7 +95,13 @@ export default function SettingsPage() {
       setServerPrefix(keys.mailchimpServerPrefix ?? "")
     }
 
-    setGmailConnected((gmailRes.data?.length ?? 0) > 0)
+    setGmailAccounts((gmailRes.data ?? []) as { id: string; email: string }[])
+
+    if (twilioRes.ok) {
+      const tw = await twilioRes.json()
+      setTwilioPhone(tw.phoneNumber ?? "")
+      setTwilioConnected(tw.connected ?? false)
+    }
 
     const creditRows = creditRes.data ?? []
     setCredits({
@@ -134,6 +153,39 @@ export default function SettingsPage() {
       setKeysError(d.error)
     }
     setSavingKeys(false)
+  }
+
+  async function handleSaveTwilio() {
+    setSavingTwilio(true)
+    setTwilioError(null)
+    setTwilioSuccess(false)
+    const body: Record<string, string> = { phoneNumber: twilioPhone }
+    if (twilioAccountSid) body.accountSid = twilioAccountSid
+    if (twilioAuthToken) body.authToken = twilioAuthToken
+    const res = await fetch("/api/settings/twilio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    if (res.ok) {
+      setTwilioSuccess(true)
+      setTwilioAccountSid("")
+      setTwilioAuthToken("")
+      setTwilioConnected(!!(twilioAccountSid || twilioConnected))
+      await loadAll()
+      setTimeout(() => setTwilioSuccess(false), 3000)
+    } else {
+      const d = await res.json()
+      setTwilioError(d.error ?? "Failed to save Twilio settings")
+    }
+    setSavingTwilio(false)
+  }
+
+  async function handleRemoveGmail(id: string) {
+    setRemovingGmailId(id)
+    await supabase.from("gmail_tokens").delete().eq("id", id)
+    setGmailAccounts((prev) => prev.filter((a) => a.id !== id))
+    setRemovingGmailId(null)
   }
 
   async function handleToggleRule(id: string, current: boolean) {
@@ -362,28 +414,113 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Gmail Integration</CardTitle>
-              <CardDescription className="text-xs">Required for sending individual emails and scanning inbox.</CardDescription>
+              <CardDescription className="text-xs">Connect one or more Gmail accounts for sending emails from Outreach.</CardDescription>
             </CardHeader>
-            <CardContent>
-              {gmailConnected ? (
-                <div className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                  <span>Gmail connected</span>
-                  <a
-                    href="/api/auth/gmail"
-                    className="ml-auto inline-flex items-center gap-1.5 h-7 px-2.5 text-[0.8rem] font-medium rounded-[min(var(--radius-md),12px)] border border-border bg-background hover:bg-muted transition-colors"
-                  >
-                    Reconnect
-                  </a>
+            <CardContent className="space-y-3">
+              {gmailAccounts.length > 0 && (
+                <div className="space-y-1">
+                  {gmailAccounts.map((acc) => (
+                    <div key={acc.id} className="flex items-center gap-2 rounded-md border px-3 py-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      <span className="text-sm flex-1 truncate font-mono">{acc.email ?? "—"}</span>
+                      <button
+                        onClick={() => handleRemoveGmail(acc.id)}
+                        disabled={removingGmailId === acc.id}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="Remove account"
+                      >
+                        {removingGmailId === acc.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                <a
-                  href="/api/auth/gmail"
-                  className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[0.8rem] font-medium rounded-[min(var(--radius-md),12px)] border border-border bg-background hover:bg-muted transition-colors"
-                >
-                  <Mail className="h-4 w-4" /> Connect Gmail
-                </a>
               )}
+              <a
+                href="/api/auth/gmail"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[0.8rem] font-medium rounded-[min(var(--radius-md),12px)] border border-border bg-background hover:bg-muted transition-colors"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {gmailAccounts.length > 0 ? "Connect another account" : "Connect Gmail"}
+              </a>
+            </CardContent>
+          </Card>
+
+          {/* Twilio */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Smartphone className="h-4 w-4" /> Twilio Integration
+                {twilioConnected && <Badge variant="outline" className="text-xs gap-1 ml-1"><CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" /> Connected</Badge>}
+              </CardTitle>
+              <CardDescription className="text-xs">Required for SMS campaigns. Enter your Twilio Account SID, Auth Token, and phone number.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Account SID</Label>
+                <div className="relative">
+                  <Input
+                    className="h-9 text-sm pr-10"
+                    type={showTwilioSid ? "text" : "password"}
+                    value={twilioAccountSid}
+                    onChange={(e) => setTwilioAccountSid(e.target.value)}
+                    placeholder={twilioConnected ? "Enter new SID to replace…" : "ACxxxxxxxxxxxxxxxx"}
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTwilioSid((v) => !v)}
+                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    {showTwilioSid ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Auth Token</Label>
+                <div className="relative">
+                  <Input
+                    className="h-9 text-sm pr-10"
+                    type={showTwilioToken ? "text" : "password"}
+                    value={twilioAuthToken}
+                    onChange={(e) => setTwilioAuthToken(e.target.value)}
+                    placeholder={twilioConnected ? "Enter new token to replace…" : "xxxxxxxxxxxxxxxx"}
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTwilioToken((v) => !v)}
+                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    {showTwilioToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Phone Number</Label>
+                <Input
+                  className="h-9 text-sm"
+                  value={twilioPhone}
+                  onChange={(e) => setTwilioPhone(e.target.value)}
+                  placeholder="+1234567890"
+                />
+                <p className="text-xs text-muted-foreground">Must be a Twilio-provisioned number in E.164 format.</p>
+              </div>
+              {twilioSuccess && (
+                <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-md px-3 py-2">
+                  <CheckCircle2 className="h-4 w-4" /> Twilio settings saved!
+                </div>
+              )}
+              {twilioError && (
+                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                  <AlertCircle className="h-4 w-4" /> {twilioError}
+                </div>
+              )}
+              <Button size="sm" onClick={handleSaveTwilio} disabled={savingTwilio} className="gap-1.5">
+                {savingTwilio ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Save Twilio
+              </Button>
             </CardContent>
           </Card>
 

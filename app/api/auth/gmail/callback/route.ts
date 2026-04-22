@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   })
   const gmailProfile = profileRes.ok ? await profileRes.json() : {}
 
-  // Upsert token
+  // Upsert token — conflict on (user_id, email) to support multiple accounts
   await supabase.from("gmail_tokens").upsert({
     user_id: user.id,
     access_token: tokens.access_token,
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     expires_at: expiresAt,
     email: gmailProfile.email ?? null,
     updated_at: new Date().toISOString(),
-  }, { onConflict: "user_id" })
+  }, { onConflict: "user_id,email" })
 
   return NextResponse.redirect(new URL("/settings?tab=api&gmail=connected", req.url))
 }

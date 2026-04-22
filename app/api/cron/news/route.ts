@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { RSS_SOURCES, fetchSource } from '@/lib/news/rss';
-
-// Load active sources from DB; fall back to hardcoded if empty
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function loadSources(supabase: any): Promise<{ name: string; url: string }[]> {
-  const { data } = await supabase
-    .from('news_sources')
-    .select('name, url')
-    .eq('is_active', true);
-  if (data && data.length > 0) return data as { name: string; url: string }[];
-  return RSS_SOURCES; // fallback
-}
+import { createServiceRoleClient } from '@/lib/supabase/serviceRole';
+import { RSS_SOURCES, MATCH_KEYWORDS, fetchSource } from '@/lib/news/rss';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadSources(supabase: any): Promise<{ name: string; url: string }[]> {
+  const { data } = await supabase.from('news_sources').select('name, url').eq('is_active', true);
+  if (data && data.length > 0) return data as { name: string; url: string }[];
+  return RSS_SOURCES;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadKeywords(supabase: any): Promise<string[]> {
+  const { data } = await supabase.from('news_keywords').select('keyword').eq('is_active', true);
+  if (data && data.length > 0) return data.map((r: { keyword: string }) => r.keyword);
+  return MATCH_KEYWORDS;
+}
 
 // ─── OpenAI scoring ──────────────────────────────────────────────────────────
 
@@ -56,10 +59,7 @@ Return ONLY a JSON array — no markdown, no extra text:
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
@@ -73,8 +73,6 @@ Return ONLY a JSON array — no markdown, no extra text:
 
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content ?? '[]';
-
-    // GPT sometimes wraps in {"articles": [...]}
     const parsed = JSON.parse(raw);
     const arr: ScoredArticle[] = Array.isArray(parsed) ? parsed : (parsed.articles ?? parsed.results ?? []);
     return arr.filter((x) => x.id && typeof x.score === 'number');
@@ -86,70 +84,47 @@ Return ONLY a JSON array — no markdown, no extra text:
 // ─── Cron handler ────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (cronSecret && req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const clientResult = createServiceRoleClient();
+  if ('error' in clientResult) return clientResult.error;
+  const { supabase } = clientResult;
 
-  if (!supabaseUrl) {
-    return NextResponse.json(
-      { error: 'Missing env var: NEXT_PUBLIC_SUPABASE_URL — add it to .env.local' },
-      { status: 500 },
-    );
-  }
-  if (!serviceRoleKey) {
-    return NextResponse.json(
-      { error: 'Missing env var: SUPABASE_SERVICE_ROLE_KEY — get it from Supabase Dashboard → Settings → API → service_role key, then add to .env.local' },
-      { status: 500 },
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-  // 1. Fetch all active RSS sources in parallel (from DB, fallback to hardcoded)
-  const activeSources = await loadSources(supabase);
+  // 1. Load active sources + keywords from DB (fallback to hardcoded)
+  const [activeSources, activeKeywords] = await Promise.all([
+    loadSources(supabase),
+    loadKeywords(supabase),
+  ]);
   const results = await Promise.allSettled(
-    activeSources.map((source) => fetchSource(source)),
+    activeSources.map((source) => fetchSource(source, activeKeywords)),
   );
-  const allArticles = results.flatMap((r) =>
-    r.status === 'fulfilled' ? r.value : [],
-  );
+  const allArticles = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
 
-  // 2. Upsert new articles (duplicates ignored via url uniqueness)
-  let inserted = 0;
-  const newIds: string[] = [];
+  // 2. Batch upsert — single DB call instead of N sequential calls
+  const fetched_at = new Date().toISOString();
+  const { data: upserted } = await supabase
+    .from('news_articles')
+    .upsert(
+      allArticles.map((a) => ({
+        title: a.title,
+        description: a.description,
+        url: a.url,
+        source_name: a.sourceName,
+        published_at: a.publishedAt,
+        keywords_matched: a.keywords,
+        image_url: a.imageUrl,
+        fetched_at,
+      })),
+      { onConflict: 'url', ignoreDuplicates: true },
+    )
+    .select('id');
 
-  for (const article of allArticles) {
-    const { data, error } = await supabase
-      .from('news_articles')
-      .upsert(
-        {
-          title: article.title,
-          description: article.description,
-          url: article.url,
-          source_name: article.sourceName,
-          published_at: article.publishedAt,
-          keywords_matched: article.keywords,
-          image_url: article.imageUrl,
-          fetched_at: new Date().toISOString(),
-        },
-        { onConflict: 'url', ignoreDuplicates: true },
-      )
-      .select('id')
-      .single();
+  const inserted = upserted?.length ?? 0;
 
-    if (!error && data?.id) {
-      newIds.push(data.id);
-      inserted++;
-    }
-  }
-
-  // 3. Score articles that have no AI summary yet (new ones + any missed before)
+  // 3. Score articles with no AI summary yet
   const { data: unscored } = await supabase
     .from('news_articles')
     .select('id, title, description, keywords_matched')
@@ -158,27 +133,21 @@ export async function GET(req: NextRequest) {
 
   let scored = 0;
   if (unscored && unscored.length > 0) {
-    // Process in batches of 10 to keep prompt size manageable
     const BATCH = 10;
     for (let i = 0; i < unscored.length; i += BATCH) {
-      const batch = unscored.slice(i, i + BATCH) as ArticleToScore[];
-      const scores = await scoreArticles(batch);
-
-      for (const s of scores) {
-        await supabase
-          .from('news_articles')
-          .update({ ai_summary: s.summary, relevance_score: s.score })
-          .eq('id', s.id);
-        scored++;
-      }
+      const scores = await scoreArticles(unscored.slice(i, i + BATCH) as ArticleToScore[]);
+      // Run all updates in parallel within each batch
+      await Promise.all(
+        scores.map((s) =>
+          supabase
+            .from('news_articles')
+            .update({ ai_summary: s.summary, relevance_score: s.score })
+            .eq('id', s.id),
+        ),
+      );
+      scored += scores.length;
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    total: allArticles.length,
-    inserted,
-    scored,
-    fetchedAt: new Date().toISOString(),
-  });
+  return NextResponse.json({ ok: true, total: allArticles.length, inserted, scored, fetchedAt: fetched_at });
 }

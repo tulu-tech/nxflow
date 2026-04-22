@@ -21,13 +21,21 @@ async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   }
 }
 
-async function sendViaGmail(accessToken: string, from: string, to: string, subject: string, body: string) {
+async function sendViaGmail(
+  accessToken: string,
+  from: string,
+  to: string,
+  subject: string,
+  body: string,
+  isHtml = false,
+) {
+  const contentType = isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8"
   const emailLines = [
     `From: ${from}`,
     `To: ${to}`,
     `Subject: ${subject}`,
     `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset=utf-8`,
+    `Content-Type: ${contentType}`,
     ``,
     body,
   ]
@@ -35,10 +43,7 @@ async function sendViaGmail(accessToken: string, from: string, to: string, subje
 
   return fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ raw: encoded }),
   })
 }
@@ -48,17 +53,20 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { to, subject, body, leadId } = await req.json()
+  const { to, subject, body, leadId, fromEmail, isHtml } = await req.json()
   if (!to || !subject || !body) {
     return NextResponse.json({ error: "to, subject, and body are required" }, { status: 400 })
   }
 
-  // Try Gmail API with stored token
-  const { data: gmailToken } = await supabase
+  // Look up specified Gmail account, or first connected if none specified
+  let tokenQuery = supabase
     .from("gmail_tokens")
-    .select("access_token, refresh_token, expires_at, email")
+    .select("id, access_token, refresh_token, expires_at, email")
     .eq("user_id", user.id)
-    .single()
+
+  if (fromEmail) tokenQuery = tokenQuery.eq("email", fromEmail)
+
+  const { data: gmailToken } = await tokenQuery.limit(1).single()
 
   if (!gmailToken?.access_token) {
     return NextResponse.json(
@@ -67,43 +75,35 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const fromEmail = gmailToken.email ?? user.email ?? "me"
+  const fromAddr = gmailToken.email ?? user.email ?? "me"
 
-  // First attempt
-  let gmailRes = await sendViaGmail(gmailToken.access_token, fromEmail, to, subject, body)
+  let gmailRes = await sendViaGmail(gmailToken.access_token, fromAddr, to, subject, body, !!isHtml)
 
-  // If 401 and we have a refresh token, try refreshing
+  // 401 → try token refresh
   if (gmailRes.status === 401 && gmailToken.refresh_token) {
     const newAccessToken = await refreshGmailToken(gmailToken.refresh_token)
     if (newAccessToken) {
-      // Save refreshed token
       await supabase
         .from("gmail_tokens")
         .update({ access_token: newAccessToken, updated_at: new Date().toISOString() })
-        .eq("user_id", user.id)
-
-      // Retry with fresh token
-      gmailRes = await sendViaGmail(newAccessToken, fromEmail, to, subject, body)
+        .eq("id", gmailToken.id)
+      gmailRes = await sendViaGmail(newAccessToken, fromAddr, to, subject, body, !!isHtml)
     }
   }
 
   if (!gmailRes.ok) {
     const err = await gmailRes.json().catch(() => null)
     const message = err?.error?.message ?? `Gmail send failed (HTTP ${gmailRes.status})`
-
-    // Token is permanently invalid — delete it so user knows to reconnect
     if (gmailRes.status === 401) {
-      await supabase.from("gmail_tokens").delete().eq("user_id", user.id)
+      await supabase.from("gmail_tokens").delete().eq("id", gmailToken.id)
       return NextResponse.json(
         { error: "Gmail session expired. Please reconnect Gmail in Settings → API & Credits." },
         { status: 400 }
       )
     }
-
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
-  // Update lead last_contacted_at
   if (leadId) {
     await supabase
       .from("leadboard")
@@ -112,12 +112,11 @@ export async function POST(req: NextRequest) {
       .eq("user_id", user.id)
   }
 
-  // Log send
   await supabase.from("credit_usage").insert({
     user_id: user.id,
     type: "mailchimp_send",
     amount: 1,
-    metadata: { to, lead_id: leadId, method: "gmail" },
+    metadata: { to, lead_id: leadId, method: "gmail", from: fromAddr },
   })
 
   return NextResponse.json({ success: true })

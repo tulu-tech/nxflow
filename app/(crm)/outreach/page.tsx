@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
@@ -13,12 +13,179 @@ import { Checkbox } from "@/components/ui-crm/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui-crm/select"
 import {
   Send, Loader2, Search, CheckCircle2, AlertCircle,
-  Clock, Users, Mail, Tag
+  Clock, Users, Mail, Tag, Monitor, Smartphone, FileText, Code2,
+  ChevronLeft,
 } from "lucide-react"
 import type { LeadboardEntry, EmailCampaign, LeadStatus } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
+
+type EmailFormat = "none" | "plain" | "html"
+type PreviewDevice = "mobile" | "desktop"
+
+interface GmailAccount {
+  id: string
+  email: string
+}
+
+const MERGE_TAGS = [
+  { label: "{{first_name}}", value: "{{first_name}}" },
+  { label: "{{last_name}}", value: "{{last_name}}" },
+  { label: "{{company}}", value: "{{company}}" },
+  { label: "{{email}}", value: "{{email}}" },
+]
+
+function fillMergeTags(template: string, lead: LeadboardEntry): string {
+  return template
+    .replace(/\{\{first_name\}\}/gi, lead.full_name.split(" ")[0] ?? "")
+    .replace(/\{\{last_name\}\}/gi, lead.full_name.split(" ").slice(1).join(" ") ?? "")
+    .replace(/\{\{company\}\}/gi, lead.company ?? "")
+    .replace(/\{\{email\}\}/gi, lead.email ?? "")
+}
+
+function insertAtCursor(
+  ref: React.RefObject<HTMLTextAreaElement | null>,
+  setter: (v: string) => void,
+  tag: string,
+) {
+  const el = ref.current
+  if (!el) return
+  const start = el.selectionStart ?? el.value.length
+  const end = el.selectionEnd ?? el.value.length
+  const next = el.value.slice(0, start) + tag + el.value.slice(end)
+  setter(next)
+  requestAnimationFrame(() => {
+    el.focus()
+    el.setSelectionRange(start + tag.length, start + tag.length)
+  })
+}
+
+// ─── Format Chooser ────────────────────────────────────────────────────────────
+
+function FormatChooser({ onChoose }: { onChoose: (f: "plain" | "html") => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <button
+        onClick={() => onChoose("plain")}
+        className="flex flex-col items-center gap-2 p-5 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all text-left group"
+      >
+        <FileText className="h-7 w-7 text-muted-foreground group-hover:text-primary transition-colors" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">Plain Text</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Simple text email, no formatting</p>
+        </div>
+      </button>
+      <button
+        onClick={() => onChoose("html")}
+        className="flex flex-col items-center gap-2 p-5 rounded-xl border-2 border-border hover:border-primary hover:bg-primary/5 transition-all text-left group"
+      >
+        <Code2 className="h-7 w-7 text-muted-foreground group-hover:text-primary transition-colors" />
+        <div>
+          <p className="text-sm font-semibold text-foreground">HTML Email</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Rich formatted email with live preview</p>
+        </div>
+      </button>
+    </div>
+  )
+}
+
+// ─── HTML Editor with device preview ───────────────────────────────────────────
+
+function HtmlEditor({
+  value,
+  onChange,
+  device,
+  onDeviceChange,
+  textareaRef,
+}: {
+  value: string
+  onChange: (v: string) => void
+  device: PreviewDevice
+  onDeviceChange: (d: PreviewDevice) => void
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Textarea
+        ref={textareaRef}
+        className="text-xs font-mono resize-none"
+        style={{ height: 200 }}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={"<p>Dear {{first_name}},</p>\n<p>Your message here...</p>"}
+      />
+      {/* Device toggle */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground mr-1">Preview:</span>
+        <button
+          onClick={() => onDeviceChange("mobile")}
+          className={cn(
+            "inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors",
+            device === "mobile"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "border-border text-muted-foreground hover:bg-muted",
+          )}
+        >
+          <Smartphone className="h-3 w-3" /> Mobile
+        </button>
+        <button
+          onClick={() => onDeviceChange("desktop")}
+          className={cn(
+            "inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors",
+            device === "desktop"
+              ? "bg-primary text-primary-foreground border-primary"
+              : "border-border text-muted-foreground hover:bg-muted",
+          )}
+        >
+          <Monitor className="h-3 w-3" /> Desktop
+        </button>
+      </div>
+      {/* Preview iframe */}
+      <div
+        className="rounded-lg border bg-white overflow-hidden"
+        style={{ height: 500, display: "flex", alignItems: "flex-start", justifyContent: "center" }}
+      >
+        <iframe
+          srcDoc={value || "<p style='color:#aaa;font-family:sans-serif;padding:16px'>Preview appears here…</p>"}
+          sandbox="allow-same-origin"
+          title="Email Preview"
+          style={{
+            border: "none",
+            height: "100%",
+            width: device === "mobile" ? 390 : "100%",
+            flexShrink: 0,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Merge tag chips ───────────────────────────────────────────────────────────
+
+function MergeTagChips({
+  onInsert,
+}: {
+  onInsert: (tag: string) => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs text-muted-foreground">Insert:</span>
+      {MERGE_TAGS.map((t) => (
+        <button
+          key={t.value}
+          onClick={() => onInsert(t.value)}
+          className="text-xs px-2 py-0.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-colors font-mono"
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OutreachPage() {
   const supabase = createClient()
@@ -26,19 +193,20 @@ export default function OutreachPage() {
   const [leads, setLeads] = useState<LeadboardEntry[]>([])
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([])
   const [loading, setLoading] = useState(true)
+  const [gmailAccounts, setGmailAccounts] = useState<GmailAccount[]>([])
 
   // Individual tab
   const [selectedLeadId, setSelectedLeadId] = useState("")
   const [leadSearch, setLeadSearch] = useState("")
   const [indSubject, setIndSubject] = useState("")
   const [indBody, setIndBody] = useState("")
+  const [indEmailFormat, setIndEmailFormat] = useState<EmailFormat>("none")
+  const [indPreviewDevice, setIndPreviewDevice] = useState<PreviewDevice>("desktop")
+  const [fromEmail, setFromEmail] = useState("")
   const [sending, setSending] = useState(false)
   const [sendSuccess, setSendSuccess] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
-
-  // HTML editor modes
-  const [indHtmlMode, setIndHtmlMode] = useState(false)
-  const [campHtmlMode, setCampHtmlMode] = useState(false)
+  const indBodyRef = useRef<HTMLTextAreaElement>(null)
 
   // Mass campaign tab
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
@@ -51,32 +219,57 @@ export default function OutreachPage() {
   const [campName, setCampName] = useState("")
   const [campSubject, setCampSubject] = useState("")
   const [campBody, setCampBody] = useState("")
+  const [campEmailFormat, setCampEmailFormat] = useState<EmailFormat>("none")
+  const [campPreviewDevice, setCampPreviewDevice] = useState<PreviewDevice>("desktop")
+  const [campFromEmail, setCampFromEmail] = useState("")
   const [creatingCampaign, setCreatingCampaign] = useState(false)
   const [campaignDraft, setCampaignDraft] = useState<EmailCampaign | null>(null)
   const [sendingCampaign, setSendingCampaign] = useState(false)
   const [campError, setCampError] = useState<string | null>(null)
   const [campSuccess, setCampSuccess] = useState(false)
+  const campBodyRef = useRef<HTMLTextAreaElement>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [{ data: l }, { data: c }, segsRes] = await Promise.all([
+    const [{ data: l }, { data: c }, segsRes, gmailRes] = await Promise.all([
       supabase.from("leadboard").select("*").order("relevance_score", { ascending: false }),
       supabase.from("email_campaigns").select("*").order("created_at", { ascending: false }),
       fetch("/api/segments"),
+      supabase.from("gmail_tokens").select("id, email").order("created_at", { ascending: true }),
     ])
     setLeads((l as LeadboardEntry[]) ?? [])
     setCampaigns((c as EmailCampaign[]) ?? [])
     const segs = segsRes.ok ? await segsRes.json() : []
     setSegments(segs ?? [])
+    const accounts = (gmailRes.data ?? []) as GmailAccount[]
+    setGmailAccounts(accounts)
+    if (accounts.length > 0) {
+      setFromEmail((prev: string) => prev || accounts[0].email)
+      setCampFromEmail((prev: string) => prev || accounts[0].email)
+    }
     setLoading(false)
   }, [supabase])
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Individual send
+  // Auto-insert template when lead is selected and body is empty
   const selectedLead = leads.find((l) => l.id === selectedLeadId)
+  useEffect(() => {
+    if (selectedLead && !indBody) {
+      const firstName = selectedLead.full_name.split(" ")[0] ?? ""
+      const company = selectedLead.company ?? ""
+      setIndBody(
+        `Dear ${firstName},\n\nI wanted to reach out to you regarding ${company}.\n\nBest regards`,
+      )
+    }
+    // Only fire when selectedLeadId changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLeadId])
+
   const filteredLeads = leads.filter((l) =>
-    !leadSearch || l.full_name.toLowerCase().includes(leadSearch.toLowerCase()) || l.email.toLowerCase().includes(leadSearch.toLowerCase())
+    !leadSearch ||
+    l.full_name.toLowerCase().includes(leadSearch.toLowerCase()) ||
+    l.email.toLowerCase().includes(leadSearch.toLowerCase()),
   )
 
   async function handleSendIndividual() {
@@ -88,7 +281,14 @@ export default function OutreachPage() {
       const res = await fetch("/api/mailchimp/send-individual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: selectedLead.email, subject: indSubject, body: indBody, leadId: selectedLead.id }),
+        body: JSON.stringify({
+          to: selectedLead.email,
+          subject: indSubject,
+          body: indBody,
+          leadId: selectedLead.id,
+          fromEmail: fromEmail || undefined,
+          isHtml: indEmailFormat === "html",
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -96,6 +296,7 @@ export default function OutreachPage() {
       setIndSubject("")
       setIndBody("")
       setSelectedLeadId("")
+      setIndEmailFormat("none")
     } catch (e) {
       setSendError((e as Error).message)
     } finally {
@@ -117,10 +318,7 @@ export default function OutreachPage() {
       const ids: string[] = res.ok ? await res.json() : []
       const idSet = new Set(ids)
       setSegmentMemberIds(idSet)
-      // auto-select all segment members visible in the filtered list
-      setSelectedLeadIds(new Set(ids.filter((id) =>
-        leads.some((l) => l.id === id)
-      )))
+      setSelectedLeadIds(new Set(ids.filter((id) => leads.some((l) => l.id === id))))
     } finally {
       setLoadingSegment(false)
     }
@@ -163,7 +361,6 @@ export default function OutreachPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      // Update recipient count in DB
       await supabase
         .from("email_campaigns")
         .update({ recipient_count: selectedLeadIds.size })
@@ -195,6 +392,7 @@ export default function OutreachPage() {
       setCampName("")
       setCampSubject("")
       setCampBody("")
+      setCampEmailFormat("none")
       setSelectedLeadIds(new Set())
       await loadData()
     } catch (e) {
@@ -218,7 +416,7 @@ export default function OutreachPage() {
           <TabsTrigger value="history" className="text-sm">Campaign History</TabsTrigger>
         </TabsList>
 
-        {/* Individual */}
+        {/* ── Individual ────────────────────────────────────────────────────── */}
         <TabsContent value="individual" className="space-y-4 mt-4">
           <Card>
             <CardContent className="pt-5 space-y-4">
@@ -261,46 +459,76 @@ export default function OutreachPage() {
                       <p className="text-sm font-medium">{selectedLead.full_name}</p>
                       <p className="text-xs text-muted-foreground font-mono">{selectedLead.email}</p>
                     </div>
-                    <button onClick={() => setSelectedLeadId("")} className="ml-auto text-muted-foreground hover:text-foreground">×</button>
+                    <button onClick={() => { setSelectedLeadId(""); setIndBody("") }} className="ml-auto text-muted-foreground hover:text-foreground">×</button>
                   </div>
                 )}
               </div>
+
+              {/* From dropdown */}
+              {gmailAccounts.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">From</Label>
+                  <Select value={fromEmail} onValueChange={(v) => v && setFromEmail(v)}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Select sender account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gmailAccounts.map((acc) => (
+                        <SelectItem key={acc.id} value={acc.email}>{acc.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-xs">Subject</Label>
                 <Input className="h-9 text-sm" placeholder="Email subject" value={indSubject} onChange={(e) => setIndSubject(e.target.value)} />
               </div>
-              <div className="space-y-1.5">
+
+              {/* Body / Format */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Message</Label>
-                  <div className="flex rounded border overflow-hidden text-xs h-5">
+                  {indEmailFormat !== "none" && (
                     <button
-                      onClick={() => setIndHtmlMode(false)}
-                      className={cn("px-2", !indHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
-                    >Plain</button>
-                    <button
-                      onClick={() => setIndHtmlMode(true)}
-                      className={cn("px-2", indHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
-                    >HTML</button>
-                  </div>
+                      onClick={() => { setIndEmailFormat("none"); setIndBody("") }}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ChevronLeft className="h-3 w-3" /> Change format
+                    </button>
+                  )}
                 </div>
-                {indHtmlMode ? (
-                  <div className="grid grid-cols-2 gap-2" style={{ height: 240 }}>
+
+                {indEmailFormat === "none" && (
+                  <FormatChooser onChoose={setIndEmailFormat} />
+                )}
+
+                {indEmailFormat === "plain" && (
+                  <>
+                    <MergeTagChips onInsert={(tag) => insertAtCursor(indBodyRef, setIndBody, tag)} />
                     <Textarea
-                      className="text-xs font-mono resize-none h-full"
+                      ref={indBodyRef}
+                      className="text-sm resize-none"
+                      rows={8}
+                      placeholder="Write your personalized email..."
                       value={indBody}
                       onChange={(e) => setIndBody(e.target.value)}
-                      placeholder={"<p>Hello,</p>\n<p>Your message here...</p>"}
                     />
-                    <iframe
-                      srcDoc={indBody || "<p style='color:#aaa;font-family:sans-serif;padding:12px'>Preview appears here...</p>"}
-                      className="border rounded-md bg-white w-full h-full"
-                      sandbox="allow-same-origin"
-                      title="Email Preview"
+                  </>
+                )}
+
+                {indEmailFormat === "html" && (
+                  <>
+                    <MergeTagChips onInsert={(tag) => insertAtCursor(indBodyRef, setIndBody, tag)} />
+                    <HtmlEditor
+                      value={indBody}
+                      onChange={setIndBody}
+                      device={indPreviewDevice}
+                      onDeviceChange={setIndPreviewDevice}
+                      textareaRef={indBodyRef}
                     />
-                  </div>
-                ) : (
-                  <Textarea className="text-sm resize-none" rows={8} placeholder="Write your personalized email..." value={indBody} onChange={(e) => setIndBody(e.target.value)} />
+                  </>
                 )}
               </div>
 
@@ -317,7 +545,7 @@ export default function OutreachPage() {
 
               <Button
                 onClick={handleSendIndividual}
-                disabled={!selectedLead || !indSubject || !indBody || sending}
+                disabled={!selectedLead || !indSubject || !indBody || sending || indEmailFormat === "none"}
                 className="gap-2"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -327,7 +555,7 @@ export default function OutreachPage() {
           </Card>
         </TabsContent>
 
-        {/* Mass Campaign */}
+        {/* ── Mass Campaign ─────────────────────────────────────────────────── */}
         <TabsContent value="campaign" className="space-y-4 mt-4">
           <div className="grid lg:grid-cols-2 gap-5">
             {/* Left: Lead selection */}
@@ -347,7 +575,7 @@ export default function OutreachPage() {
                       {segmentFilter === "all" ? (
                         <span className="text-muted-foreground text-sm">All Leads</span>
                       ) : (() => {
-                        const seg = segments.find(s => s.id === segmentFilter)
+                        const seg = segments.find((s) => s.id === segmentFilter)
                         return seg ? (
                           <span className="flex items-center gap-2 text-sm">
                             <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
@@ -361,10 +589,7 @@ export default function OutreachPage() {
                       {segments.map((seg) => (
                         <SelectItem key={seg.id} value={seg.id}>
                           <span className="flex items-center gap-2">
-                            <span
-                              className="inline-block w-2 h-2 rounded-full shrink-0"
-                              style={{ background: seg.color }}
-                            />
+                            <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
                             {seg.name}
                           </span>
                         </SelectItem>
@@ -447,41 +672,71 @@ export default function OutreachPage() {
                   <Label className="text-xs">Campaign Name</Label>
                   <Input className="h-8 text-sm" value={campName} onChange={(e) => setCampName(e.target.value)} placeholder="e.g. Q1 Asia Outreach" />
                 </div>
+
+                {/* From dropdown */}
+                {gmailAccounts.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">From</Label>
+                    <Select value={campFromEmail} onValueChange={(v) => v && setCampFromEmail(v)}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Select sender account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gmailAccounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.email}>{acc.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <Label className="text-xs">Subject Line</Label>
                   <Input className="h-8 text-sm" value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder="Email subject" />
                 </div>
-                <div className="space-y-1.5">
+
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs">Email Body</Label>
-                    <div className="flex rounded border overflow-hidden text-xs h-5">
+                    {campEmailFormat !== "none" && (
                       <button
-                        onClick={() => setCampHtmlMode(false)}
-                        className={cn("px-2", !campHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
-                      >Plain</button>
-                      <button
-                        onClick={() => setCampHtmlMode(true)}
-                        className={cn("px-2", campHtmlMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
-                      >HTML</button>
-                    </div>
+                        onClick={() => { setCampEmailFormat("none"); setCampBody("") }}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <ChevronLeft className="h-3 w-3" /> Change format
+                      </button>
+                    )}
                   </div>
-                  {campHtmlMode ? (
-                    <div className="grid grid-cols-2 gap-2" style={{ height: 200 }}>
+
+                  {campEmailFormat === "none" && (
+                    <FormatChooser onChoose={setCampEmailFormat} />
+                  )}
+
+                  {campEmailFormat === "plain" && (
+                    <>
+                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} />
                       <Textarea
-                        className="text-xs font-mono resize-none h-full"
+                        ref={campBodyRef}
+                        className="text-sm resize-none"
+                        rows={6}
                         value={campBody}
                         onChange={(e) => setCampBody(e.target.value)}
-                        placeholder={"<p>Hello,</p>\n<p>Your campaign message...</p>"}
+                        placeholder="Write your campaign email... Use {{first_name}}, {{company}} etc."
                       />
-                      <iframe
-                        srcDoc={campBody || "<p style='color:#aaa;font-family:sans-serif;padding:12px'>Preview appears here...</p>"}
-                        className="border rounded-md bg-white w-full h-full"
-                        sandbox="allow-same-origin"
-                        title="Campaign Email Preview"
+                    </>
+                  )}
+
+                  {campEmailFormat === "html" && (
+                    <>
+                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} />
+                      <HtmlEditor
+                        value={campBody}
+                        onChange={setCampBody}
+                        device={campPreviewDevice}
+                        onDeviceChange={setCampPreviewDevice}
+                        textareaRef={campBodyRef}
                       />
-                    </div>
-                  ) : (
-                    <Textarea className="text-sm resize-none" rows={6} value={campBody} onChange={(e) => setCampBody(e.target.value)} placeholder="Write your campaign email..." />
+                    </>
                   )}
                 </div>
 
@@ -508,7 +763,7 @@ export default function OutreachPage() {
                 ) : (
                   <Button
                     onClick={handleCreateCampaign}
-                    disabled={!campName.trim() || !selectedLeadIds.size || creatingCampaign}
+                    disabled={!campName.trim() || !selectedLeadIds.size || creatingCampaign || campEmailFormat === "none"}
                     className="w-full gap-2"
                     variant="outline"
                   >
@@ -521,7 +776,7 @@ export default function OutreachPage() {
           </div>
         </TabsContent>
 
-        {/* History */}
+        {/* ── History ───────────────────────────────────────────────────────── */}
         <TabsContent value="history" className="mt-4">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>

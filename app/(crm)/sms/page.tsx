@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui-crm/ta
 import { Checkbox } from "@/components/ui-crm/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui-crm/select"
 import {
-  Smartphone, Loader2, AlertCircle, Settings, MessageSquare,
+  Smartphone, Loader2, AlertCircle, CheckCircle2, Settings, MessageSquare,
   Tag, Users
 } from "lucide-react"
 import type { LeadboardEntry, LeadStatus } from "@/types"
@@ -31,6 +31,7 @@ export default function SMSPage() {
 
   const [leads, setLeads] = useState<LeadboardEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [twilioConnected, setTwilioConnected] = useState<boolean | null>(null)
 
   // Recipient filters
   const [segments, setSegments] = useState<{ id: string; name: string; color: string }[]>([])
@@ -47,13 +48,20 @@ export default function SMSPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true)
-    const [{ data: l }, segsRes] = await Promise.all([
+    const [{ data: l }, segsRes, twilioRes] = await Promise.all([
       supabase.from("leadboard").select("*").order("relevance_score", { ascending: false }),
       fetch("/api/segments"),
+      fetch("/api/settings/twilio"),
     ])
     setLeads((l as LeadboardEntry[]) ?? [])
     const segs = segsRes.ok ? await segsRes.json() : []
     setSegments(segs ?? [])
+    if (twilioRes.ok) {
+      const tw = await twilioRes.json()
+      setTwilioConnected(tw.connected ?? false)
+    } else {
+      setTwilioConnected(false)
+    }
     setLoading(false)
   }, [supabase])
 
@@ -122,20 +130,30 @@ export default function SMSPage() {
         <a href="/settings">
           <Button variant="outline" size="sm" className="gap-2">
             <Settings className="h-4 w-4" />
-            Connect Twilio
+            {twilioConnected ? "Twilio Settings" : "Connect Twilio"}
           </Button>
         </a>
       </div>
 
-      {/* Twilio not connected warning */}
-      <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3">
-        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-        <p className="text-sm text-amber-800 dark:text-amber-300">
-          Twilio is not connected. Configure your Account SID, Auth Token, and phone number in{" "}
-          <a href="/settings" className="underline font-medium">Settings</a>{" "}
-          to start sending SMS campaigns.
-        </p>
-      </div>
+      {/* Twilio connection status */}
+      {twilioConnected === false && (
+        <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            Twilio is not connected. Configure your Account SID, Auth Token, and phone number in{" "}
+            <a href="/settings" className="underline font-medium">Settings</a>{" "}
+            to start sending SMS campaigns.
+          </p>
+        </div>
+      )}
+      {twilioConnected === true && (
+        <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-3">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <p className="text-sm text-emerald-800 dark:text-emerald-300 font-medium">
+            Twilio connected — ready to send SMS campaigns.
+          </p>
+        </div>
+      )}
 
       <Tabs defaultValue="new">
         <TabsList className="h-9">

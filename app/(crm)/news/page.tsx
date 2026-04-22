@@ -46,6 +46,13 @@ interface NewsSource {
   created_at: string;
 }
 
+interface NewsKeyword {
+  id: string;
+  keyword: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 const KEYWORD_COLORS: Record<string, { bg: string; text: string }> = {
   'armored vehicle':   { bg: '#1e3a5f', text: '#60a5fa' },
   'armoured vehicle':  { bg: '#1e3a5f', text: '#60a5fa' },
@@ -476,6 +483,211 @@ function SourcesPanel() {
   );
 }
 
+// ─── Keywords Panel ───────────────────────────────────────────────────────────
+
+function KeywordsPanel() {
+  const [keywords, setKeywords] = useState<NewsKeyword[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [addKw, setAddKw] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const loadKeywords = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const res = await fetch('/api/news/keywords');
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setError(d.error ?? 'Failed to load keywords');
+    } else {
+      setKeywords(await res.json());
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadKeywords(); }, [loadKeywords]);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setAddError(null);
+    setAdding(true);
+    const res = await fetch('/api/news/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: addKw.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setAddError(data.error ?? 'Failed to add keyword');
+    } else {
+      setKeywords((prev) => [...prev, data]);
+      setAddKw('');
+      inputRef.current?.focus();
+    }
+    setAdding(false);
+  }
+
+  async function handleToggle(id: string, current: boolean) {
+    setTogglingId(id);
+    const res = await fetch('/api/news/keywords', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, is_active: !current }),
+    });
+    if (res.ok) {
+      setKeywords((prev) => prev.map((k) => k.id === id ? { ...k, is_active: !current } : k));
+    }
+    setTogglingId(null);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Remove this keyword?')) return;
+    setDeletingId(id);
+    const res = await fetch(`/api/news/keywords?id=${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setKeywords((prev) => prev.filter((k) => k.id !== id));
+    }
+    setDeletingId(null);
+  }
+
+  const activeCount = keywords.filter((k) => k.is_active).length;
+
+  return (
+    <div style={{
+      background: 'var(--card)',
+      border: '1px solid var(--border)',
+      borderRadius: 10,
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '12px 16px', borderBottom: '1px solid var(--border)',
+        background: 'rgba(99,102,241,0.04)',
+      }}>
+        <Tag size={14} color="var(--primary)" />
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--foreground)' }}>Keywords</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
+          background: 'rgba(99,102,241,0.15)', color: 'var(--primary)',
+        }}>
+          {activeCount} active
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--muted-foreground)', flex: 1 }}>
+          — articles must match at least one keyword (word-boundary)
+        </span>
+      </div>
+
+      {/* Keyword list */}
+      <div style={{ padding: '12px 16px' }}>
+        {error && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', borderRadius: 7,
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+            color: '#f87171', fontSize: 12, marginBottom: 12,
+          }}>
+            <AlertCircle size={13} /> {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: 'var(--muted-foreground)', fontSize: 12 }}>
+            <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Loading keywords…
+          </div>
+        ) : keywords.length === 0 ? (
+          <p style={{ fontSize: 12, color: 'var(--muted-foreground)', margin: '0 0 12px' }}>
+            No keywords yet. Add one below.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginBottom: 14 }}>
+            {keywords.map((kw) => (
+              <div key={kw.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 7,
+                opacity: kw.is_active ? 1 : 0.55,
+                transition: 'opacity 0.15s',
+              }}>
+                <button
+                  onClick={() => handleToggle(kw.id, kw.is_active)}
+                  disabled={togglingId === kw.id}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: kw.is_active ? 'var(--primary)' : 'var(--muted-foreground)' }}
+                  title={kw.is_active ? 'Disable keyword' : 'Enable keyword'}
+                >
+                  {togglingId === kw.id
+                    ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    : kw.is_active
+                      ? <ToggleRight size={16} />
+                      : <ToggleLeft size={16} />
+                  }
+                </button>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--foreground)', fontFamily: 'monospace' }}>{kw.keyword}</span>
+                <button
+                  onClick={() => handleDelete(kw.id)}
+                  disabled={deletingId === kw.id}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--muted-foreground)', padding: '2px 4px', borderRadius: 4, display: 'flex',
+                  }}
+                  title="Remove keyword"
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted-foreground)')}
+                >
+                  {deletingId === kw.id
+                    ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                    : <Trash2 size={13} />
+                  }
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add keyword form */}
+        <form onSubmit={handleAdd} style={{ display: 'flex', gap: 8 }}>
+          <input
+            ref={inputRef}
+            value={addKw}
+            onChange={(e) => setAddKw(e.target.value)}
+            placeholder="e.g. run-flat"
+            required
+            style={{
+              flex: 1, padding: '6px 10px', borderRadius: 6, fontSize: 12,
+              border: addError ? '1px solid #ef4444' : '1px solid var(--border)',
+              background: 'var(--background)', color: 'var(--foreground)',
+              outline: 'none', fontFamily: 'monospace',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={adding || !addKw.trim()}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+              background: 'var(--primary)', color: '#fff', border: 'none',
+              cursor: adding ? 'not-allowed' : 'pointer',
+              opacity: adding ? 0.7 : 1, flexShrink: 0,
+            }}
+          >
+            {adding ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={12} />}
+            Add
+          </button>
+        </form>
+
+        {addError && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, color: '#f87171', fontSize: 12 }}>
+            <X size={12} /> {addError}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function NewsPage() {
@@ -486,6 +698,7 @@ export default function NewsPage() {
   const [error, setError] = useState<string | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [keywordsOpen, setKeywordsOpen] = useState(false);
   const [lastFetch, setLastFetch] = useState<string | null>(null);
 
   const loadNews = useCallback(async () => {
@@ -578,6 +791,20 @@ export default function NewsPage() {
 
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <button
+            onClick={() => setKeywordsOpen((v) => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 13, fontWeight: 500,
+              padding: '8px 14px', borderRadius: 7,
+              background: keywordsOpen ? 'rgba(99,102,241,0.12)' : 'transparent',
+              color: keywordsOpen ? 'var(--primary)' : 'var(--muted-foreground)',
+              border: '1px solid var(--border)', cursor: 'pointer',
+            }}
+          >
+            <Tag size={13} />
+            Keywords
+          </button>
+          <button
             onClick={() => setSourcesOpen((v) => !v)}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -608,6 +835,13 @@ export default function NewsPage() {
           </button>
         </div>
       </div>
+
+      {/* Keywords panel */}
+      {keywordsOpen && (
+        <div style={{ marginBottom: 16 }}>
+          <KeywordsPanel />
+        </div>
+      )}
 
       {/* Sources panel */}
       {sourcesOpen && (

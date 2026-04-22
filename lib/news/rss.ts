@@ -6,7 +6,7 @@ export interface ParsedArticle {
   imageUrl: string | null;
 }
 
-// Keywords to match (case-insensitive)
+// Default keywords (fallback when DB table is empty)
 export const MATCH_KEYWORDS = [
   'armored vehicle',
   'armoured vehicle',
@@ -22,7 +22,7 @@ export const MATCH_KEYWORDS = [
   'tyre',
 ];
 
-// RSS feed sources — all publicly accessible
+// Default RSS sources (fallback when DB table is empty)
 export const RSS_SOURCES = [
   { name: 'Defense News',              url: 'https://www.defensenews.com/arc/outboundfeeds/rss/?outputType=xml' },
   { name: 'Breaking Defense',          url: 'https://breakingdefense.com/feed/' },
@@ -37,7 +37,6 @@ export const RSS_SOURCES = [
 // ─── XML helpers ──────────────────────────────────────────────────────────────
 
 function extractTag(xml: string, tag: string): string {
-  // Handle both <tag>value</tag> and <tag><![CDATA[value]]></tag>
   const re = new RegExp(`<${tag}[^>]*>(?:<!\\[CDATA\\[)?(.*?)(?:\\]\\]>)?<\\/${tag}>`, 'is');
   return (xml.match(re)?.[1] ?? '').trim();
 }
@@ -61,16 +60,13 @@ function stripHtml(html: string): string {
 }
 
 function extractImageFromDescription(desc: string): string | null {
-  const match = desc.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return match?.[1] ?? null;
+  return desc.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] ?? null;
 }
 
 // ─── RSS Parser ───────────────────────────────────────────────────────────────
 
 export function parseRSSXML(xml: string): ParsedArticle[] {
   const articles: ParsedArticle[] = [];
-
-  // Support both <item> (RSS 2.0) and <entry> (Atom)
   const isAtom = xml.includes('<feed') && xml.includes('<entry');
   const itemTag = isAtom ? 'entry' : 'item';
   const itemRe = new RegExp(`<${itemTag}[\\s>]([\\s\\S]*?)<\\/${itemTag}>`, 'gi');
@@ -78,14 +74,12 @@ export function parseRSSXML(xml: string): ParsedArticle[] {
   let match: RegExpExecArray | null;
   while ((match = itemRe.exec(xml)) !== null) {
     const item = match[1];
-
     const title = stripHtml(extractTag(item, 'title'));
     if (!title) continue;
 
     const rawDesc = extractTag(item, 'description') || extractTag(item, 'summary') || extractTag(item, 'content');
     const description = stripHtml(rawDesc).slice(0, 400);
 
-    // Link: <link>, <guid isPermaLink="true">, or Atom <link href="...">
     let url =
       extractTag(item, 'link') ||
       extractAttr(item, 'link', 'href') ||
@@ -100,7 +94,6 @@ export function parseRSSXML(xml: string): ParsedArticle[] {
       try { publishedAt = new Date(pubDateRaw).toISOString(); } catch { /* keep now */ }
     }
 
-    // Image: media:content url, enclosure url, or <img> in description
     const imageUrl =
       extractAttr(item, 'media:content', 'url') ||
       extractAttr(item, 'media:thumbnail', 'url') ||
@@ -114,16 +107,39 @@ export function parseRSSXML(xml: string): ParsedArticle[] {
   return articles;
 }
 
-// ─── Keyword matching ─────────────────────────────────────────────────────────
+// ─── Keyword matching (word-boundary aware) ───────────────────────────────────
 
-export function matchKeywords(title: string, description: string): string[] {
-  const haystack = `${title} ${description}`.toLowerCase();
-  return MATCH_KEYWORDS.filter((kw) => haystack.includes(kw.toLowerCase()));
+/**
+ * Checks if a keyword appears as a whole word in the haystack.
+ * Prevents "tire" from matching "retire", "entire", "attire".
+ * Handles multi-word / hyphenated keywords (e.g. "run-flat").
+ */
+function matchesKeyword(haystack: string, kw: string): boolean {
+  const escaped = kw
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // escape regex special chars
+    .replace(/[\s-]+/g, '[\\s-]+');           // flexible space/hyphen between words
+  return new RegExp(`(?<![a-zA-Z])${escaped}(?![a-zA-Z])`, 'i').test(haystack);
+}
+
+/**
+ * Returns matched keywords from title + description.
+ * Pass a custom `keywords` array (from DB) or falls back to MATCH_KEYWORDS.
+ */
+export function matchKeywords(
+  title: string,
+  description: string,
+  keywords: string[] = MATCH_KEYWORDS,
+): string[] {
+  const haystack = `${title} ${description}`;
+  return keywords.filter((kw) => matchesKeyword(haystack, kw));
 }
 
 // ─── Fetch + parse one RSS source ────────────────────────────────────────────
 
-export async function fetchSource(source: { name: string; url: string }): Promise<Array<ParsedArticle & { sourceName: string; keywords: string[] }>> {
+export async function fetchSource(
+  source: { name: string; url: string },
+  keywords: string[] = MATCH_KEYWORDS,
+): Promise<Array<ParsedArticle & { sourceName: string; keywords: string[] }>> {
   try {
     const res = await fetch(source.url, {
       headers: { 'User-Agent': 'NXFlow/1.0 (+https://nxflow.app)' },
@@ -136,10 +152,11 @@ export async function fetchSource(source: { name: string; url: string }): Promis
     const articles = parseRSSXML(xml);
 
     return articles
-      .map((a) => {
-        const keywords = matchKeywords(a.title, a.description);
-        return { ...a, sourceName: source.name, keywords };
-      })
+      .map((a) => ({
+        ...a,
+        sourceName: source.name,
+        keywords: matchKeywords(a.title, a.description, keywords),
+      }))
       .filter((a) => a.keywords.length > 0);
   } catch {
     return [];
