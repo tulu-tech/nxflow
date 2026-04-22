@@ -30,16 +30,23 @@ interface GmailAccount {
 }
 
 const MERGE_TAGS = [
-  { label: "{{first_name}}", value: "{{first_name}}" },
-  { label: "{{last_name}}", value: "{{last_name}}" },
-  { label: "{{company}}", value: "{{company}}" },
-  { label: "{{email}}", value: "{{email}}" },
+  { label: "{{first_name}}", value: "{{first_name}}", hint: "İsim (full name'in ilk kelimesi)" },
+  { label: "{{last_name}}", value: "{{last_name}}", hint: "Soyisim (kalan kelimeler)" },
+  { label: "{{full_name}}", value: "{{full_name}}", hint: "Tam ad" },
+  { label: "{{position}}", value: "{{position}}", hint: "Pozisyon / unvan" },
+  { label: "{{company}}", value: "{{company}}", hint: "Şirket adı" },
+  { label: "{{email}}", value: "{{email}}", hint: "E-posta adresi" },
 ]
 
 function fillMergeTags(template: string, lead: LeadboardEntry): string {
+  const parts = lead.full_name.trim().split(/\s+/)
+  const firstName = parts[0] ?? ""
+  const lastName = parts.slice(1).join(" ")
   return template
-    .replace(/\{\{first_name\}\}/gi, lead.full_name.split(" ")[0] ?? "")
-    .replace(/\{\{last_name\}\}/gi, lead.full_name.split(" ").slice(1).join(" ") ?? "")
+    .replace(/\{\{first_name\}\}/gi, firstName)
+    .replace(/\{\{last_name\}\}/gi, lastName)
+    .replace(/\{\{full_name\}\}/gi, lead.full_name)
+    .replace(/\{\{position\}\}/gi, lead.position ?? "")
     .replace(/\{\{company\}\}/gi, lead.company ?? "")
     .replace(/\{\{email\}\}/gi, lead.email ?? "")
 }
@@ -106,55 +113,92 @@ function HtmlEditor({
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <Textarea
-        ref={textareaRef}
-        className="text-xs font-mono resize-none"
-        style={{ height: 200 }}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={"<p>Dear {{first_name}},</p>\n<p>Your message here...</p>"}
-      />
-      {/* Device toggle */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground mr-1">Preview:</span>
-        <button
-          onClick={() => onDeviceChange("mobile")}
-          className={cn(
-            "inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors",
-            device === "mobile"
-              ? "bg-primary text-primary-foreground border-primary"
-              : "border-border text-muted-foreground hover:bg-muted",
-          )}
-        >
-          <Smartphone className="h-3 w-3" /> Mobile
-        </button>
-        <button
-          onClick={() => onDeviceChange("desktop")}
-          className={cn(
-            "inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors",
-            device === "desktop"
-              ? "bg-primary text-primary-foreground border-primary"
-              : "border-border text-muted-foreground hover:bg-muted",
-          )}
-        >
-          <Monitor className="h-3 w-3" /> Desktop
-        </button>
+    <div
+      className="rounded-xl border border-border overflow-hidden"
+      style={{ display: "flex", height: 560 }}
+    >
+      {/* ── Left: Live preview ─────────────────────────────── */}
+      <div style={{ flex: "1 1 0", display: "flex", flexDirection: "column", borderRight: "1px solid var(--border)", minWidth: 0 }}>
+        {/* Preview toolbar */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "8px 14px", borderBottom: "1px solid var(--border)",
+          background: "var(--muted)", flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)", marginRight: 6 }}>Preview</span>
+          <button
+            onClick={() => onDeviceChange("desktop")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid",
+              cursor: "pointer", transition: "all 0.15s",
+              background: device === "desktop" ? "var(--primary)" : "transparent",
+              color: device === "desktop" ? "#fff" : "var(--muted-foreground)",
+              borderColor: device === "desktop" ? "var(--primary)" : "var(--border)",
+            }}
+          >
+            <Monitor style={{ width: 12, height: 12 }} /> Desktop
+          </button>
+          <button
+            onClick={() => onDeviceChange("mobile")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid",
+              cursor: "pointer", transition: "all 0.15s",
+              background: device === "mobile" ? "var(--primary)" : "transparent",
+              color: device === "mobile" ? "#fff" : "var(--muted-foreground)",
+              borderColor: device === "mobile" ? "var(--primary)" : "var(--border)",
+            }}
+          >
+            <Smartphone style={{ width: 12, height: 12 }} /> Mobile
+          </button>
+        </div>
+        {/* Preview area */}
+        <div style={{
+          flex: 1, background: "#f5f5f5",
+          display: "flex", justifyContent: "center", alignItems: "flex-start",
+          overflow: "auto", padding: device === "mobile" ? "16px 0" : 0,
+        }}>
+          <iframe
+            srcDoc={value || "<p style='color:#aaa;font-family:sans-serif;padding:20px;font-size:14px'>Preview appears here…</p>"}
+            sandbox="allow-same-origin"
+            title="Email Preview"
+            style={{
+              border: device === "mobile" ? "1px solid #ddd" : "none",
+              borderRadius: device === "mobile" ? 8 : 0,
+              background: "#fff",
+              height: device === "mobile" ? 480 : "100%",
+              width: device === "mobile" ? 390 : "100%",
+              flexShrink: 0,
+              display: "block",
+            }}
+          />
+        </div>
       </div>
-      {/* Preview iframe */}
-      <div
-        className="rounded-lg border bg-white overflow-hidden"
-        style={{ height: 500, display: "flex", alignItems: "flex-start", justifyContent: "center" }}
-      >
-        <iframe
-          srcDoc={value || "<p style='color:#aaa;font-family:sans-serif;padding:16px'>Preview appears here…</p>"}
-          sandbox="allow-same-origin"
-          title="Email Preview"
+
+      {/* ── Right: Code editor ─────────────────────────────── */}
+      <div style={{ width: 360, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+        {/* Code tab header */}
+        <div style={{
+          padding: "8px 14px", borderBottom: "1px solid var(--border)",
+          background: "var(--muted)", flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <Code2 style={{ width: 13, height: 13, color: "var(--primary)" }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)" }}>HTML Code</span>
+        </div>
+        {/* Textarea fills remaining height */}
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={"<p>Dear {{first_name}},</p>\n<p>Your message here...</p>"}
           style={{
-            border: "none",
-            height: "100%",
-            width: device === "mobile" ? 390 : "100%",
-            flexShrink: 0,
+            flex: 1, resize: "none", border: "none", outline: "none",
+            padding: "12px 14px", fontSize: 12, lineHeight: 1.6,
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            background: "var(--background)", color: "var(--foreground)",
+            width: "100%", boxSizing: "border-box",
           }}
         />
       </div>
@@ -166,21 +210,27 @@ function HtmlEditor({
 
 function MergeTagChips({
   onInsert,
+  lead,
 }: {
   onInsert: (tag: string) => void
+  lead?: LeadboardEntry
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-muted-foreground">Insert:</span>
-      {MERGE_TAGS.map((t) => (
-        <button
-          key={t.value}
-          onClick={() => onInsert(t.value)}
-          className="text-xs px-2 py-0.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-colors font-mono"
-        >
-          {t.label}
-        </button>
-      ))}
+      <span className="text-xs text-muted-foreground shrink-0">Insert:</span>
+      {MERGE_TAGS.map((t) => {
+        const preview = lead ? fillMergeTags(t.value, lead) : null
+        return (
+          <button
+            key={t.value}
+            onClick={() => onInsert(t.value)}
+            title={preview ? `${t.hint} → "${preview}"` : t.hint}
+            className="text-xs px-2 py-0.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-colors font-mono"
+          >
+            {t.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -256,10 +306,12 @@ export default function OutreachPage() {
   const selectedLead = leads.find((l) => l.id === selectedLeadId)
   useEffect(() => {
     if (selectedLead && !indBody) {
-      const firstName = selectedLead.full_name.split(" ")[0] ?? ""
-      const company = selectedLead.company ?? ""
+      const parts = selectedLead.full_name.trim().split(/\s+/)
+      const firstName = parts[0] ?? ""
+      const company = selectedLead.company ? ` regarding ${selectedLead.company}` : ""
+      const position = selectedLead.position ? ` — ${selectedLead.position}` : ""
       setIndBody(
-        `Dear ${firstName},\n\nI wanted to reach out to you regarding ${company}.\n\nBest regards`,
+        `Dear ${firstName}${position},\n\nI wanted to reach out to you${company}.\n\nBest regards`,
       )
     }
     // Only fire when selectedLeadId changes
@@ -465,9 +517,9 @@ export default function OutreachPage() {
               </div>
 
               {/* From dropdown */}
-              {gmailAccounts.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">From</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">From</Label>
+                {gmailAccounts.length > 0 ? (
                   <Select value={fromEmail} onValueChange={(v) => v && setFromEmail(v)}>
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="Select sender account" />
@@ -478,8 +530,14 @@ export default function OutreachPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5 shrink-0" />
+                    No Gmail connected —{" "}
+                    <a href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</a>
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs">Subject</Label>
@@ -506,7 +564,7 @@ export default function OutreachPage() {
 
                 {indEmailFormat === "plain" && (
                   <>
-                    <MergeTagChips onInsert={(tag) => insertAtCursor(indBodyRef, setIndBody, tag)} />
+                    <MergeTagChips onInsert={(tag) => insertAtCursor(indBodyRef, setIndBody, tag)} lead={selectedLead} />
                     <Textarea
                       ref={indBodyRef}
                       className="text-sm resize-none"
@@ -520,7 +578,7 @@ export default function OutreachPage() {
 
                 {indEmailFormat === "html" && (
                   <>
-                    <MergeTagChips onInsert={(tag) => insertAtCursor(indBodyRef, setIndBody, tag)} />
+                    <MergeTagChips onInsert={(tag) => insertAtCursor(indBodyRef, setIndBody, tag)} lead={selectedLead} />
                     <HtmlEditor
                       value={indBody}
                       onChange={setIndBody}
@@ -557,9 +615,48 @@ export default function OutreachPage() {
 
         {/* ── Mass Campaign ─────────────────────────────────────────────────── */}
         <TabsContent value="campaign" className="space-y-4 mt-4">
-          <div className="grid lg:grid-cols-2 gap-5">
-            {/* Left: Lead selection */}
-            <Card>
+          {/* Compact recipients bar shown only in HTML mode */}
+          {campEmailFormat === "html" && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-muted/40 flex-wrap">
+              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium text-foreground">
+                {selectedLeadIds.size} recipient{selectedLeadIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <span className="text-muted-foreground text-xs">·</span>
+              <Select value={segmentFilter} onValueChange={(v) => handleSegmentChange(v ?? "all")}>
+                <SelectTrigger className="h-7 text-xs w-36">
+                  {segmentFilter === "all" ? "All Leads" : (segments.find((s) => s.id === segmentFilter)?.name ?? "Segment")}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Leads</SelectItem>
+                  {segments.map((seg) => (
+                    <SelectItem key={seg.id} value={seg.id}>{seg.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | "all")}>
+                <SelectTrigger className="h-7 text-xs w-28">
+                  {statusFilter === "all" ? "All Status" : (LEAD_STATUS_CONFIG[statusFilter as LeadStatus]?.label ?? statusFilter)}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {(Object.keys(LEAD_STATUS_CONFIG) as LeadStatus[]).map((s) => (
+                    <SelectItem key={s} value={s}>{LEAD_STATUS_CONFIG[s].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <button
+                onClick={toggleAll}
+                className="text-xs text-primary hover:underline ml-auto"
+              >
+                {selectedLeadIds.size === massLeads.length && massLeads.length > 0 ? "Deselect all" : `Select all (${massLeads.length})`}
+              </button>
+            </div>
+          )}
+
+          <div className={cn("grid gap-5", campEmailFormat === "html" ? "grid-cols-1" : "lg:grid-cols-2")}>
+            {/* Left: Lead selection — hidden in HTML mode (compact bar above replaces it) */}
+            <Card className={campEmailFormat === "html" ? "hidden" : ""}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Select Recipients</CardTitle>
               </CardHeader>
@@ -674,9 +771,9 @@ export default function OutreachPage() {
                 </div>
 
                 {/* From dropdown */}
-                {gmailAccounts.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">From</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">From</Label>
+                  {gmailAccounts.length > 0 ? (
                     <Select value={campFromEmail} onValueChange={(v) => v && setCampFromEmail(v)}>
                       <SelectTrigger className="h-8 text-sm">
                         <SelectValue placeholder="Select sender account" />
@@ -687,8 +784,14 @@ export default function OutreachPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center gap-2 h-8 px-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      No Gmail connected —{" "}
+                      <a href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</a>
+                    </div>
+                  )}
+                </div>
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Subject Line</Label>
@@ -714,7 +817,7 @@ export default function OutreachPage() {
 
                   {campEmailFormat === "plain" && (
                     <>
-                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} />
+                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} lead={massLeads.find(l => selectedLeadIds.has(l.id))} />
                       <Textarea
                         ref={campBodyRef}
                         className="text-sm resize-none"
@@ -728,7 +831,7 @@ export default function OutreachPage() {
 
                   {campEmailFormat === "html" && (
                     <>
-                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} />
+                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} lead={massLeads.find(l => selectedLeadIds.has(l.id))} />
                       <HtmlEditor
                         value={campBody}
                         onChange={setCampBody}
