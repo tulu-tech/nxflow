@@ -25,15 +25,31 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const { name, subject, body } = await req.json()
+  if (!name?.trim()) return NextResponse.json({ error: "Campaign name required" }, { status: 400 })
+
+  // Prefer Gmail when connected — skip Mailchimp sync entirely. Actual
+  // delivery happens at /api/mailchimp/send via the Gmail API.
+  const { data: gmailTokens } = await supabase
+    .from("gmail_tokens")
+    .select("id")
+    .eq("user_id", user.id)
+    .limit(1)
+
+  if (gmailTokens && gmailTokens.length > 0) {
+    const { data: campaign } = await supabase
+      .from("email_campaigns")
+      .insert({ user_id: user.id, name, subject, body, status: "draft", recipient_count: 0 })
+      .select()
+      .single()
+    return NextResponse.json({ campaign, provider: "gmail" })
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("mailchimp_api_key, mailchimp_server_prefix")
     .eq("id", user.id)
     .single()
-
-  const { name, subject, body } = await req.json()
-
-  if (!name?.trim()) return NextResponse.json({ error: "Campaign name required" }, { status: 400 })
 
   // If Mailchimp not configured, save as draft in DB only
   if (!profile?.mailchimp_api_key || !profile?.mailchimp_server_prefix) {
@@ -42,7 +58,7 @@ export async function POST(req: NextRequest) {
       .insert({ user_id: user.id, name, subject, body, status: "draft", recipient_count: 0 })
       .select()
       .single()
-    return NextResponse.json({ campaign, warning: "Mailchimp not configured — saved as local draft." })
+    return NextResponse.json({ campaign, warning: "No email provider configured — saved as local draft. Connect Gmail in Settings to send." })
   }
 
   // Fetch the first available Mailchimp audience/list
