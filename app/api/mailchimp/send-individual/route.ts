@@ -112,6 +112,17 @@ export async function POST(req: NextRequest) {
       .eq("user_id", user.id)
   }
 
+  // Log the sent email for the thread view in lead card
+  await supabase.from("email_logs").insert({
+    user_id: user.id,
+    lead_id: leadId ?? null,
+    from_email: fromAddr,
+    to_email: to,
+    subject: subject ?? null,
+    body: body ?? null,
+    is_html: !!isHtml,
+  })
+
   await supabase.from("credit_usage").insert({
     user_id: user.id,
     type: "mailchimp_send",

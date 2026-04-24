@@ -90,6 +90,16 @@ interface Sequence {
   description?: string
 }
 
+interface EmailLog {
+  id: string
+  from_email: string
+  to_email: string
+  subject: string | null
+  body: string | null
+  is_html: boolean
+  sent_at: string
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TAG_PRESET_COLORS = [
@@ -249,6 +259,11 @@ export default function LeadboardPage() {
   const [newNote, setNewNote] = useState("")
   const [addingNote, setAddingNote] = useState(false)
 
+  // ── Email Thread ─────────────────────────────────────────────────────────────
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([])
+  const [emailLogsLoading, setEmailLogsLoading] = useState(false)
+  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null)
+
   // ── Tags in Sheet ────────────────────────────────────────────────────────────
   const [newTagName, setNewTagName] = useState("")
   const [newTagColor, setNewTagColor] = useState(TAG_PRESET_COLORS[0])
@@ -342,6 +357,7 @@ export default function LeadboardPage() {
     if (selectedLead) {
       setNotesDraft(selectedLead.notes ?? "")
       loadActivities(selectedLead.id)
+      loadEmailLogs(selectedLead.id)
       loadExistingReminder(selectedLead.id)
     }
   // We intentionally only re-run when the selected lead ID changes
@@ -353,6 +369,17 @@ export default function LeadboardPage() {
     const res = await fetch(`/api/leads/${leadId}/activities`)
     if (res.ok) setActivities(await res.json())
     setActivitiesLoading(false)
+  }
+
+  async function loadEmailLogs(leadId: string) {
+    setEmailLogsLoading(true)
+    const { data } = await supabase
+      .from("email_logs")
+      .select("id, from_email, to_email, subject, body, is_html, sent_at")
+      .eq("lead_id", leadId)
+      .order("sent_at", { ascending: false })
+    setEmailLogs((data as EmailLog[]) ?? [])
+    setEmailLogsLoading(false)
   }
 
   async function loadExistingReminder(leadId: string) {
@@ -1652,6 +1679,91 @@ export default function LeadboardPage() {
                       value={reminderNote}
                       onChange={(e) => setReminderNote(e.target.value)}
                     />
+                  </div>
+
+                  <Separator />
+
+                  {/* Email Thread */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Mail className="h-3 w-3" /> Sent Emails
+                      {emailLogs.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+                          {emailLogs.length}
+                        </span>
+                      )}
+                    </Label>
+
+                    {emailLogsLoading ? (
+                      <div className="flex justify-center py-3">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : emailLogs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-3">No emails sent yet</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {emailLogs.map((log) => {
+                          const isExpanded = expandedEmailId === log.id
+                          return (
+                            <div
+                              key={log.id}
+                              className="rounded-lg border border-border overflow-hidden"
+                            >
+                              {/* Header row */}
+                              <button
+                                onClick={() => setExpandedEmailId(isExpanded ? null : log.id)}
+                                className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+                              >
+                                <Send className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-foreground truncate">
+                                    {log.subject ?? "(no subject)"}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    From: {log.from_email}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {log.is_html && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">HTML</span>
+                                  )}
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    {formatDistanceToNow(new Date(log.sent_at), { addSuffix: true })}
+                                  </span>
+                                  <ChevronRight className={cn("h-3 w-3 text-muted-foreground transition-transform", isExpanded && "rotate-90")} />
+                                </div>
+                              </button>
+
+                              {/* Expanded body */}
+                              {isExpanded && (
+                                <div className="border-t border-border px-3 py-2.5 bg-muted/20">
+                                  <p className="text-[10px] text-muted-foreground mb-1.5">
+                                    {format(new Date(log.sent_at), "MMM d, yyyy 'at' HH:mm")} · to {log.to_email}
+                                  </p>
+                                  {log.body ? (
+                                    log.is_html ? (
+                                      <iframe
+                                        srcDoc={log.body}
+                                        sandbox="allow-same-origin"
+                                        className="w-full rounded border bg-white"
+                                        style={{ height: 220, border: "1px solid var(--border)" }}
+                                        title="Email preview"
+                                      />
+                                    ) : (
+                                      <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                        {log.body}
+                                      </p>
+                                    )
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground italic">No body recorded</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <Separator />
