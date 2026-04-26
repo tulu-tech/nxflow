@@ -102,6 +102,11 @@ export function WorkspaceDashboard({ workspace }: Props) {
   const [kwError, setKwError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Create content panel state
+  const [showCreatePanel, setShowCreatePanel] = useState(false);
+  const [contentName, setContentName] = useState(`${workspace.brandName} — New Article`);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
+
   // Projects in this workspace
   const wsProjects = workspace.projectIds
     .map((pid) => projects[pid])
@@ -136,11 +141,19 @@ export function WorkspaceDashboard({ workspace }: Props) {
   };
 
   // ── Create content project
-  const handleCreateContent = () => {
-    const name = prompt('Content project name:', `${workspace.brandName} — New Article`);
-    if (!name?.trim()) return;
-    const pid = createProject(name.trim(), workspace);
+  const handleStartCreate = () => {
+    setContentName(`${workspace.brandName} — New Article`);
+    setSelectedPersonaId(null);
+    setShowCreatePanel(true);
+  };
+
+  const handleConfirmCreate = () => {
+    if (!contentName.trim()) return;
+    // If workspace has personas but none selected, don't proceed
+    if (workspace.personas.length > 0 && !selectedPersonaId) return;
+    const pid = createProject(contentName.trim(), workspace, selectedPersonaId ?? undefined);
     addProjectToWorkspace(workspace.id, pid);
+    setShowCreatePanel(false);
     router.push(`/seoagent/workspace/${workspace.id}/project/${pid}`);
   };
 
@@ -175,7 +188,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
             </div>
           )}
         </div>
-        <button className="seo-btn seo-btn-primary" onClick={handleCreateContent}>
+        <button className="seo-btn seo-btn-primary" onClick={handleStartCreate}>
           <Plus size={14} /> Create Content
         </button>
       </div>
@@ -197,7 +210,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
-          { icon: <Users size={16} />, label: 'Personas', value: workspace.personas.length, color: workspace.personas.length > 0 ? '#e78bfa' : 'var(--text-muted)', sub: workspace.personas.length > 0 ? `${workspace.personas.filter(p => p.buyingStage === 'decision').length} decision-stage` : 'Not configured' },
+          { icon: <Users size={16} />, label: 'Personas', value: workspace.personas.length, color: workspace.personas.length > 0 ? '#e78bfa' : 'var(--text-muted)', sub: workspace.personas.length > 0 ? `${workspace.personas.filter(p => p.intentStages.includes('decision')).length} decision-stage` : 'Not configured' },
           { icon: <BookOpen size={16} />, label: 'Topics', value: workspace.contentTopics.length, color: workspace.contentTopics.length > 0 ? '#fdab3d' : 'var(--text-muted)', sub: workspace.contentTopics.length > 0 ? `${workspace.contentTopics.filter(t => t.priority === 'high').length} high priority` : 'Not configured' },
           { icon: <Settings size={16} />, label: 'Platforms', value: workspace.platforms.filter(p => p.enabled).length, color: workspace.platforms.some(p => p.enabled) ? '#00c875' : 'var(--text-muted)', sub: 'enabled' },
         ].map((stat, i) => (
@@ -432,29 +445,39 @@ export function WorkspaceDashboard({ workspace }: Props) {
             )}
           </h3>
           {workspace.personas.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {workspace.personas.map((p) => (
-                <div key={p.id} style={{
-                  padding: '8px 10px', borderRadius: 6,
-                  border: '1px solid var(--border-subtle)',
-                  fontSize: 12,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
-                    <span style={{
-                      fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                      background: p.buyingStage === 'decision' ? 'rgba(0,200,117,0.12)' : p.buyingStage === 'consideration' ? 'rgba(129,140,248,0.12)' : 'rgba(253,171,61,0.12)',
-                      color: p.buyingStage === 'decision' ? '#00c875' : p.buyingStage === 'consideration' ? 'var(--accent)' : '#fdab3d',
-                      textTransform: 'capitalize',
-                    }}>
-                      {p.buyingStage}
-                    </span>
+            <div style={{ maxHeight: 420, overflow: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {workspace.personas.map((p) => (
+                  <div key={p.id} style={{
+                    padding: '8px 10px', borderRadius: 6,
+                    border: '1px solid var(--border-subtle)',
+                    fontSize: 12,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
+                      <span style={{
+                        fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                        background: p.claimRiskLevel === 'high' ? 'rgba(239,68,68,0.12)' : p.claimRiskLevel === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(0,200,117,0.12)',
+                        color: p.claimRiskLevel === 'high' ? '#f87171' : p.claimRiskLevel === 'medium' ? '#fdab3d' : '#00c875',
+                      }}>
+                        {p.claimRiskLevel === 'high' ? '⚠️ high risk' : p.claimRiskLevel === 'medium' ? '⚡ med risk' : '✓ low risk'}
+                      </span>
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.4, marginBottom: 4 }}>
+                      {p.shortDescription}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {p.intentStages.map((s) => (
+                        <span key={s} style={{
+                          fontSize: 9, padding: '1px 5px', borderRadius: 3,
+                          background: 'rgba(129,140,248,0.08)', color: 'var(--accent)',
+                          textTransform: 'capitalize',
+                        }}>{s}</span>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.4 }}>
-                    {p.description.length > 100 ? p.description.slice(0, 100) + '…' : p.description}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
@@ -527,10 +550,101 @@ export function WorkspaceDashboard({ workspace }: Props) {
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
             📝 Content Projects
           </h3>
-          <button className="seo-btn seo-btn-primary seo-btn-sm" onClick={handleCreateContent}>
+          <button className="seo-btn seo-btn-primary seo-btn-sm" onClick={handleStartCreate}>
             <Plus size={12} /> New Content
           </button>
         </div>
+
+        {/* Inline Create Content Panel */}
+        {showCreatePanel && (
+          <div className="seo-card" style={{ marginBottom: 16, border: '1px solid var(--accent)', background: 'rgba(129,140,248,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                ✨ Create New Content
+              </h4>
+              <button className="seo-btn seo-btn-ghost seo-btn-sm" onClick={() => setShowCreatePanel(false)}>
+                <X size={12} /> Cancel
+              </button>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label className="seo-label" style={{ fontSize: 11 }}>Content Name</label>
+              <input
+                className="seo-input"
+                value={contentName}
+                onChange={(e) => setContentName(e.target.value)}
+                placeholder="e.g. Best Massage Chairs 2025 — Comparison Guide"
+                autoFocus
+                style={{ fontSize: 13 }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmCreate(); }}
+              />
+            </div>
+
+            {/* Persona Selection — only if workspace has personas */}
+            {workspace.personas.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <label className="seo-label" style={{ fontSize: 11 }}>
+                  Target Persona *
+                  <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>
+                    Select who this content is for
+                  </span>
+                </label>
+                <div style={{ maxHeight: 240, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                  {workspace.personas.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedPersonaId(p.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 10px', borderRadius: 6, fontSize: 12, textAlign: 'left',
+                        border: selectedPersonaId === p.id ? '1.5px solid var(--accent)' : '1px solid var(--border-subtle)',
+                        background: selectedPersonaId === p.id ? 'rgba(129,140,248,0.08)' : 'transparent',
+                        color: 'var(--text-primary)', cursor: 'pointer', transition: 'all 0.12s',
+                        width: '100%',
+                      }}
+                    >
+                      <div style={{
+                        width: 16, height: 16, borderRadius: 8, flexShrink: 0,
+                        border: selectedPersonaId === p.id ? '5px solid var(--accent)' : '2px solid var(--border)',
+                        background: selectedPersonaId === p.id ? '#fff' : 'transparent',
+                      }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 12 }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.3 }}>{p.shortDescription}</div>
+                      </div>
+                      <span style={{
+                        fontSize: 9, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
+                        background: p.claimRiskLevel === 'high' ? 'rgba(239,68,68,0.12)' : p.claimRiskLevel === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(0,200,117,0.08)',
+                        color: p.claimRiskLevel === 'high' ? '#f87171' : p.claimRiskLevel === 'medium' ? '#fdab3d' : '#00c875',
+                      }}>
+                        {p.claimRiskLevel}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {!selectedPersonaId && (
+                  <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>
+                    Please select a target persona to continue.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="seo-btn seo-btn-secondary" onClick={() => setShowCreatePanel(false)}>
+                Cancel
+              </button>
+              <button
+                className="seo-btn seo-btn-primary"
+                onClick={handleConfirmCreate}
+                disabled={!contentName.trim() || (workspace.personas.length > 0 && !selectedPersonaId)}
+              >
+                Create Content →
+              </button>
+            </div>
+          </div>
+        )}
 
         {wsProjects.length > 0 ? (
           <div className="seo-projects-grid">
@@ -547,7 +661,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
               Create your first SEO content project for {workspace.brandName}
             </div>
-            <button className="seo-btn seo-btn-primary" onClick={handleCreateContent}>
+            <button className="seo-btn seo-btn-primary" onClick={handleStartCreate}>
               <Plus size={14} /> Create Content
             </button>
           </div>

@@ -177,6 +177,7 @@ export interface PublishPackage {
 export interface SEOProject {
   id: string;
   workspaceId: string | null;
+  targetPersonaId: string | null;
   name: string;
   currentPhase: number;
   status: ProjectStatus;

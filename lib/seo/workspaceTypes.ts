@@ -84,16 +84,17 @@ export interface ContentEntry {
 
 // ─── Persona Library ─────────────────────────────────────────────────────────
 
+export type ClaimRiskLevel = 'low' | 'medium' | 'high';
+
 export interface WorkspacePersona {
   id: string;
   name: string;
-  description: string;
-  demographics: string;
-  painPoints: string[];
-  motivations: string[];
-  searchBehavior: string;
-  contentPreferences: string;
-  buyingStage: 'awareness' | 'consideration' | 'decision';
+  shortDescription: string;
+  intentStages: string[];
+  defaultCTA: string;
+  claimRiskLevel: ClaimRiskLevel;
+  recommendedTone: string;
+  allowedTopicIds: string[];
 }
 
 // ─── Content Topic Library ───────────────────────────────────────────────────
