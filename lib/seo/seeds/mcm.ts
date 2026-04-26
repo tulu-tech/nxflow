@@ -8,6 +8,7 @@
 
 import type { SEOWorkspace, WorkspacePersona, WorkspaceContentTopic, PlatformConfig } from '../workspaceTypes';
 import { ALL_PLATFORMS } from '../workspaceTypes';
+import { MCM_SEED_KEYWORDS } from './mcmKeywords.gen';
 import { MCM_CONTENT_TOPICS_V2 } from './mcmTopics';
 
 // ─── MCM Workspace ID (stable so we can check if it already exists) ──────────
@@ -321,11 +322,11 @@ export function buildMCMWorkspace(): Omit<SEOWorkspace, 'createdAt' | 'updatedAt
       'For health-sensitive content, suggest consulting a physician where appropriate.',
     ].join('\n'),
 
-    // Keywords — empty until uploaded
-    keywordList: [],
-    keywordListUploadedAt: null,
-    keywordListVersion: 0,
-    keywordVersions: [],
+    // Keywords — pre-loaded from MCM Keywords List CSV (985 keywords)
+    keywordList: MCM_SEED_KEYWORDS,
+    keywordListUploadedAt: '2026-04-26T00:00:00Z',
+    keywordListVersion: 1,
+    keywordVersions: [{ versionId: '1', workspaceId: 'mcm-workspace', fileName: 'MCM Keywords List.csv', keywordCount: MCM_SEED_KEYWORDS.length, activeKeywordCount: MCM_SEED_KEYWORDS.length, archivedKeywordCount: 0, uploadedAt: '2026-04-26T00:00:00Z', status: 'active' as const }],
 
     // Sitemap
     sitemapUrl: 'https://www.massagechairsandmore.com/sitemap.xml',

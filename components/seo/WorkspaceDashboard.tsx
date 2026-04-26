@@ -1,133 +1,29 @@
 'use client';
 
-import type { SEOWorkspace, WorkspaceKeyword } from '@/lib/seo/workspaceTypes';
+import type { SEOWorkspace } from '@/lib/seo/workspaceTypes';
 import { PLATFORM_LABELS, PLATFORM_ICONS, PlatformType } from '@/lib/seo/workspaceTypes';
 import { useWorkspaceStore } from '@/store/seoWorkspaceStore';
 import { useSEOStore } from '@/store/seoStore';
 import { useRouter } from 'next/navigation';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import {
-  Globe, Tag, FileText, Upload, Plus, Settings, Map,
+  Globe, Tag, FileText, Plus, Settings, Map,
   Pencil, Check, X, Trash2, ExternalLink, Users, BookOpen,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { ProjectCard } from './ProjectCard';
 import { ContentTracker } from './ContentTracker';
 import { KeywordManager } from './KeywordManager';
 import { BusinessType } from '@/lib/seo/types';
 
-
-
 interface Props {
   workspace: SEOWorkspace;
-}
-
-// ─── Keyword Upload Helper ───────────────────────────────────────────────────
-
-function normalizeHeader(h: string): string {
-  return h.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function normalizeKeyword(kw: string): string {
-  return kw.toLowerCase().trim().replace(/\s+/g, ' ');
-}
-
-function parseKeywordFile(
-  buffer: ArrayBuffer,
-  workspaceId: string,
-  version: number,
-  fileName: string,
-): { keywords: WorkspaceKeyword[]; errors: string[] } {
-  const wb = XLSX.read(buffer, { type: 'array' });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
-  if (raw.length === 0) return { keywords: [], errors: ['File is empty.'] };
-
-  const headers = Object.keys(raw[0]);
-  const colMap: Record<string, string> = {};
-  for (const h of headers) {
-    const norm = normalizeHeader(h);
-    if (norm.includes('keyword') && !norm.includes('diff')) colMap.keyword = h;
-    else if (norm === 'tag' || norm === 'tags' || norm === 'label' || norm === 'category') colMap.tag = h;
-    else if (norm.includes('volume') || norm === 'searchvolume' || norm === 'sv') colMap.volume = h;
-    else if (norm.includes('difficulty') || norm === 'kd' || norm === 'keyworddiff') colMap.kd = h;
-    else if (norm.includes('cpc') || norm.includes('cost')) colMap.cpc = h;
-  }
-  if (!colMap.keyword) colMap.keyword = headers[0];
-
-  const errors: string[] = [];
-  const now = new Date().toISOString();
-  const seen = new Set<string>();
-
-  const keywords: WorkspaceKeyword[] = [];
-
-  for (let idx = 0; idx < raw.length; idx++) {
-    const row = raw[idx];
-    const kwRaw = row[colMap.keyword];
-    if (!kwRaw || !String(kwRaw).trim()) {
-      errors.push(`Row ${idx + 2}: Missing keyword — skipped.`);
-      continue;
-    }
-    const kw = String(kwRaw).trim();
-    const normalized = normalizeKeyword(kw);
-
-    // Deduplicate
-    if (seen.has(normalized)) continue;
-    seen.add(normalized);
-
-    const tagRaw = colMap.tag ? String(row[colMap.tag] ?? '').trim() : '';
-    if (!tagRaw) {
-      errors.push(`Row ${idx + 2}: "${kw}" has no tag — defaulting to "untagged".`);
-    }
-
-    const volumeRaw = colMap.volume ? row[colMap.volume] : null;
-    const kdRaw = colMap.kd ? row[colMap.kd] : null;
-    const cpcRaw = colMap.cpc ? row[colMap.cpc] : null;
-
-    const volVal = volumeRaw !== null && volumeRaw !== '' && !isNaN(Number(volumeRaw)) ? Number(volumeRaw) : null;
-    const kdVal = kdRaw !== null && kdRaw !== '' && !isNaN(Number(kdRaw)) ? Number(kdRaw) : null;
-    const cpcVal = cpcRaw !== null && cpcRaw !== '' && !isNaN(Number(cpcRaw)) ? Number(cpcRaw) : null;
-    const tagVal = tagRaw || 'untagged';
-
-    // dataCompleteness: keyword always present=1, tag, kd, cpc, volume each add 0.2
-    let completeness = 0.2; // keyword present
-    if (tagVal !== 'untagged') completeness += 0.2;
-    if (kdVal !== null) completeness += 0.2;
-    if (cpcVal !== null) completeness += 0.2;
-    if (volVal !== null) completeness += 0.2;
-
-    keywords.push({
-      keywordId: `wk-${version}-${idx}`,
-      workspaceId,
-      keyword: kw,
-      normalizedKeyword: normalized,
-      tag: tagVal,
-      kd: kdVal,
-      cpc: cpcVal,
-      volume: volVal,
-      sourceFile: fileName,
-      uploadedAt: now,
-      keywordListVersion: version,
-      status: 'active',
-      dataCompleteness: Math.round(completeness * 100) / 100,
-      usage: {
-        usedAsPrimaryCount: 0,
-        usedAsSecondaryCount: 0,
-        lastUsedAsPrimaryAt: null,
-        lastUsedAsSecondaryAt: null,
-        usedInContentIds: [],
-      },
-    });
-  }
-
-  return { keywords, errors };
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function WorkspaceDashboard({ workspace }: Props) {
   const router = useRouter();
-  const { updateWorkspace, updateKeywordList, updateSitemap, setSitemapStatus, togglePlatform } = useWorkspaceStore();
+  const { updateWorkspace, updateSitemap, setSitemapStatus, togglePlatform } = useWorkspaceStore();
   const { createProject, projects, updateProjectField } = useSEOStore();
   const { addProjectToWorkspace } = useWorkspaceStore();
 
@@ -145,9 +41,6 @@ export function WorkspaceDashboard({ workspace }: Props) {
     brandDifferentiators: workspace.brandDifferentiators,
   });
   const [sitemapInput, setSitemapInput] = useState(workspace.sitemapUrl);
-  const [kwUploading, setKwUploading] = useState(false);
-  const [kwError, setKwError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [showSitemapPages, setShowSitemapPages] = useState(false);
 
 
@@ -167,30 +60,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
     setEditingBrand(false);
   };
 
-  // ── Keyword upload
-  const handleKwUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setKwUploading(true);
-    setKwError(null);
-    try {
-      const buffer = await file.arrayBuffer();
-      const nextVersion = workspace.keywordListVersion + 1;
-      const { keywords, errors } = parseKeywordFile(buffer, workspace.id, nextVersion, file.name);
-      if (keywords.length === 0) {
-        setKwError(errors.length > 0 ? errors.join(' ') : 'No keywords found in file.');
-      } else {
-        updateKeywordList(workspace.id, keywords);
-        if (errors.length > 0) {
-          setKwError(`Imported ${keywords.length} keywords. Warnings: ${errors.slice(0, 3).join(' ')}${errors.length > 3 ? ` +${errors.length - 3} more` : ''}`);
-        }
-      }
-    } catch {
-      setKwError('Failed to parse file.');
-    }
-    setKwUploading(false);
-    if (fileRef.current) fileRef.current.value = '';
-  };
+
 
   // ── Create content project — go straight to wizard
   const handleStartCreate = () => {
