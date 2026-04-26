@@ -97,7 +97,7 @@ Return strict JSON matching the schema provided.`;
 // ─── User Prompt Builder ─────────────────────────────────────────────────────
 
 export function buildInternalLinkPlanUserPrompt(input: InternalLinkPlanInput): string {
-  const pagesStr = input.sitemapPages.length > 0
+  const pagesStr = (input.sitemapPages ?? []).length > 0
     ? input.sitemapPages
         .filter(p => p.path !== '/' && p.path !== '')
         .slice(0, 100)
@@ -106,12 +106,12 @@ export function buildInternalLinkPlanUserPrompt(input: InternalLinkPlanInput): s
     : '  (no sitemap pages available)';
 
   // Truncate content to first 3000 chars for prompt efficiency
-  const contentSnippet = input.generatedContent.length > 3000
-    ? input.generatedContent.slice(0, 3000) + '\n\n[... content continues ...]'
+  const contentSnippet = (input.generatedContent ?? "").length > 3000
+    ? (input.generatedContent ?? "").slice(0, 3000) + '\n\n[... content continues ...]'
     : input.generatedContent;
 
-  return `WORKSPACE: ${input.workspace.brandName} (${input.workspace.websiteUrl})
-Industry: ${input.workspace.industry}
+  return `WORKSPACE: ${(input.workspace ?? {} as any).brandName ?? ""} (${(input.workspace ?? {} as any).websiteUrl ?? ""})
+Industry: ${(input.workspace ?? {} as any).industry ?? ""}
 MCM Rules Active: ${input.mcmWorkspaceRulesIfApplicable}
 
 CONTENT CONTEXT:
@@ -119,9 +119,9 @@ Persona: ${input.selectedPersona}
 Topic: ${input.selectedTopic}
 Topic ID: ${input.selectedTopicId}
 Platform/Format: ${input.selectedPlatformFormat}
-Primary Keyword: ${input.approvedKeywordStrategy.primaryKeyword}
-Secondary Keywords: ${input.approvedKeywordStrategy.secondaryKeywords.join(', ')}
-Search Intent: ${input.approvedKeywordStrategy.searchIntent}
+Primary Keyword: ${(input.approvedKeywordStrategy ?? {} as any).primaryKeyword ?? ""}
+Secondary Keywords: ${((input.approvedKeywordStrategy ?? {} as any).secondaryKeywords ?? []).join(', ')}
+Search Intent: ${(input.approvedKeywordStrategy ?? {} as any).searchIntent ?? ""}
 Funnel Stage: ${input.approvedKeywordStrategy.funnelStage}
 
 GENERATED CONTENT:
@@ -156,7 +156,7 @@ Return strict JSON:
 // ─── Mock Response ───────────────────────────────────────────────────────────
 
 export function mockInternalLinkPlan(input: InternalLinkPlanInput): InternalLinkPlanResult {
-  const pages = input.sitemapPages.filter(p => p.path !== '/' && p.path !== '');
+  const pages = (input.sitemapPages ?? []).filter(p => p.path !== '/' && p.path !== '');
 
   if (pages.length === 0) {
     return {
@@ -167,7 +167,7 @@ export function mockInternalLinkPlan(input: InternalLinkPlanInput): InternalLink
   }
 
   const topic = input.selectedTopic.toLowerCase();
-  const pk = input.approvedKeywordStrategy.primaryKeyword.toLowerCase();
+  const pk = (input.approvedKeywordStrategy ?? {} as any).primaryKeyword ?? "".toLowerCase();
 
   // Score and sort pages by relevance
   const scored = pages.map(p => {

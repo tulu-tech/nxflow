@@ -182,21 +182,34 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
     const brief = data.brief ?? data;
     return (
       <div style={{ fontSize: 12 }}>
-        {label('Content Angle', brief.contentAngle)}
-        {label('Title', brief.h1 || brief.title || (brief.titleIdeas?.[0]))}
-        {label('Target Persona', brief.targetPersona)}
+        {label('Brief Title', brief.briefTitle)}
+        {label('Angle', brief.angle ?? brief.contentAngle)}
+        {label('Primary Keyword', brief.primaryKeyword)}
+        {label('Search Intent', brief.searchIntent)}
         {label('Funnel Stage', brief.funnelStage)}
         {label('Content Goal', brief.contentGoal)}
-        {Array.isArray(brief.outline) && (
+        {label('Recommended CTA', brief.recommendedCTA)}
+        {label('Reader Problem', brief.readerProblem)}
+        {label('Word Count', brief.recommendedWordCount)}
+        {Array.isArray(brief.outline) && brief.outline.length > 0 && (
           <div style={{ marginTop: 6 }}>
             <strong>Outline ({brief.outline.length} sections):</strong>
             <div style={{ marginTop: 4, paddingLeft: 8, borderLeft: '2px solid var(--border-subtle)', fontSize: 11 }}>
-              {brief.outline.slice(0, 10).map((item: Record<string, string>, i: number) => (
-                <div key={i} style={{ marginBottom: 2, color: item.level === 'h2' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: item.level === 'h2' ? 600 : 400, paddingLeft: item.level === 'h3' ? 12 : 0 }}>
-                  {item.text}
+              {brief.outline.slice(0, 14).map((item: Record<string, string>, i: number) => (
+                <div key={i} style={{ marginBottom: 2, color: item.level === 'h1' ? '#00c875' : item.level === 'h2' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: item.level === 'h3' ? 400 : 600, paddingLeft: item.level === 'h3' ? 12 : 0 }}>
+                  [{item.level}] {item.text}
                 </div>
               ))}
-              {brief.outline.length > 10 && <div style={{ color: 'var(--text-muted)' }}>+{brief.outline.length - 10} more...</div>}
+            </div>
+          </div>
+        )}
+        {Array.isArray(brief.faqPlan) && brief.faqPlan.length > 0 && (
+          <div style={{ marginTop: 6 }}>
+            <strong>FAQ Plan ({brief.faqPlan.length}):</strong>
+            <div style={{ marginTop: 4, fontSize: 11 }}>
+              {brief.faqPlan.slice(0, 5).map((faq: Record<string, string>, i: number) => (
+                <div key={i} style={{ marginBottom: 4 }}><span style={{ color: '#fdab3d' }}>Q:</span> {faq.question}</div>
+              ))}
             </div>
           </div>
         )}
@@ -206,55 +219,61 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
 
   // Step 7: Generated Content
   if (step === 7) {
-    const content = data.content ?? data.article?.content ?? data.article ?? (typeof data === 'string' ? data : null);
-    const title = data.title ?? data.article?.title ?? data.metaTitle ?? '';
-    const wordCount = data.wordCount ?? data.article?.wordCount;
+    const article = data.article ?? data;
+    const content = article?.content ?? (typeof data === 'string' ? data : null);
+    const title = article?.title ?? article?.metaTitle ?? data.title ?? '';
+    const wordCount = article?.wordCount ?? data.wordCount;
+    const slug = article?.slug;
+    const metaDesc = article?.metaDescription;
     if (typeof content === 'string') {
       return (
         <div style={{ fontSize: 12 }}>
-          {title && <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>{str(title)}</div>}
+          {title && <div style={{ fontWeight: 700, marginBottom: 4, color: '#00c875', fontSize: 14 }}>{str(title)}</div>}
+          {slug && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>/{slug}</div>}
+          {metaDesc && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, fontStyle: 'italic' }}>{str(metaDesc)}</div>}
           {wordCount && <div style={{ fontSize: 10, color: '#00c875', marginBottom: 8 }}>📝 {wordCount} words</div>}
-          <div style={{ maxHeight: 280, overflow: 'auto', lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 8, background: 'rgba(0,0,0,0.08)', borderRadius: 6 }}>
-            {content.slice(0, 2000)}
-            {content.length > 2000 && <div style={{ color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>... ({content.length} chars total)</div>}
+          <div style={{ maxHeight: 400, overflow: 'auto', lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 12, background: 'rgba(0,0,0,0.08)', borderRadius: 6, fontSize: 12 }}>
+            {content}
           </div>
         </div>
       );
     }
-    // If content is an object, show structured
-    return <div style={{ fontSize: 12 }}>{label('Title', title)}<pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre></div>;
+    return <pre style={{ maxHeight: 300, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
   }
 
   // Steps 8-9: Link Plans
   if (step === 8 || step === 9) {
-    const links = data.links ?? data.internalLinks ?? data.externalLinks ?? (Array.isArray(data) ? data : null);
+    const links = step === 8
+      ? (data.internalLinkPlan ?? data.internalLinks ?? data.links ?? (Array.isArray(data) ? data : null))
+      : (data.externalLinkPlan ?? data.externalLinks ?? data.links ?? (Array.isArray(data) ? data : null));
     const label2 = step === 8 ? 'Internal' : 'External';
     if (Array.isArray(links)) {
       return (
         <div style={{ fontSize: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>{links.length} {label2} Links</div>
-          {links.slice(0, 8).map((link: Record<string, string>, i: number) => (
-            <div key={i} style={{ marginBottom: 4, paddingLeft: 8, borderLeft: '2px solid var(--border-subtle)' }}>
-              <div style={{ fontWeight: 600, fontSize: 11 }}>{link.anchorText || link.anchor || link.url}</div>
-              <div style={{ fontSize: 10, color: 'var(--accent)' }}>{link.url || link.targetUrl}</div>
+          <div style={{ fontWeight: 600, marginBottom: 6, color: '#00c875' }}>✅ {links.length} {label2} Links</div>
+          {data.notes && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, fontStyle: 'italic' }}>{str(data.notes)}</div>}
+          {links.slice(0, 10).map((link: Record<string, string>, i: number) => (
+            <div key={i} style={{ marginBottom: 6, paddingLeft: 8, borderLeft: '2px solid var(--border-subtle)' }}>
+              <div style={{ fontWeight: 600, fontSize: 11 }}>{link.anchorText || link.anchor || `Link ${i+1}`}</div>
+              <div style={{ fontSize: 10, color: 'var(--accent)' }}>{link.targetUrl || link.url}</div>
               {link.reason && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{link.reason}</div>}
+              {link.placementSection && <div style={{ fontSize: 10, color: '#fdab3d' }}>📍 {link.placementSection}</div>}
             </div>
           ))}
-          {links.length > 8 && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>+{links.length - 8} more...</div>}
+          {links.length > 10 && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>+{links.length - 10} more...</div>}
         </div>
       );
     }
     return <pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
   }
 
-  // Step 10: Link Injection (content with links)
+  // Step 10: Link Injection
   if (step === 10) {
-    const content = data.content ?? (typeof data === 'string' ? data : null);
+    const content = data.linkedContent ?? data.content ?? (typeof data === 'string' ? data : null);
     if (typeof content === 'string') {
       return (
-        <div style={{ maxHeight: 280, overflow: 'auto', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 8, background: 'rgba(0,0,0,0.08)', borderRadius: 6 }}>
-          {content.slice(0, 2000)}
-          {content.length > 2000 && <div style={{ color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>... ({content.length} chars total)</div>}
+        <div style={{ maxHeight: 400, overflow: 'auto', fontSize: 12, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 12, background: 'rgba(0,0,0,0.08)', borderRadius: 6 }}>
+          {content}
         </div>
       );
     }
@@ -263,17 +282,22 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
 
   // Step 11: Image Plan
   if (step === 11) {
-    const images = data.images ?? data.imagePrompts ?? (Array.isArray(data) ? data : null);
+    const images = data.imagePlan ?? data.images ?? data.imagePrompts ?? (Array.isArray(data) ? data : null);
     if (Array.isArray(images)) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {images.map((img: Record<string, string>, i: number) => (
-            <div key={i} style={{ padding: 8, borderRadius: 6, background: 'rgba(129,140,248,0.04)', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2 }}>🖼️ Image {i + 1}: {img.placement || img.section || ''}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{img.description || img.prompt || ''}</div>
-              {img.altText && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>Alt: {img.altText}</div>}
+          <div style={{ fontWeight: 600, color: '#00c875' }}>🖼️ {images.length} Image Concepts</div>
+          {images.map((img: Record<string, unknown>, i: number) => (
+            <div key={i} style={{ padding: 10, borderRadius: 6, background: 'rgba(129,140,248,0.06)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>#{(img.imageNumber as number) ?? i+1} — {str(img.imagePurpose)} ({str(img.aspectRatio)})</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>{str(img.placementRecommendation)}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>Prompt: {str(img.imagePrompt).slice(0, 200)}...</div>
+              {img.notes && <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 2 }}>📝 {str(img.notes)}</div>}
             </div>
           ))}
+          {Array.isArray(data.warnings) && data.warnings.length > 0 && (
+            <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 4 }}>⚠️ {(data.warnings as string[]).join(' · ')}</div>
+          )}
         </div>
       );
     }
@@ -282,7 +306,7 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
 
   // Step 12: Generated Images
   if (step === 12) {
-    const images = data.images ?? data.imagePrompts ?? (Array.isArray(data) ? data : null);
+    const images = data.images ?? data.generatedImages ?? (Array.isArray(data) ? data : null);
     if (Array.isArray(images)) {
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>

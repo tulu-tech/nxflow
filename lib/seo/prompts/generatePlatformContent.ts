@@ -146,10 +146,10 @@ Return strict JSON matching the schema provided.`;
 // ─── User Prompt Builder ─────────────────────────────────────────────────────
 
 export function buildPlatformContentUserPrompt(input: PlatformContentInput): string {
-  return `WORKSPACE BRAND: ${input.workspace.brandName}
-Website: ${input.workspace.websiteUrl}
-Industry: ${input.workspace.industry}
-Business Type: ${input.workspace.businessType}
+  return `WORKSPACE BRAND: ${(input.workspace ?? {} as any).brandName ?? ""}
+Website: ${(input.workspace ?? {} as any).websiteUrl ?? ""}
+Industry: ${(input.workspace ?? {} as any).industry ?? ""}
+Business Type: ${(input.workspace ?? {} as any).businessType ?? ""}
 Target Market: ${input.workspace.targetMarket}
 Tone of Voice: ${input.workspace.toneOfVoice}
 Core Offer: ${input.workspace.coreOffer}
@@ -167,13 +167,13 @@ Content Goal: ${input.contentGoal}
 SELECTED PLATFORM/FORMAT: ${input.selectedPlatformFormat}
 
 APPROVED KEYWORD STRATEGY:
-- Primary Keyword: ${input.approvedKeywordStrategy.primaryKeyword}
-- Secondary Keywords: ${input.approvedKeywordStrategy.secondaryKeywords.join(', ')}
-- Search Intent: ${input.approvedKeywordStrategy.searchIntent}
+- Primary Keyword: ${(input.approvedKeywordStrategy ?? {} as any).primaryKeyword ?? ""}
+- Secondary Keywords: ${((input.approvedKeywordStrategy ?? {} as any).secondaryKeywords ?? []).join(', ')}
+- Search Intent: ${(input.approvedKeywordStrategy ?? {} as any).searchIntent ?? ""}
 - Funnel Stage: ${input.approvedKeywordStrategy.funnelStage}
 - Commercial Priority: ${input.approvedKeywordStrategy.commercialPriority}
-- Claim Risk: ${input.approvedKeywordStrategy.claimRisk}
-- Claim Risk Notes: ${input.approvedKeywordStrategy.claimRiskNotes}
+- Claim Risk: ${(input.approvedKeywordStrategy ?? {} as any).claimRisk ?? "Low"}
+- Claim Risk Notes: ${(input.approvedKeywordStrategy ?? {} as any).claimRiskNotes ?? ""}
 - Recommended CTA: ${input.approvedKeywordStrategy.recommendedCTA}
 - Content Angle: ${input.approvedKeywordStrategy.contentAngle}
 
@@ -186,10 +186,10 @@ Recommended CTA: ${input.approvedContentBrief.recommendedCTA}
 Platform Structure: ${JSON.stringify(input.approvedContentBrief.platformSpecificStructure)}
 
 MUST INCLUDE:
-${input.approvedContentBrief.mustInclude.map(m => '- ' + m).join('\n')}
+${((input.approvedContentBrief ?? {} as any).mustInclude ?? []).map(m => '- ' + m).join('\n')}
 
 MUST AVOID:
-${input.approvedContentBrief.mustAvoid.map(m => '- ' + m).join('\n')}
+${((input.approvedContentBrief ?? {} as any).mustAvoid ?? []).map(m => '- ' + m).join('\n')}
 
 TASK:
 Generate platform-native content for format "${input.selectedPlatformFormat}".
@@ -214,9 +214,9 @@ Return strict JSON:
 // ─── Mock Response ───────────────────────────────────────────────────────────
 
 export function mockPlatformContent(input: PlatformContentInput): PlatformContentResult {
-  const pk = input.approvedKeywordStrategy.primaryKeyword || input.selectedTopic;
+  const pk = ((input.approvedKeywordStrategy ?? {} as any).primaryKeyword ?? "") || input.selectedTopic;
   const cta = input.approvedContentBrief.recommendedCTA || input.approvedKeywordStrategy.recommendedCTA;
-  const brand = input.workspace.brandName;
+  const brand = (input.workspace ?? {} as any).brandName ?? "";
   const fmt = input.selectedPlatformFormat;
 
   const base = {
@@ -226,7 +226,7 @@ export function mockPlatformContent(input: PlatformContentInput): PlatformConten
     primaryKeyword: pk,
     contentGoal: input.contentGoal,
     recommendedCTA: cta,
-    claimRiskNotes: input.approvedKeywordStrategy.claimRiskNotes || '',
+    claimRiskNotes: ((input.approvedKeywordStrategy ?? {} as any).claimRiskNotes ?? "") || '',
   };
 
   // Generate format-specific mock items
@@ -344,7 +344,7 @@ export function mockPlatformContent(input: PlatformContentInput): PlatformConten
         pageNumber: i + 1,
         pageTitle: i === 0 ? pk : i === 7 ? 'Get Expert Help' : `Section ${i}`,
         bodyCopy: i === 0 ? `A guide for ${input.selectedPersona.toLowerCase()} buyers`
-          : i === 7 ? `${cta}\n\n${input.workspace.websiteUrl}`
+          : i === 7 ? `${cta}\n\n${(input.workspace ?? {} as any).websiteUrl ?? ""}`
           : `Detailed insight #${i} about ${pk.toLowerCase()}.`,
         visualDirection: i === 0 ? 'Cover page — premium design' : i === 7 ? 'CTA page with contact info' : 'Content page with supporting graphic',
         designNotes: i === 0 ? 'Use brand logo and colors' : '',
@@ -394,7 +394,7 @@ export function mockPlatformContent(input: PlatformContentInput): PlatformConten
         comment: [
           `Really good breakdown! One thing worth adding — trying in person makes a huge difference for ${pk.toLowerCase()}. The specs don't always tell the full story.`,
           `Great question! The answer depends a lot on your specific needs. If you want a personalized rec, happy to share what I've seen work for different situations.`,
-          `This is spot on. The ${input.workspace.industry} space has changed a lot — expert guidance matters more than ever for high-ticket decisions.`,
+          `This is spot on. The ${(input.workspace ?? {} as any).industry ?? ""} space has changed a lot — expert guidance matters more than ever for high-ticket decisions.`,
           `Totally understand the frustration. The key is making sure you get the right fit from the start — that's where in-person guidance really helps.`,
           `A few things to consider: your budget, space, and what features actually matter for YOUR needs. Generic "best of" lists miss the personal fit factor.`,
           `Good comparison! Worth noting that specs only tell part of the story — comfort and build quality are things you really need to experience.`,

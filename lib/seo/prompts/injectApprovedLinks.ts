@@ -74,14 +74,14 @@ Return strict JSON matching the schema provided.`;
 // ─── User Prompt Builder ─────────────────────────────────────────────────────
 
 export function buildInjectLinksUserPrompt(input: InjectLinksInput): string {
-  const internalStr = input.approvedInternalLinkPlan.length > 0
-    ? input.approvedInternalLinkPlan.map((l, i) =>
+  const internalStr = (input.approvedInternalLinkPlan ?? []).length > 0
+    ? (input.approvedInternalLinkPlan ?? []).map((l, i) =>
         `  ${i + 1}. URL: ${l.targetUrl}\n     Anchor: "${l.anchorText}"\n     Section: ${l.placementSection}`
       ).join('\n')
     : '  (none)';
 
-  const externalStr = input.approvedExternalLinkPlan.length > 0
-    ? input.approvedExternalLinkPlan.map((l, i) =>
+  const externalStr = (input.approvedExternalLinkPlan ?? []).length > 0
+    ? (input.approvedExternalLinkPlan ?? []).map((l, i) =>
         `  ${i + 1}. URL: ${l.targetUrl}\n     Anchor: "${l.anchorText}"\n     Section: ${l.placementSection}`
       ).join('\n')
     : '  (none)';
@@ -125,7 +125,7 @@ export function mockInjectLinks(input: InjectLinksInput): InjectLinksResult {
   let internalMarkerIdx = 0;
   content = content.replace(internalMarkerRegex, (match, anchor) => {
     const cleanAnchor = anchor.trim();
-    if (internalMarkerIdx < input.approvedInternalLinkPlan.length) {
+    if (internalMarkerIdx < (input.approvedInternalLinkPlan ?? []).length) {
       const link = input.approvedInternalLinkPlan[internalMarkerIdx];
       internalMarkerIdx++;
       insertedInternal.push({
@@ -144,7 +144,7 @@ export function mockInjectLinks(input: InjectLinksInput): InjectLinksResult {
   let externalMarkerIdx = 0;
   content = content.replace(externalMarkerRegex, (match, claim) => {
     const cleanClaim = claim.trim();
-    if (externalMarkerIdx < input.approvedExternalLinkPlan.length) {
+    if (externalMarkerIdx < (input.approvedExternalLinkPlan ?? []).length) {
       const link = input.approvedExternalLinkPlan[externalMarkerIdx];
       externalMarkerIdx++;
       insertedExternal.push({
@@ -158,7 +158,7 @@ export function mockInjectLinks(input: InjectLinksInput): InjectLinksResult {
   });
 
   // 3. Place remaining approved internal links by matching anchor text
-  for (let i = internalMarkerIdx; i < input.approvedInternalLinkPlan.length; i++) {
+  for (let i = internalMarkerIdx; i < (input.approvedInternalLinkPlan ?? []).length; i++) {
     const link = input.approvedInternalLinkPlan[i];
     const anchor = link.anchorText;
     const escapedAnchor = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -177,7 +177,7 @@ export function mockInjectLinks(input: InjectLinksInput): InjectLinksResult {
   }
 
   // 4. Place remaining approved external links by matching anchor text
-  for (let i = externalMarkerIdx; i < input.approvedExternalLinkPlan.length; i++) {
+  for (let i = externalMarkerIdx; i < (input.approvedExternalLinkPlan ?? []).length; i++) {
     const link = input.approvedExternalLinkPlan[i];
     const anchor = link.anchorText;
     const escapedAnchor = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

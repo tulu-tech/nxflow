@@ -120,12 +120,12 @@ Return strict JSON matching the schema provided.`;
 
 export function buildExternalLinkPlanUserPrompt(input: ExternalLinkPlanInput): string {
   // Truncate content for prompt efficiency
-  const contentSnippet = input.generatedContent.length > 3500
-    ? input.generatedContent.slice(0, 3500) + '\n\n[... content continues ...]'
+  const contentSnippet = (input.generatedContent ?? "").length > 3500
+    ? (input.generatedContent ?? "").slice(0, 3500) + '\n\n[... content continues ...]'
     : input.generatedContent;
 
-  return `WORKSPACE: ${input.workspace.brandName} (${input.workspace.websiteUrl})
-Industry: ${input.workspace.industry}
+  return `WORKSPACE: ${(input.workspace ?? {} as any).brandName ?? ""} (${(input.workspace ?? {} as any).websiteUrl ?? ""})
+Industry: ${(input.workspace ?? {} as any).industry ?? ""}
 MCM Rules Active: ${input.mcmWorkspaceRulesIfApplicable}
 
 CONTENT CONTEXT:
@@ -133,11 +133,11 @@ Persona: ${input.selectedPersona}
 Topic: ${input.selectedTopic}
 Topic ID: ${input.selectedTopicId}
 Platform/Format: ${input.selectedPlatformFormat}
-Primary Keyword: ${input.approvedKeywordStrategy.primaryKeyword}
-Search Intent: ${input.approvedKeywordStrategy.searchIntent}
+Primary Keyword: ${(input.approvedKeywordStrategy ?? {} as any).primaryKeyword ?? ""}
+Search Intent: ${(input.approvedKeywordStrategy ?? {} as any).searchIntent ?? ""}
 Funnel Stage: ${input.approvedKeywordStrategy.funnelStage}
-Claim Risk: ${input.approvedKeywordStrategy.claimRisk}
-Claim Risk Notes: ${input.approvedKeywordStrategy.claimRiskNotes}
+Claim Risk: ${(input.approvedKeywordStrategy ?? {} as any).claimRisk ?? "Low"}
+Claim Risk Notes: ${(input.approvedKeywordStrategy ?? {} as any).claimRiskNotes ?? ""}
 
 GENERATED CONTENT:
 ${contentSnippet}
@@ -266,7 +266,7 @@ export function mockExternalLinkPlan(input: ExternalLinkPlanInput): ExternalLink
   // Build plan based on topic relevance
   let plan: ExternalLinkItem[] = [];
 
-  const hasHealth = /pain|back|neck|shoulder|stress|relief|recovery|wellness|therapy|muscle|tension|circulation|sleep/i.test(topic + ' ' + input.generatedContent.slice(0, 500));
+  const hasHealth = /pain|back|neck|shoulder|stress|relief|recovery|wellness|therapy|muscle|tension|circulation|sleep/i.test(topic + ' ' + (input.generatedContent ?? "").slice(0, 500));
   const hasWarranty = /warranty|service|support|repair|protect/i.test(topic);
   const hasErgonomics = /posture|ergonomic|fit|space|dimension|body|comfort|zero.gravity/i.test(topic);
   const hasBuying = /buy|price|cost|value|compare|worth|invest/i.test(topic);
@@ -297,7 +297,7 @@ export function mockExternalLinkPlan(input: ExternalLinkPlanInput): ExternalLink
   });
 
   const warnings: string[] = [];
-  if (input.approvedKeywordStrategy.claimRisk === 'High') {
+  if (((input.approvedKeywordStrategy ?? {} as any).claimRisk ?? 'Low') === 'High') {
     warnings.push('High claim risk detected. Ensure all health/wellness claims are supported by cited sources. Avoid unsupported therapeutic claims.');
   }
   if (isShortForm && plan.length === 0) {

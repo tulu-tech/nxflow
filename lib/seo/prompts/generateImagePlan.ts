@@ -130,20 +130,20 @@ Return strict JSON matching the schema provided.`;
 // ─── User Prompt Builder ─────────────────────────────────────────────────────
 
 export function buildImagePlanUserPrompt(input: ImagePlanInput): string {
-  const refPagesStr = input.imageReferencePages.length > 0
-    ? input.imageReferencePages.map((p, i) =>
-        `  ${i + 1}. [${p.pageType}] ${p.url}\n     Reason: ${p.relevanceReason}\n     Brand/Product: ${p.detectedProductOrBrand || '—'}\n     Images: ${p.imageUrls.length > 0 ? p.imageUrls.join(', ') : 'none extracted'}`
+  const refPagesStr = (input.imageReferencePages ?? []).length > 0
+    ? (input.imageReferencePages ?? []).map((p, i) =>
+        `  ${i + 1}. [${p.pageType}] ${p.url}\n     Reason: ${p.relevanceReason}\n     Brand/Product: ${p.detectedProductOrBrand || '—'}\n     Images: ${(p.imageUrls ?? []).length > 0 ? (p.imageUrls ?? []).join(', ') : 'none extracted'}`
       ).join('\n')
     : '  (no reference pages available)';
 
   // Truncate content for prompt efficiency — extract headings and IMAGE_OPPORTUNITY markers
-  const headings = input.linkedContent.match(/^#{1,3}\s+.+$/gm)?.join('\n') ?? '';
-  const imageMarkers = input.linkedContent.match(/\[IMAGE_OPPORTUNITY:[^\]]+\]/g)?.join('\n') ?? '';
+  const headings = (input.linkedContent ?? "").match(/^#{1,3}\s+.+$/gm)?.join('\n') ?? '';
+  const imageMarkers = (input.linkedContent ?? "").match(/\[IMAGE_OPPORTUNITY:[^\]]+\]/g)?.join('\n') ?? '';
   const contentContext = `HEADINGS:\n${headings}\n\nIMAGE MARKERS:\n${imageMarkers || '(none)'}`;
 
-  return `WORKSPACE: ${input.workspace.brandName} (${input.workspace.websiteUrl})
-Industry: ${input.workspace.industry}
-Business Type: ${input.workspace.businessType}
+  return `WORKSPACE: ${(input.workspace ?? {} as any).brandName ?? ""} (${(input.workspace ?? {} as any).websiteUrl ?? ""})
+Industry: ${(input.workspace ?? {} as any).industry ?? ""}
+Business Type: ${(input.workspace ?? {} as any).businessType ?? ""}
 MCM Rules Active: ${input.mcmWorkspaceRulesIfApplicable}
 
 CONTENT CONTEXT:
@@ -151,11 +151,11 @@ Persona: ${input.selectedPersona}
 Topic: ${input.selectedTopic}
 Topic ID: ${input.selectedTopicId}
 Platform/Format: ${input.selectedPlatformFormat}
-Primary Keyword: ${input.approvedKeywordStrategy.primaryKeyword}
-Brand Intent: ${input.approvedKeywordStrategy.brandIntent}
-Local Intent: ${input.approvedKeywordStrategy.localIntent}
-Comparison Intent: ${input.approvedKeywordStrategy.comparisonIntent}
-Claim Risk: ${input.approvedKeywordStrategy.claimRisk}
+Primary Keyword: ${(input.approvedKeywordStrategy ?? {} as any).primaryKeyword ?? ""}
+Brand Intent: ${(input.approvedKeywordStrategy ?? {} as any).brandIntent ?? false}
+Local Intent: ${(input.approvedKeywordStrategy ?? {} as any).localIntent ?? false}
+Comparison Intent: ${(input.approvedKeywordStrategy ?? {} as any).comparisonIntent ?? false}
+Claim Risk: ${(input.approvedKeywordStrategy ?? {} as any).claimRisk ?? "Low"}
 
 CONTENT STRUCTURE:
 ${contentContext}
@@ -192,24 +192,24 @@ Return strict JSON:
 // ─── Mock Response ───────────────────────────────────────────────────────────
 
 export function mockImagePlan(input: ImagePlanInput): ImagePlanResult {
-  const pk = input.approvedKeywordStrategy.primaryKeyword;
+  const pk = (input.approvedKeywordStrategy ?? {} as any).primaryKeyword ?? "";
   const topic = input.selectedTopic;
-  const brand = input.workspace.brandName;
+  const brand = (input.workspace ?? {} as any).brandName ?? "";
   const isMCM = input.mcmWorkspaceRulesIfApplicable;
-  const isBrand = input.approvedKeywordStrategy.brandIntent;
-  const isLocal = input.approvedKeywordStrategy.localIntent;
-  const isComparison = input.approvedKeywordStrategy.comparisonIntent;
+  const isBrand = (input.approvedKeywordStrategy ?? {} as any).brandIntent ?? false;
+  const isLocal = (input.approvedKeywordStrategy ?? {} as any).localIntent ?? false;
+  const isComparison = (input.approvedKeywordStrategy ?? {} as any).comparisonIntent ?? false;
   const isArticle = input.selectedPlatformFormat === 'article-blog';
 
   const defaultNeg = 'no text overlay, no logos, no watermark, no cartoon, no illustration, no fantasy, no surreal, no medical setting, no doctors, no hospital, no blurry, no low quality, no plastic skin';
 
   // Find best reference page
-  const refPage = input.imageReferencePages[0];
+  const refPage = (input.imageReferencePages ?? [])[0];
   const refUrl = refPage?.url ?? '';
   const refImgs = refPage?.imageUrls ?? [];
 
   // Determine detected product/brand from references
-  const detectedBrand = input.imageReferencePages.find(p => p.detectedProductOrBrand)?.detectedProductOrBrand ?? '';
+  const detectedBrand = (input.imageReferencePages ?? []).find(p => p.detectedProductOrBrand)?.detectedProductOrBrand ?? '';
 
   // Build 5 images based on topic context
   const plan: ImagePlanItem[] = [];
@@ -237,13 +237,13 @@ export function mockImagePlan(input: ImagePlanInput): ImagePlanResult {
     imageNumber: 2,
     imagePurpose: isLocal ? 'local' : 'showroom',
     placementRecommendation: 'After the introduction or "why it matters" section',
-    relatedKeyword: input.approvedKeywordStrategy.secondaryKeywords[0] ?? pk,
+    relatedKeyword: ((input.approvedKeywordStrategy ?? {} as any).secondaryKeywords ?? [])[0] ?? pk,
     relatedSection: isLocal ? 'Local/Showroom section' : 'Expert guidance section',
-    referencePageUrl: input.imageReferencePages.find(p => p.pageType === 'local')?.url ?? refUrl,
+    referencePageUrl: (input.imageReferencePages ?? []).find(p => p.pageType === 'local')?.url ?? refUrl,
     referenceImageUrls: [],
     imagePrompt: isMCM
       ? `A knowledgeable massage chair specialist speaking with a couple in a premium showroom, multiple massage chairs visible in the background, clean modern retail environment, warm professional lighting, the salesperson is gesturing toward a chair feature, customers look engaged and comfortable, natural candid moment, editorial retail photography, photorealistic`
-      : `A professional consultant helping a customer make a decision in a clean, modern retail showroom for ${input.workspace.industry}, warm lighting, natural interaction, editorial photography`,
+      : `A professional consultant helping a customer make a decision in a clean, modern retail showroom for ${(input.workspace ?? {} as any).industry ?? ""}, warm lighting, natural interaction, editorial photography`,
     negativePrompt: defaultNeg,
     aspectRatio: isArticle ? '16:9' : '4:5',
     realismLevel: 'High',
@@ -255,9 +255,9 @@ export function mockImagePlan(input: ImagePlanInput): ImagePlanResult {
     imageNumber: 3,
     imagePurpose: isBrand ? 'product' : 'feature-detail',
     placementRecommendation: 'Within the comparison or feature breakdown section',
-    relatedKeyword: input.approvedKeywordStrategy.secondaryKeywords[1] ?? pk,
+    relatedKeyword: ((input.approvedKeywordStrategy ?? {} as any).secondaryKeywords ?? [])[1] ?? pk,
     relatedSection: 'Features / Comparison section',
-    referencePageUrl: input.imageReferencePages.find(p => p.pageType === 'product')?.url ?? refUrl,
+    referencePageUrl: (input.imageReferencePages ?? []).find(p => p.pageType === 'product')?.url ?? refUrl,
     referenceImageUrls: refImgs.slice(0, 1),
     imagePrompt: isMCM
       ? `Close-up detail shot of a premium massage chair feature: ${isBrand && detectedBrand ? `${detectedBrand} model showing` : ''} advanced foot roller mechanism with heating elements, smooth leather upholstery visible, soft studio lighting from the left, shallow depth of field, product photography style, clean white-gray background, 8k, photorealistic`
@@ -273,7 +273,7 @@ export function mockImagePlan(input: ImagePlanInput): ImagePlanResult {
     imageNumber: 4,
     imagePurpose: isComparison ? 'comparison' : 'lifestyle',
     placementRecommendation: 'Within the decision-making or lifestyle section',
-    relatedKeyword: input.approvedKeywordStrategy.secondaryKeywords[2] ?? pk,
+    relatedKeyword: ((input.approvedKeywordStrategy ?? {} as any).secondaryKeywords ?? [])[2] ?? pk,
     relatedSection: isComparison ? 'Comparison section' : 'Lifestyle / Wellness section',
     referencePageUrl: refUrl,
     referenceImageUrls: [],
@@ -297,7 +297,7 @@ export function mockImagePlan(input: ImagePlanInput): ImagePlanResult {
     placementRecommendation: 'Near the conclusion or CTA section',
     relatedKeyword: pk,
     relatedSection: 'Conclusion / CTA',
-    referencePageUrl: input.imageReferencePages.find(p => p.pageType === 'local' || p.pageType === 'contact')?.url ?? refUrl,
+    referencePageUrl: (input.imageReferencePages ?? []).find(p => p.pageType === 'local' || p.pageType === 'contact')?.url ?? refUrl,
     referenceImageUrls: [],
     imagePrompt: isMCM
       ? `A white-glove delivery team carefully placing a premium massage chair in a customer's home, modern living room, the homeowner watching with a satisfied smile, professional installation setup, clean organized environment, warm natural light from windows, the scene conveys trust, professionalism, and premium service, editorial photography, photorealistic`
@@ -309,10 +309,10 @@ export function mockImagePlan(input: ImagePlanInput): ImagePlanResult {
   });
 
   const warnings: string[] = [];
-  if (input.imageReferencePages.length === 0) {
+  if ((input.imageReferencePages ?? []).length === 0) {
     warnings.push('No image reference pages available. Image prompts are based on topic context only — no visual grounding from website.');
   }
-  if (input.approvedKeywordStrategy.claimRisk === 'High') {
+  if (((input.approvedKeywordStrategy ?? {} as any).claimRisk ?? 'Low') === 'High') {
     warnings.push('High claim risk topic. All images avoid medical/treatment/clinical imagery. Wellness-only visuals used.');
   }
 
