@@ -8,6 +8,7 @@ import { EXTERNAL_LINK_PLAN_SYSTEM_PROMPT, buildExternalLinkPlanUserPrompt, mock
 import { INJECT_LINKS_SYSTEM_PROMPT, buildInjectLinksUserPrompt, mockInjectLinks as mockInjectApprovedLinks, type InjectLinksInput } from '@/lib/seo/prompts/injectApprovedLinks';
 import { IMAGE_REFERENCE_SYSTEM_PROMPT, buildImageReferenceUserPrompt, discoverImageReferences, type ImageReferenceInput } from '@/lib/seo/prompts/discoverImageReferences';
 import { IMAGE_PLAN_SYSTEM_PROMPT, buildImagePlanUserPrompt, mockImagePlan, type ImagePlanInput } from '@/lib/seo/prompts/generateImagePlan';
+import { mockContentImages, generateContentImages, type ContentImagesInput } from '@/lib/seo/prompts/generateContentImages';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -934,6 +935,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(discoverImageReferences(body as ImageReferenceInput));
         case 'generate-image-plan':
           return NextResponse.json(mockImagePlan(body as ImagePlanInput));
+        case 'generate-content-images':
+          return NextResponse.json(mockContentImages(body as ContentImagesInput));
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -973,6 +976,12 @@ export async function POST(req: NextRequest) {
       const dalleData = await dalleRes.json();
       const imageUrl = dalleData.data?.[0]?.url || null;
       return NextResponse.json({ imageUrl });
+    }
+
+    // Special case: batch image generation via DALL-E 3 (5 images)
+    if (action === 'generate-content-images') {
+      const result = await generateContentImages(body as ContentImagesInput, apiKey);
+      return NextResponse.json(result);
     }
 
     // Special case: link injection (no AI needed — deterministic)
