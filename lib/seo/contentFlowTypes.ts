@@ -27,6 +27,7 @@ export const CONTENT_PHASES: ContentPhaseConfig[] = [
   { step: 10, label: 'Link Injection',        shortLabel: 'Inject',    icon: '💉' },
   { step: 11, label: 'Image Plan',            shortLabel: 'Img Plan',  icon: '🖼️' },
   { step: 12, label: 'Image Generation',      shortLabel: 'Images',    icon: '📸' },
+  { step: 13, label: 'Final Preview & Export', shortLabel: 'Export',   icon: '📦' },
 ];
 
 // ─── Content Format Options ──────────────────────────────────────────────────

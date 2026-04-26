@@ -125,24 +125,27 @@ export async function generateWithDalle(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
+        model: 'gpt-image-1.5',
         prompt: fullPrompt,
         n: 1,
         size,
-        quality: 'standard',
       }),
     });
 
     if (!res.ok) {
       const err = await res.text();
-      console.error(`[DALL-E Error] Image generation failed:`, err);
+      console.error(`[GPT-Image Error] Image generation failed:`, err);
       return null;
     }
 
     const data = await res.json();
-    return data.data?.[0]?.url || null;
+    // gpt-image-1.5 returns b64_json by default; also check for url
+    const item = data.data?.[0];
+    if (item?.url) return item.url;
+    if (item?.b64_json) return `data:image/png;base64,${item.b64_json}`;
+    return null;
   } catch (err) {
-    console.error('[DALL-E Error]', err);
+    console.error('[GPT-Image Error]', err);
     return null;
   }
 }

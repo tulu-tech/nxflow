@@ -8,7 +8,178 @@ import { CONTENT_PHASES, CONTENT_FORMATS, CONTENT_GOALS, type ContentFormatType 
 import { MCM_WORKSPACE_ID } from '@/lib/seo/seeds/mcm';
 import { MCM_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/mcmPersonaTopics';
 import { AIStep } from './AIStep';
-import { ChevronLeft, ChevronRight, Check, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, RotateCcw, Download, FileText } from 'lucide-react';
+
+// ─── Final Preview & Export (Step 13) ────────────────────────────────────────
+
+function FinalPreview({ project, workspace, persona, topic }: {
+  project: SEOProject;
+  workspace: SEOWorkspace;
+  persona: WorkspacePersona | undefined;
+  topic: WorkspaceContentTopic | undefined;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = project as any;
+  const article = p.generatedArticle?.article ?? p.generatedArticle ?? {};
+  const content = p.linkedContent ?? article?.content ?? p.rawContent ?? '';
+  const title = article?.title ?? article?.metaTitle ?? p.name ?? '';
+  const metaDesc = article?.metaDescription ?? '';
+  const slug = article?.slug ?? '';
+  const wordCount = article?.wordCount ?? (typeof content === 'string' ? content.split(/\s+/).length : 0);
+
+  // Images
+  const imgs = p.generatedImages?.generatedImages ?? p.finalOutput?.generatedImages ?? [];
+  // Links
+  const intLinks = p.internalLinkPlan?.internalLinkPlan ?? [];
+  const extLinks = p.externalLinkPlan?.externalLinkPlan ?? [];
+  // Keyword
+  const kw = p.keywordStrategy?.primaryKeyword;
+  const pkName = typeof kw === 'string' ? kw : kw?.keyword ?? '';
+
+  const exportDocx = () => {
+    // Build HTML content for .docx (Word can open HTML)
+    const imagesHtml = Array.isArray(imgs) && imgs.length > 0
+      ? `<h2>Images</h2>${imgs.map((img: Record<string, string>) =>
+          `<div style="margin:12px 0;"><img src="${img.imageUrl}" alt="${img.altText}" style="max-width:600px;border-radius:8px;" /><br/><small><b>Alt:</b> ${img.altText} | <b>File:</b> ${img.recommendedFileName}</small></div>`
+        ).join('')}`
+      : '';
+    const intLinksHtml = Array.isArray(intLinks) && intLinks.length > 0
+      ? `<h2>Internal Links</h2><ul>${intLinks.map((l: Record<string, string>) =>
+          `<li><a href="${l.targetUrl}">${l.anchorText}</a> — ${l.placementSection ?? ''}</li>`
+        ).join('')}</ul>`
+      : '';
+    const extLinksHtml = Array.isArray(extLinks) && extLinks.length > 0
+      ? `<h2>External Links</h2><ul>${extLinks.map((l: Record<string, string>) =>
+          `<li><a href="${l.targetUrl}">${l.anchorText}</a> — ${l.placementSection ?? ''}</li>`
+        ).join('')}</ul>`
+      : '';
+    const contentHtml = typeof content === 'string'
+      ? content.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>')
+      : JSON.stringify(content, null, 2);
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+      <style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;line-height:1.8;color:#222;}
+      h1{font-size:28px;} h2{font-size:22px;color:#444;border-bottom:1px solid #ddd;padding-bottom:4px;}
+      img{max-width:100%;border-radius:8px;} a{color:#2563eb;} small{color:#666;}
+      .meta{color:#888;font-size:14px;margin-bottom:20px;}</style></head><body>
+      <h1>${title}</h1>
+      <div class="meta">
+        ${slug ? `<div>Slug: /${slug}</div>` : ''}
+        ${metaDesc ? `<div>Meta: ${metaDesc}</div>` : ''}
+        <div>Words: ${wordCount} | Keyword: ${pkName}</div>
+        ${persona ? `<div>Persona: ${persona.name}</div>` : ''}
+        ${topic ? `<div>Topic: ${topic.topicName ?? topic.topic}</div>` : ''}
+      </div>
+      <hr/>
+      <p>${contentHtml}</p>
+      ${imagesHtml}
+      ${intLinksHtml}
+      ${extLinksHtml}
+      </body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-word;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug || 'content'}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportHtml = () => {
+    const blob = new Blob([typeof content === 'string' ? content : JSON.stringify(content, null, 2)], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug || 'content'}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="seo-card" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: '#00c875', margin: '0 0 4px' }}>📦 Final Content Preview</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Review your complete content with links and images before export.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="seo-btn seo-btn-ghost" onClick={exportHtml} style={{ fontSize: 11 }}>
+            <FileText size={12} /> HTML
+          </button>
+          <button className="seo-btn seo-btn-primary" onClick={exportDocx} style={{ fontSize: 11 }}>
+            <Download size={12} /> Export .DOC
+          </button>
+        </div>
+      </div>
+
+      {/* Meta info */}
+      <div style={{ padding: 10, borderRadius: 6, background: '#1e293b', marginBottom: 12, fontSize: 11 }}>
+        {title && <div style={{ fontWeight: 700, fontSize: 16, color: '#00c875', marginBottom: 4 }}>{title}</div>}
+        {slug && <div style={{ color: '#60a5fa' }}>/{slug}</div>}
+        {metaDesc && <div style={{ color: '#94a3b8', fontStyle: 'italic' }}>{metaDesc}</div>}
+        <div style={{ color: '#94a3b8', marginTop: 4 }}>📝 {wordCount} words · 🔑 {pkName} {persona ? `· 👤 ${persona.name}` : ''}</div>
+      </div>
+
+      {/* Content */}
+      <div style={{ maxHeight: 500, overflow: 'auto', lineHeight: 1.8, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 16, background: 'rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+        {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+      </div>
+
+      {/* Images grid */}
+      {Array.isArray(imgs) && imgs.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: 'var(--text-primary)' }}>🖼️ Generated Images ({imgs.length})</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            {imgs.map((img: Record<string, string>, i: number) => (
+              <div key={i} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.04)' }}>
+                <img src={img.imageUrl} alt={img.altText} style={{ width: '100%', height: 140, objectFit: 'cover' }} />
+                <div style={{ padding: 6, fontSize: 10 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{img.imagePurpose}</div>
+                  <div style={{ color: '#94a3b8' }}>{img.altText}</div>
+                  <div style={{ color: '#60a5fa', fontSize: 9 }}>{img.recommendedFileName}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Links summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        {Array.isArray(intLinks) && intLinks.length > 0 && (
+          <div style={{ padding: 10, borderRadius: 6, background: 'rgba(0,200,117,0.04)', border: '1px solid rgba(0,200,117,0.15)' }}>
+            <div style={{ fontWeight: 600, fontSize: 12, color: '#00c875', marginBottom: 6 }}>🔗 {intLinks.length} Internal Links</div>
+            {intLinks.slice(0, 6).map((l: Record<string, string>, i: number) => (
+              <div key={i} style={{ fontSize: 10, marginBottom: 3 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{l.anchorText}</span>
+                <span style={{ color: '#60a5fa', marginLeft: 4 }}>{l.targetUrl}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {Array.isArray(extLinks) && extLinks.length > 0 && (
+          <div style={{ padding: 10, borderRadius: 6, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <div style={{ fontWeight: 600, fontSize: 12, color: '#60a5fa', marginBottom: 6 }}>🌐 {extLinks.length} External Links</div>
+            {extLinks.slice(0, 6).map((l: Record<string, string>, i: number) => (
+              <div key={i} style={{ fontSize: 10, marginBottom: 3 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{l.anchorText}</span>
+                <span style={{ color: '#60a5fa', marginLeft: 4 }}>{l.targetUrl}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Export bar */}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: 12, borderRadius: 8, background: '#065f46', border: '1px solid #00c875' }}>
+        <button className="seo-btn seo-btn-primary" onClick={exportDocx} style={{ background: '#00c875', border: 'none', fontWeight: 700 }}>
+          <Download size={14} /> Download .DOC (Full Content + Images + Links)
+        </button>
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   project: SEOProject;
@@ -312,10 +483,15 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
             if (step === 9) updateProjectField(pid, 'externalLinkPlan', data);
             if (step === 10) updateProjectField(pid, 'linkedContent', data?.content ?? data);
             if (step === 11) updateProjectField(pid, 'imagePlan', data);
-            if (step === 12) updateProjectField(pid, 'finalOutput', data);
+            if (step === 12) { updateProjectField(pid, 'generatedImages', data); updateProjectField(pid, 'finalOutput', data); }
             goNext();
           }}
         />
+      )}
+
+      {/* ── STEP 13: Final Preview & DOCX Export ── */}
+      {step === 13 && (
+        <FinalPreview project={project} workspace={workspace} persona={persona} topic={topic} />
       )}
 
       {/* ── Navigation Footer ── */}
@@ -333,7 +509,7 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
               Continue <ChevronRight size={14} />
             </button>
           )}
-          {step > 4 && step < 12 && (
+          {step > 4 && step < 13 && (
             <button className="seo-btn seo-btn-primary" onClick={goNext}>
               Next Step <ChevronRight size={14} />
             </button>
