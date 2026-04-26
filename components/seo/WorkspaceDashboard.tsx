@@ -245,7 +245,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
           { icon: <Users size={16} />, label: 'Personas', value: workspace.personas.length, color: workspace.personas.length > 0 ? '#e78bfa' : 'var(--text-muted)', sub: workspace.personas.length > 0 ? `${workspace.personas.filter(p => p.intentStages.includes('decision')).length} decision-stage` : 'Not configured' },
-          { icon: <BookOpen size={16} />, label: 'Topics', value: workspace.contentTopics.length, color: workspace.contentTopics.length > 0 ? '#fdab3d' : 'var(--text-muted)', sub: workspace.contentTopics.length > 0 ? `${workspace.contentTopics.filter(t => t.priority === 'high').length} high priority` : 'Not configured' },
+          { icon: <BookOpen size={16} />, label: 'Topics', value: workspace.contentTopics.length, color: workspace.contentTopics.length > 0 ? '#fdab3d' : 'var(--text-muted)', sub: workspace.contentTopics.length > 0 ? `${new Set(workspace.contentTopics.map(t => t.topicCluster ?? t.category)).size} clusters` : 'Not configured' },
           { icon: <Settings size={16} />, label: 'Platforms', value: workspace.platforms.filter(p => p.enabled).length, color: workspace.platforms.some(p => p.enabled) ? '#00c875' : 'var(--text-muted)', sub: 'enabled' },
         ].map((stat, i) => (
           <div key={i} className="seo-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
@@ -570,47 +570,76 @@ export function WorkspaceDashboard({ workspace }: Props) {
               </span>
             )}
           </h3>
-          {workspace.contentTopics.length > 0 ? (
-            <div style={{ maxHeight: 360, overflow: 'auto' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {workspace.contentTopics.map((t) => (
-                  <div key={t.id} style={{
-                    padding: '8px 10px', borderRadius: 6,
-                    border: '1px solid var(--border-subtle)',
-                    fontSize: 12,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{t.topic}</span>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <span style={{
-                          fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                          background: t.priority === 'high' ? 'rgba(239,68,68,0.12)' : t.priority === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(129,140,248,0.06)',
-                          color: t.priority === 'high' ? '#f87171' : t.priority === 'medium' ? '#fdab3d' : 'var(--text-muted)',
-                        }}>
-                          {t.priority}
+          {workspace.contentTopics.length > 0 ? (() => {
+            // Group by cluster
+            const clusters: Record<string, typeof workspace.contentTopics> = {};
+            workspace.contentTopics.forEach((t) => {
+              const cluster = t.topicCluster ?? t.category ?? 'Other';
+              if (!clusters[cluster]) clusters[cluster] = [];
+              clusters[cluster].push(t);
+            });
+            return (
+              <div style={{ maxHeight: 420, overflow: 'auto' }}>
+                {/* Cluster pill summary */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                  {Object.entries(clusters).map(([cluster, topics]) => (
+                    <span key={cluster} style={{
+                      fontSize: 10, padding: '2px 7px', borderRadius: 3,
+                      background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)',
+                    }}>
+                      {cluster} ({topics.length})
+                    </span>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {workspace.contentTopics.map((t) => (
+                    <div key={t.topicId ?? t.id} style={{
+                      padding: '8px 10px', borderRadius: 6,
+                      border: '1px solid var(--border-subtle)',
+                      fontSize: 12,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{t.topicName ?? t.topic}</span>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                          {t.claimRiskLevel && (
+                            <span style={{
+                              fontSize: 9, padding: '1px 5px', borderRadius: 3,
+                              background: t.claimRiskLevel === 'high' ? 'rgba(239,68,68,0.12)' : t.claimRiskLevel === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(0,200,117,0.08)',
+                              color: t.claimRiskLevel === 'high' ? '#f87171' : t.claimRiskLevel === 'medium' ? '#fdab3d' : '#00c875',
+                            }}>
+                              {t.claimRiskLevel === 'high' ? '⚠️' : t.claimRiskLevel === 'medium' ? '⚡' : '✓'} {t.claimRiskLevel}
+                            </span>
+                          )}
+                          <span style={{
+                            fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                            background: t.funnelStage === 'bottom' ? 'rgba(0,200,117,0.12)' : t.funnelStage === 'middle' ? 'rgba(129,140,248,0.12)' : 'rgba(253,171,61,0.12)',
+                            color: t.funnelStage === 'bottom' ? '#00c875' : t.funnelStage === 'middle' ? 'var(--accent)' : '#fdab3d',
+                          }}>
+                            {t.funnelStage}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)' }}>
+                          {t.topicCluster ?? t.category}
                         </span>
-                        <span style={{
-                          fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                          background: t.funnelStage === 'bottom' ? 'rgba(0,200,117,0.12)' : t.funnelStage === 'middle' ? 'rgba(129,140,248,0.12)' : 'rgba(253,171,61,0.12)',
-                          color: t.funnelStage === 'bottom' ? '#00c875' : t.funnelStage === 'middle' ? 'var(--accent)' : '#fdab3d',
-                        }}>
-                          {t.funnelStage}
-                        </span>
+                        {t.brandOrProductSignal && (
+                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(253,171,61,0.08)', color: '#fdab3d' }}>
+                            {t.brandOrProductSignal}
+                          </span>
+                        )}
+                        {t.defaultSearchIntent && (
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+                            {t.defaultSearchIntent}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)' }}>
-                        {t.category}
-                      </span>
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                        {t.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
+            );
+          })() : (
             <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
               No content topics configured yet.
             </div>

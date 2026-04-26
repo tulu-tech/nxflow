@@ -138,9 +138,86 @@ export interface WorkspacePersona {
 
 // ─── Content Topic Library ───────────────────────────────────────────────────
 
+export type TopicCluster =
+  | 'Local / Showroom'
+  | 'Best / Buying Guide'
+  | 'Comparison / VS'
+  | 'Brand / Model Review'
+  | 'Price / Value'
+  | 'Warranty / Service'
+  | 'Delivery / Space / Fit'
+  | 'Pain / Comfort / Relaxation'
+  | 'Feature Education'
+  | 'AI Search / Answer Engine'
+  | 'Lifestyle / Luxury';
+
+export type TopicSearchIntent =
+  | 'informational'
+  | 'navigational'
+  | 'commercial'
+  | 'transactional'
+  | 'local';
+
+export type TopicContentType =
+  | 'blog-post'
+  | 'landing-page'
+  | 'comparison-page'
+  | 'review-page'
+  | 'guide'
+  | 'faq-page'
+  | 'local-page'
+  | 'product-page';
+
+export type TopicLinkIntent =
+  | 'product-page'
+  | 'collection-page'
+  | 'showroom-page'
+  | 'buying-guide'
+  | 'comparison-page'
+  | 'warranty-service-page'
+  | 'delivery-fit-page'
+  | 'local-page'
+  | 'educational-page';
+
+export type TopicImageIntent =
+  | 'product-realistic'
+  | 'showroom-realistic'
+  | 'customer-demo-realistic'
+  | 'feature-detail-realistic'
+  | 'comparison-visual'
+  | 'local-showroom-visual'
+  | 'lifestyle-home-visual'
+  | 'infographic-style'
+  | 'warranty-service-visual'
+  | 'delivery-fit-visual';
+
+export interface PreferredKeywordTagLogic {
+  primaryTags: string[];
+  secondaryTags: string[];
+  avoidTags?: string[];
+  notes?: string;
+}
+
 export interface WorkspaceContentTopic {
+  topicId: string;
+  topicName: string;
+  topicCluster: TopicCluster;
+  defaultSearchIntent: TopicSearchIntent;
+  defaultContentType: TopicContentType;
+  defaultCTA: string;
+  claimRiskLevel: ClaimRiskLevel;
+  recommendedPlatformFit: PlatformType[];
+  brandOrProductSignal: string;
+  preferredKeywordTagLogic: PreferredKeywordTagLogic;
+  linkIntent: TopicLinkIntent;
+  imageIntent: TopicImageIntent;
+
+  // Legacy / backward-compatible fields (kept for dashboard display)
+  /** @deprecated use topicId */
   id: string;
+  /** @deprecated use topicName */
   topic: string;
+  /** @deprecated use topicCluster */
   category: string;
   description: string;
   targetPersonaIds: string[];
