@@ -7,6 +7,7 @@ import { useSEOStore } from '@/store/seoStore';
 import { CONTENT_PHASES, CONTENT_FORMATS, CONTENT_GOALS, type ContentFormatType } from '@/lib/seo/contentFlowTypes';
 import { MCM_WORKSPACE_ID } from '@/lib/seo/seeds/mcm';
 import { MCM_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/mcmPersonaTopics';
+import { AIStep } from './AIStep';
 import { ChevronLeft, ChevronRight, Check, RotateCcw } from 'lucide-react';
 
 interface Props {
@@ -166,34 +167,7 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
     return goals.slice(0, 10);
   };
 
-  // ─── Placeholder for AI steps (5–12) ────────────────────────────────────────
 
-  const renderAIStep = (title: string, desc: string) => (
-    <StepCard title={title} subtitle={desc}>
-      <div style={{
-        padding: '32px 24px', textAlign: 'center', borderRadius: 8,
-        background: 'rgba(129,140,248,0.04)', border: '1px dashed var(--border)',
-      }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>{phase?.icon}</div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-          {title}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-          {desc}
-        </div>
-        {/* Summary of selections so far */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 16 }}>
-          {persona && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(129,140,248,0.1)', color: 'var(--accent)' }}>👤 {persona.name}</span>}
-          {topic && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(253,171,61,0.1)', color: '#fdab3d' }}>📚 {topic.topicName ?? topic.topic}</span>}
-          {platformFormat && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,200,117,0.1)', color: '#00c875' }}>📡 {CONTENT_FORMATS.find(f => f.id === platformFormat)?.label ?? platformFormat}</span>}
-          {(contentGoal || customGoal) && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(129,140,248,0.06)', color: 'var(--text-muted)' }}>🎯 {contentGoal || customGoal}</span>}
-        </div>
-        <button className="seo-btn seo-btn-primary" disabled style={{ opacity: 0.5 }}>
-          AI Generation — Coming Next
-        </button>
-      </div>
-    </StepCard>
-  );
 
   return (
     <div>
@@ -317,15 +291,31 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
         </StepCard>
       )}
 
-      {/* ── STEPS 5–12: AI Steps (placeholder) ── */}
-      {step === 5 && renderAIStep('AI Keyword Selection', 'AI will analyze your workspace keywords, topic, persona, and prior usage to recommend the optimal primary and secondary keywords.')}
-      {step === 6 && renderAIStep('Generate Content Brief', 'Generate a platform-specific content brief using your approved keyword strategy.')}
-      {step === 7 && renderAIStep('Generate Content', 'Generate the full content piece based on all your selections and the approved brief.')}
-      {step === 8 && renderAIStep('Internal Link Plan', 'Plan internal links using URLs from your workspace sitemap.')}
-      {step === 9 && renderAIStep('External Link Plan', 'Find authoritative external sources to cite. No competitor or seller links.')}
-      {step === 10 && renderAIStep('Link Injection', 'Inject approved internal and external links naturally into the content.')}
-      {step === 11 && renderAIStep('Image Plan', 'Create a 5-image visual plan based on your content, persona, and topic.')}
-      {step === 12 && renderAIStep('Image Generation', 'Generate 5 realistic, premium, on-brand images based on the approved image plan.')}
+      {/* ── STEPS 5–12: Live AI Steps ── */}
+      {step >= 5 && step <= 12 && (
+        <AIStep
+          step={step}
+          phase={phase}
+          workspace={workspace}
+          project={project}
+          persona={persona}
+          topic={topic}
+          platformFormat={platformFormat}
+          contentGoal={contentGoal || customGoal}
+          onApprove={(data) => {
+            // Persist to project store
+            if (step === 5) updateProjectField(pid, 'keywordStrategy', data);
+            if (step === 6) updateProjectField(pid, 'contentBrief', data);
+            if (step === 7) { updateProjectField(pid, 'rawContent', data?.content ?? data); updateProjectField(pid, 'generatedArticle', data); }
+            if (step === 8) updateProjectField(pid, 'internalLinkPlan', data);
+            if (step === 9) updateProjectField(pid, 'externalLinkPlan', data);
+            if (step === 10) updateProjectField(pid, 'linkedContent', data?.content ?? data);
+            if (step === 11) updateProjectField(pid, 'imagePlan', data);
+            if (step === 12) updateProjectField(pid, 'finalOutput', data);
+            goNext();
+          }}
+        />
+      )}
 
       {/* ── Navigation Footer ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
