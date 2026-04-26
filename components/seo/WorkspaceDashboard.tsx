@@ -520,9 +520,9 @@ export function WorkspaceDashboard({ workspace }: Props) {
                 onClick={() => togglePlatform(workspace.id, p.platform, !p.enabled)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: p.enabled ? 600 : 400,
-                  border: `1px solid ${p.enabled ? 'var(--accent)' : 'var(--border)'}`,
-                  background: p.enabled ? 'var(--accent)' : 'transparent',
+                  padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                  border: p.enabled ? 'none' : '1px solid var(--border)',
+                  background: p.enabled ? '#6366f1' : 'transparent',
                   color: p.enabled ? '#ffffff' : 'var(--text-muted)',
                   cursor: 'pointer', transition: 'all 0.15s',
                 }}
@@ -571,8 +571,8 @@ export function WorkspaceDashboard({ workspace }: Props) {
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {p.intentStages.map((s) => (
                         <span key={s} style={{
-                          fontSize: 10, padding: '2px 6px', borderRadius: 3,
-                          background: 'rgba(129,140,248,0.15)', color: '#a5b4fc',
+                          fontSize: 10, padding: '2px 7px', borderRadius: 3,
+                          background: '#3730a3', color: '#c7d2fe',
                           textTransform: 'capitalize', fontWeight: 500,
                         }}>{s}</span>
                       ))}
@@ -639,16 +639,17 @@ export function WorkspaceDashboard({ workspace }: Props) {
                             </span>
                           )}
                           <span style={{
-                            fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                            background: t.funnelStage === 'bottom' ? 'rgba(0,200,117,0.12)' : t.funnelStage === 'middle' ? 'rgba(129,140,248,0.12)' : 'rgba(253,171,61,0.12)',
-                            color: t.funnelStage === 'bottom' ? '#00c875' : t.funnelStage === 'middle' ? 'var(--accent)' : '#fdab3d',
+                            fontSize: 10, padding: '2px 7px', borderRadius: 3,
+                            background: t.funnelStage === 'bottom' ? '#065f46' : t.funnelStage === 'middle' ? '#3730a3' : '#78350f',
+                            color: t.funnelStage === 'bottom' ? '#6ee7b7' : t.funnelStage === 'middle' ? '#c7d2fe' : '#fcd34d',
+                            fontWeight: 500,
                           }}>
                             {t.funnelStage}
                           </span>
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 3, background: '#1e293b', color: '#94a3b8' }}>
                           {t.topicCluster ?? t.category}
                         </span>
                         {t.brandOrProductSignal && (
