@@ -929,6 +929,23 @@ export async function POST(req: NextRequest) {
     body.priorPublishedContent = body.priorPublishedContent ?? [];
     body.priorDraftContent = body.priorDraftContent ?? [];
 
+    // Image plan: ensure it's always an array
+    if (!Array.isArray(body.approvedImagePlan)) {
+      // Could be an object with imagePlan array inside
+      if (body.approvedImagePlan?.imagePlan && Array.isArray(body.approvedImagePlan.imagePlan)) {
+        body.approvedImagePlan = body.approvedImagePlan.imagePlan;
+      } else {
+        body.approvedImagePlan = [];
+      }
+    }
+    // Link plans: ensure arrays
+    if (!Array.isArray(body.approvedInternalLinkPlan)) {
+      body.approvedInternalLinkPlan = body.approvedInternalLinkPlan?.internalLinkPlan ?? body.approvedInternalLinkPlan?.links ?? [];
+    }
+    if (!Array.isArray(body.approvedExternalLinkPlan)) {
+      body.approvedExternalLinkPlan = body.approvedExternalLinkPlan?.externalLinkPlan ?? body.approvedExternalLinkPlan?.links ?? [];
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
