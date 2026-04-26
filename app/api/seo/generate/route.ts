@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { KEYWORD_SELECTION_SYSTEM_PROMPT, buildKeywordSelectionUserPrompt, mockKeywordStrategy, type KeywordSelectionInput } from '@/lib/seo/prompts/selectKeywords';
+import { CONTENT_BRIEF_SYSTEM_PROMPT, buildContentBriefUserPrompt, mockContentBrief, type ContentBriefInput } from '@/lib/seo/prompts/generateBrief';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -910,6 +911,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(mockInjectLinks(body));
         case 'select-keywords-for-content':
           return NextResponse.json(mockKeywordStrategy(body as KeywordSelectionInput));
+        case 'generate-content-brief':
+          return NextResponse.json(mockContentBrief(body as ContentBriefInput));
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -997,6 +1000,8 @@ Rules:
     // Use structured user prompt for keyword selection
     const userContent = action === 'select-keywords-for-content'
       ? buildKeywordSelectionUserPrompt(body as KeywordSelectionInput)
+      : action === 'generate-content-brief'
+      ? buildContentBriefUserPrompt(body as ContentBriefInput)
       : JSON.stringify(body);
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1011,8 +1016,8 @@ Rules:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },
         ],
-        temperature: action === 'article' ? 0.8 : action === 'select-keywords-for-content' ? 0.5 : 0.7,
-        max_tokens: action === 'article' ? 8000 : action === 'select-keywords-for-content' ? 6000 : 4000,
+        temperature: action === 'article' ? 0.8 : action === 'select-keywords-for-content' ? 0.5 : action === 'generate-content-brief' ? 0.6 : 0.7,
+        max_tokens: action === 'article' ? 8000 : action === 'select-keywords-for-content' ? 6000 : action === 'generate-content-brief' ? 5000 : 4000,
         response_format: { type: 'json_object' },
       }),
     });
@@ -1109,6 +1114,9 @@ Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The ou
 
     case 'select-keywords-for-content':
       return KEYWORD_SELECTION_SYSTEM_PROMPT;
+
+    case 'generate-content-brief':
+      return CONTENT_BRIEF_SYSTEM_PROMPT;
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';
