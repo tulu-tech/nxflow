@@ -6,6 +6,7 @@ import { PLATFORM_CONTENT_SYSTEM_PROMPT, buildPlatformContentUserPrompt, mockPla
 import { INTERNAL_LINK_PLAN_SYSTEM_PROMPT, buildInternalLinkPlanUserPrompt, mockInternalLinkPlan, type InternalLinkPlanInput } from '@/lib/seo/prompts/generateInternalLinkPlan';
 import { EXTERNAL_LINK_PLAN_SYSTEM_PROMPT, buildExternalLinkPlanUserPrompt, mockExternalLinkPlan, type ExternalLinkPlanInput } from '@/lib/seo/prompts/generateExternalLinkPlan';
 import { INJECT_LINKS_SYSTEM_PROMPT, buildInjectLinksUserPrompt, mockInjectLinks as mockInjectApprovedLinks, type InjectLinksInput } from '@/lib/seo/prompts/injectApprovedLinks';
+import { IMAGE_REFERENCE_SYSTEM_PROMPT, buildImageReferenceUserPrompt, discoverImageReferences, type ImageReferenceInput } from '@/lib/seo/prompts/discoverImageReferences';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -928,6 +929,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(mockExternalLinkPlan(body as ExternalLinkPlanInput));
         case 'inject-approved-links':
           return NextResponse.json(mockInjectApprovedLinks(body as InjectLinksInput));
+        case 'discover-image-references':
+          return NextResponse.json(discoverImageReferences(body as ImageReferenceInput));
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -1027,6 +1030,8 @@ Rules:
       ? buildExternalLinkPlanUserPrompt(body as ExternalLinkPlanInput)
       : action === 'inject-approved-links'
       ? buildInjectLinksUserPrompt(body as InjectLinksInput)
+      : action === 'discover-image-references'
+      ? buildImageReferenceUserPrompt(body as ImageReferenceInput)
       : JSON.stringify(body);
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1157,6 +1162,9 @@ Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The ou
 
     case 'inject-approved-links':
       return INJECT_LINKS_SYSTEM_PROMPT;
+
+    case 'discover-image-references':
+      return IMAGE_REFERENCE_SYSTEM_PROMPT;
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';
