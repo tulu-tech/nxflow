@@ -158,10 +158,32 @@ export function mockContentImages(input: ContentImagesInput): ContentImagesResul
   const warnings: string[] = [];
   const plan = (input.approvedImagePlan ?? []).slice(0, 5);
 
+  // Helper: pick the best real image URL from plan item references
+  const pickRealImage = (item: ContentImagesInput['approvedImagePlan'][0]): string | null => {
+    const refs = item.referenceImageUrls ?? [];
+    if (refs.length > 0) return refs[0]; // Use first reference image from sitemap
+    return null;
+  };
+
+  // Helper: Unsplash source URL (keyword-relevant stock photo, no API key needed)
+  const unsplashUrl = (query: string, w = 1200, h = 800): string => {
+    const q = encodeURIComponent(query.slice(0, 80));
+    return `https://source.unsplash.com/${w}x${h}/?${q}`;
+  };
+
   const generatedImages: GeneratedImage[] = plan.map((item) => {
-    const altText = generateAltText(item.imagePurpose, item.relatedKeyword || pk, brand);
-    const fileName = generateFileName(item.imagePurpose, item.relatedKeyword || pk, item.imageNumber);
-    const imageUrl = generatePlaceholderUrl(item.imagePurpose, item.relatedKeyword || pk, item.aspectRatio);
+    const kw = item.relatedKeyword || pk;
+    const altText = generateAltText(item.imagePurpose, kw, brand);
+    const fileName = generateFileName(item.imagePurpose, kw, item.imageNumber);
+
+    // 1st priority: real reference image from sitemap
+    const realUrl = pickRealImage(item);
+    // 2nd priority: Unsplash with keyword search
+    const imageUrl = realUrl ?? unsplashUrl(`${kw} ${item.imagePurpose}`, 1200, 800);
+
+    if (realUrl) {
+      warnings.push(`Image #${item.imageNumber}: Using reference image from ${item.referencePageUrl ?? 'sitemap'}`);
+    }
 
     return {
       imageNumber: item.imageNumber,
@@ -170,16 +192,16 @@ export function mockContentImages(input: ContentImagesInput): ContentImagesResul
       imageUrl,
       altText,
       recommendedFileName: fileName,
-      relatedKeyword: item.relatedKeyword || pk,
+      relatedKeyword: kw,
       placementRecommendation: item.placementRecommendation,
     };
   });
 
-  // Topic-aware fallback purposes (not generic "lifestyle")
+  // Topic-aware fallback purposes
   const fallbackPurposes = ['hero', 'product', 'feature-detail', 'showroom', 'comparison'];
   const fallbackSections = ['Hero / Above the fold', 'Product detail section', 'Feature breakdown section', 'Expert guidance section', 'Comparison / CTA section'];
 
-  // Pad to 5 if plan had fewer — use topic context
+  // Pad to 5 if plan had fewer — use topic context with Unsplash
   while (generatedImages.length < 5) {
     const num = generatedImages.length + 1;
     const idx = num - 1;
@@ -190,7 +212,7 @@ export function mockContentImages(input: ContentImagesInput): ContentImagesResul
       imageNumber: num,
       imagePurpose: purpose,
       promptUsed: `Premium ${purpose} image for ${pk} — ${brand}, editorial photography, photorealistic, 8k`,
-      imageUrl: generatePlaceholderUrl(purpose, kw, '16:9'),
+      imageUrl: unsplashUrl(`${kw} ${purpose}`, 1200, 800),
       altText: generateAltText(purpose, kw, brand),
       recommendedFileName: `${slug}-${purpose}-${num}.webp`,
       relatedKeyword: kw,
@@ -199,7 +221,7 @@ export function mockContentImages(input: ContentImagesInput): ContentImagesResul
     warnings.push(`Image #${num}: Generated from topic context (no approved plan item).`);
   }
 
-  warnings.push('Images generated as placeholders (no DALL-E API key). Replace with DALL-E generated images when API key is configured.');
+  warnings.push('⚠️ No DALL-E API key configured. Images sourced from sitemap references or Unsplash stock. Configure OPENAI_API_KEY for AI-generated images.');
 
   return { generatedImages, warnings };
 }
