@@ -292,7 +292,7 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>#{(img.imageNumber as number) ?? i+1} — {str(img.imagePurpose)} ({str(img.aspectRatio)})</div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>{str(img.placementRecommendation)}</div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>Prompt: {str(img.imagePrompt).slice(0, 200)}...</div>
-              {img.notes && <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 2 }}>📝 {str(img.notes)}</div>}
+              {!!img.notes && <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 2 }}>📝 {str(img.notes)}</div>}
             </div>
           ))}
           {Array.isArray(data.warnings) && data.warnings.length > 0 && (
