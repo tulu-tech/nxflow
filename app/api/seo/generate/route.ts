@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { KEYWORD_SELECTION_SYSTEM_PROMPT, buildKeywordSelectionUserPrompt, mockKeywordStrategy, type KeywordSelectionInput } from '@/lib/seo/prompts/selectKeywords';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -907,6 +908,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ linkPlan: mockLinkPlan(body) });
         case 'inject-links':
           return NextResponse.json(mockInjectLinks(body));
+        case 'select-keywords-for-content':
+          return NextResponse.json(mockKeywordStrategy(body as KeywordSelectionInput));
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -991,6 +994,11 @@ Rules:
     // Standard AI generation
     const systemPrompt = buildSystemPrompt(action, body);
 
+    // Use structured user prompt for keyword selection
+    const userContent = action === 'select-keywords-for-content'
+      ? buildKeywordSelectionUserPrompt(body as KeywordSelectionInput)
+      : JSON.stringify(body);
+
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1001,10 +1009,10 @@ Rules:
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: JSON.stringify(body) },
+          { role: 'user', content: userContent },
         ],
-        temperature: action === 'article' ? 0.8 : 0.7,
-        max_tokens: action === 'article' ? 8000 : 4000,
+        temperature: action === 'article' ? 0.8 : action === 'select-keywords-for-content' ? 0.5 : 0.7,
+        max_tokens: action === 'article' ? 8000 : action === 'select-keywords-for-content' ? 6000 : 4000,
         response_format: { type: 'json_object' },
       }),
     });
@@ -1098,6 +1106,9 @@ The outline should be publication-ready and reflect the correct information arch
 Return JSON: { "h1": "exact H1 title", "outline": [{ "level": "h2|h3", "text": "section heading" }] }
 Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The outline should cover: intro hook, definition, why it matters, core methodology/how-to (3-4 H3s), common mistakes, tools/resources, FAQ, conclusion.`;
     }
+
+    case 'select-keywords-for-content':
+      return KEYWORD_SELECTION_SYSTEM_PROMPT;
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';
