@@ -15,8 +15,8 @@ import { ProjectCard } from './ProjectCard';
 import { ContentTracker } from './ContentTracker';
 import { KeywordManager } from './KeywordManager';
 import { BusinessType } from '@/lib/seo/types';
-import { MCM_WORKSPACE_ID } from '@/lib/seo/seeds/mcm';
-import { MCM_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/mcmPersonaTopics';
+
+
 
 interface Props {
   workspace: SEOWorkspace;
@@ -150,23 +150,10 @@ export function WorkspaceDashboard({ workspace }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [showSitemapPages, setShowSitemapPages] = useState(false);
 
-  // Create content panel state
-  const [showCreatePanel, setShowCreatePanel] = useState(false);
-  const [contentName, setContentName] = useState(`${workspace.brandName} — New Article`);
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
-  // MCM-specific topic filtering
-  const isMCM = workspace.id === MCM_WORKSPACE_ID;
-  const selectedPersona = workspace.personas.find((p) => p.id === selectedPersonaId);
-  const allowedTopicIds = isMCM && selectedPersonaId
-    ? MCM_PERSONA_TOPIC_MAP[selectedPersonaId] ?? []
-    : [];
-  const filteredTopics = isMCM && selectedPersonaId
-    ? workspace.contentTopics.filter((t) => allowedTopicIds.includes(t.topicId ?? t.id))
-    : [];
-  const hasTopicStep = isMCM && workspace.personas.length > 0 && workspace.contentTopics.length > 0;
-  const needsTopicSelection = hasTopicStep && selectedPersonaId;
+
+
+
 
   // Projects in this workspace
   const wsProjects = workspace.projectIds
@@ -205,37 +192,11 @@ export function WorkspaceDashboard({ workspace }: Props) {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  // ── Create content project
+  // ── Create content project — go straight to wizard
   const handleStartCreate = () => {
-    setContentName(`${workspace.brandName} — New Article`);
-    setSelectedPersonaId(null);
-    setSelectedTopicId(null);
-    setShowCreatePanel(true);
-  };
-
-  const handleConfirmCreate = () => {
-    if (!contentName.trim()) return;
-    if (workspace.personas.length > 0 && !selectedPersonaId) return;
-    if (hasTopicStep && selectedPersonaId && !selectedTopicId) return;
-    const pid = createProject(contentName.trim(), workspace, selectedPersonaId ?? undefined, selectedTopicId ?? undefined);
+    const name = `${workspace.brandName} — New Article`;
+    const pid = createProject(name, workspace);
     addProjectToWorkspace(workspace.id, pid);
-    // Also store topic info in content entry
-    if (selectedTopicId) {
-      const topic = workspace.contentTopics.find((t) => (t.topicId ?? t.id) === selectedTopicId);
-      const persona = workspace.personas.find((p) => p.id === selectedPersonaId);
-      const { updateContentEntry } = useWorkspaceStore.getState();
-      updateContentEntry(workspace.id, {
-        projectId: pid,
-        title: contentName.trim(),
-        status: 'draft',
-        targetPersonaId: selectedPersonaId ?? undefined,
-        targetPersonaName: persona?.name,
-        targetTopicId: selectedTopicId,
-        targetTopicName: topic?.topicName ?? topic?.topic,
-        generatedAt: new Date().toISOString(),
-      });
-    }
-    setShowCreatePanel(false);
     router.push(`/seoagent/workspace/${workspace.id}/project/${pid}`);
   };
 
@@ -690,187 +651,6 @@ export function WorkspaceDashboard({ workspace }: Props) {
           </button>
         </div>
 
-        {/* Inline Create Content Panel */}
-        {showCreatePanel && (
-          <div className="seo-card" style={{ marginBottom: 16, border: '1px solid var(--accent)', background: 'rgba(129,140,248,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                ✨ Create New Content
-              </h4>
-              <button className="seo-btn seo-btn-ghost seo-btn-sm" onClick={() => setShowCreatePanel(false)}>
-                <X size={12} /> Cancel
-              </button>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label className="seo-label" style={{ fontSize: 11 }}>Content Name</label>
-              <input
-                className="seo-input"
-                value={contentName}
-                onChange={(e) => setContentName(e.target.value)}
-                placeholder="e.g. Best Massage Chairs 2025 — Comparison Guide"
-                autoFocus
-                style={{ fontSize: 13 }}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmCreate(); }}
-              />
-            </div>
-
-            {/* Persona Selection — only if workspace has personas */}
-            {workspace.personas.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <label className="seo-label" style={{ fontSize: 11 }}>
-                  Target Persona *
-                  <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>
-                    Select who this content is for
-                  </span>
-                </label>
-                <div style={{ maxHeight: 240, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                  {workspace.personas.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => { setSelectedPersonaId(p.id); setSelectedTopicId(null); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '8px 10px', borderRadius: 6, fontSize: 12, textAlign: 'left',
-                        border: selectedPersonaId === p.id ? '1.5px solid var(--accent)' : '1px solid var(--border-subtle)',
-                        background: selectedPersonaId === p.id ? 'rgba(129,140,248,0.08)' : 'transparent',
-                        color: 'var(--text-primary)', cursor: 'pointer', transition: 'all 0.12s',
-                        width: '100%',
-                      }}
-                    >
-                      <div style={{
-                        width: 16, height: 16, borderRadius: 8, flexShrink: 0,
-                        border: selectedPersonaId === p.id ? '5px solid var(--accent)' : '2px solid var(--border)',
-                        background: selectedPersonaId === p.id ? '#fff' : 'transparent',
-                      }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 12 }}>{p.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.3 }}>{p.shortDescription}</div>
-                      </div>
-                      <span style={{
-                        fontSize: 9, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
-                        background: p.claimRiskLevel === 'high' ? 'rgba(239,68,68,0.12)' : p.claimRiskLevel === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(0,200,117,0.08)',
-                        color: p.claimRiskLevel === 'high' ? '#f87171' : p.claimRiskLevel === 'medium' ? '#fdab3d' : '#00c875',
-                      }}>
-                        {p.claimRiskLevel}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {!selectedPersonaId && (
-                  <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>
-                    Please select a target persona to continue.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Topic Selection — MCM only, after persona selection */}
-            {needsTopicSelection && (
-              <div style={{ marginBottom: 12 }}>
-                <label className="seo-label" style={{ fontSize: 11 }}>
-                  Content Topic *
-                  <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>
-                    Primary topics for {selectedPersona?.name}
-                  </span>
-                </label>
-                {filteredTopics.length > 0 ? (
-                  <div style={{ maxHeight: 260, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                    {filteredTopics.map((t) => (
-                      <button
-                        key={t.topicId ?? t.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTopicId(t.topicId ?? t.id);
-                          setContentName(`${workspace.brandName} — ${t.topicName ?? t.topic}`);
-                        }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '8px 10px', borderRadius: 6, fontSize: 12, textAlign: 'left',
-                          border: selectedTopicId === (t.topicId ?? t.id) ? '1.5px solid var(--accent)' : '1px solid var(--border-subtle)',
-                          background: selectedTopicId === (t.topicId ?? t.id) ? 'rgba(129,140,248,0.08)' : 'transparent',
-                          color: 'var(--text-primary)', cursor: 'pointer', transition: 'all 0.12s',
-                          width: '100%',
-                        }}
-                      >
-                        <div style={{
-                          width: 16, height: 16, borderRadius: 8, flexShrink: 0,
-                          border: selectedTopicId === (t.topicId ?? t.id) ? '5px solid var(--accent)' : '2px solid var(--border)',
-                          background: selectedTopicId === (t.topicId ?? t.id) ? '#fff' : 'transparent',
-                        }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 12 }}>{t.topicName ?? t.topic}</div>
-                          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
-                            <span style={{
-                              fontSize: 9, padding: '1px 5px', borderRadius: 3,
-                              background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)',
-                            }}>
-                              {t.topicCluster ?? t.category}
-                            </span>
-                            {t.brandOrProductSignal && (
-                              <span style={{
-                                fontSize: 9, padding: '1px 5px', borderRadius: 3,
-                                background: 'rgba(253,171,61,0.08)', color: '#fdab3d',
-                              }}>
-                                {t.brandOrProductSignal}
-                              </span>
-                            )}
-                            {t.defaultSearchIntent && (
-                              <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
-                                {t.defaultSearchIntent}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {t.claimRiskLevel && (
-                          <span style={{
-                            fontSize: 9, padding: '1px 5px', borderRadius: 3, flexShrink: 0,
-                            background: t.claimRiskLevel === 'high' ? 'rgba(239,68,68,0.12)' : t.claimRiskLevel === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(0,200,117,0.08)',
-                            color: t.claimRiskLevel === 'high' ? '#f87171' : t.claimRiskLevel === 'medium' ? '#fdab3d' : '#00c875',
-                          }}>
-                            {t.claimRiskLevel}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: '12px 16px', borderRadius: 6, marginTop: 4,
-                    background: 'rgba(253,171,61,0.06)', border: '1px solid rgba(253,171,61,0.15)',
-                    color: '#fdab3d', fontSize: 12,
-                  }}>
-                    No primary topics configured for this persona.
-                  </div>
-                )}
-                {filteredTopics.length > 0 && !selectedTopicId && (
-                  <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>
-                    Please select a content topic to continue.
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="seo-btn seo-btn-secondary" onClick={() => setShowCreatePanel(false)}>
-                Cancel
-              </button>
-              <button
-                className="seo-btn seo-btn-primary"
-                onClick={handleConfirmCreate}
-                disabled={
-                  !contentName.trim() ||
-                  (workspace.personas.length > 0 && !selectedPersonaId) ||
-                  !!(hasTopicStep && selectedPersonaId && !selectedTopicId) ||
-                  !!(needsTopicSelection && filteredTopics.length === 0)
-                }
-              >
-                Create Content →
-              </button>
-            </div>
-          </div>
-        )}
 
         {(() => {
           const scheduled = wsProjects.filter(p => p.status === 'scheduled');

@@ -239,10 +239,29 @@ function FinalPreview({ project, workspace, persona, topic }: {
         <div style={{ color: '#94a3b8', marginTop: 4 }}>📝 {wordCount} words · 🔑 {pkName} {persona ? `· 👤 ${persona.name}` : ''}</div>
       </div>
 
-      {/* Content */}
-      <div style={{ maxHeight: 500, overflow: 'auto', lineHeight: 1.8, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 16, background: 'rgba(0,0,0,0.06)', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
-        {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
-      </div>
+
+      {/* Content — rendered as formatted article */}
+      <div
+        className="final-content-preview"
+        style={{
+          maxHeight: 600, overflow: 'auto', lineHeight: 1.9, padding: '24px 28px',
+          background: '#0f172a', borderRadius: 10, fontSize: 15, marginBottom: 16,
+          color: '#e2e8f0', fontFamily: 'Georgia, "Times New Roman", serif',
+          border: '1px solid #1e293b',
+        }}
+        dangerouslySetInnerHTML={{
+          __html: (typeof content === 'string' ? content : JSON.stringify(content, null, 2))
+            .replace(/^### (.+)$/gm, '<h3 style="font-size:18px;font-weight:700;color:#f1f5f9;margin:20px 0 8px;font-family:Inter,system-ui,sans-serif;">$1</h3>')
+            .replace(/^## (.+)$/gm, '<h2 style="font-size:22px;font-weight:700;color:#f1f5f9;margin:28px 0 10px;font-family:Inter,system-ui,sans-serif;border-bottom:1px solid #334155;padding-bottom:6px;">$1</h2>')
+            .replace(/^# (.+)$/gm, '<h1 style="font-size:28px;font-weight:800;color:#fff;margin:32px 0 12px;font-family:Inter,system-ui,sans-serif;">$1</h1>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#f1f5f9;font-weight:700;">$1</strong>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#60a5fa;text-decoration:underline;" target="_blank">$1</a>')
+            .replace(/^- (.+)$/gm, '<li style="margin:4px 0;padding-left:4px;">$1</li>')
+            .replace(/(<li.*<\/li>\n?)+/g, (m) => `<ul style="margin:8px 0 8px 16px;padding-left:16px;">${m}</ul>`)
+            .replace(/\n\n/g, '</p><p style="margin:12px 0;">')
+            .replace(/\n/g, '<br/>')
+        }}
+      />
 
       {/* Images grid */}
       {Array.isArray(imgs) && imgs.length > 0 && (
