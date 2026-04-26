@@ -181,66 +181,72 @@ Return strict JSON matching the schema provided.`;
 // ─── User Prompt Builder ─────────────────────────────────────────────────────
 
 export function buildLongFormContentUserPrompt(input: LongFormContentInput): string {
-  const outlineStr = input.approvedContentBrief.outline
-    .map((o, i) => `  ${i + 1}. [${o.level.toUpperCase()}] ${o.text}${o.notes ? ` — ${o.notes}` : ''}`)
+  const ws = input.workspace ?? {} as LongFormContentInput['workspace'];
+  const ks = input.approvedKeywordStrategy ?? {} as LongFormContentInput['approvedKeywordStrategy'];
+  const cb = input.approvedContentBrief ?? {} as LongFormContentInput['approvedContentBrief'];
+  const outline = cb.outline ?? [];
+  const faqPlan = cb.faqPlan ?? [];
+
+  const outlineStr = outline
+    .map((o, i) => `  ${i + 1}. [${(o.level ?? 'h2').toUpperCase()}] ${o.text ?? ''}${o.notes ? ` — ${o.notes}` : ''}`)
     .join('\n');
 
-  const faqStr = input.approvedContentBrief.faqPlan
-    .map((f, i) => `  ${i + 1}. Q: ${f.question}\n     Direction: ${f.answerDirection}`)
+  const faqStr = faqPlan
+    .map((f, i) => `  ${i + 1}. Q: ${f.question ?? ''}\n     Direction: ${f.answerDirection ?? ''}`)
     .join('\n');
 
-  return `WORKSPACE BRAND: ${input.workspace.brandName}
-Website: ${input.workspace.websiteUrl}
-Industry: ${input.workspace.industry}
-Business Type: ${input.workspace.businessType}
-Target Market: ${input.workspace.targetMarket}
-Tone of Voice: ${input.workspace.toneOfVoice}
-Core Offer: ${input.workspace.coreOffer}
-Brand Differentiators: ${input.workspace.brandDifferentiators}
-Compliance Notes: ${input.workspace.complianceNotes}
-MCM Rules Active: ${input.mcmWorkspaceRulesIfApplicable}
+  return `WORKSPACE BRAND: ${ws.brandName ?? ''}
+Website: ${ws.websiteUrl ?? ''}
+Industry: ${ws.industry ?? ''}
+Business Type: ${ws.businessType ?? ''}
+Target Market: ${ws.targetMarket ?? ''}
+Tone of Voice: ${ws.toneOfVoice ?? ''}
+Core Offer: ${ws.coreOffer ?? ''}
+Brand Differentiators: ${ws.brandDifferentiators ?? ''}
+Compliance Notes: ${ws.complianceNotes ?? ''}
+MCM Rules Active: ${input.mcmWorkspaceRulesIfApplicable ?? false}
 
-SELECTED PERSONA: ${input.selectedPersona}
-Persona Description: ${input.selectedPersonaDescription}
+SELECTED PERSONA: ${input.selectedPersona ?? ''}
+Persona Description: ${input.selectedPersonaDescription ?? ''}
 
-SELECTED TOPIC: ${input.selectedTopic}
-Topic ID: ${input.selectedTopicId}
-Content Goal: ${input.contentGoal}
+SELECTED TOPIC: ${input.selectedTopic ?? ''}
+Topic ID: ${input.selectedTopicId ?? ''}
+Content Goal: ${input.contentGoal ?? ''}
 
 APPROVED KEYWORD STRATEGY:
-- Primary Keyword: ${input.approvedKeywordStrategy.primaryKeyword}
-- Secondary Keywords: ${input.approvedKeywordStrategy.secondaryKeywords.join(', ')}
-- Search Intent: ${input.approvedKeywordStrategy.searchIntent}
-- Funnel Stage: ${input.approvedKeywordStrategy.funnelStage}
-- Commercial Priority: ${input.approvedKeywordStrategy.commercialPriority}
-- Claim Risk: ${input.approvedKeywordStrategy.claimRisk}
-- Claim Risk Notes: ${input.approvedKeywordStrategy.claimRiskNotes}
-- Recommended CTA: ${input.approvedKeywordStrategy.recommendedCTA}
-- Content Angle: ${input.approvedKeywordStrategy.contentAngle}
+- Primary Keyword: ${ks.primaryKeyword ?? ''}
+- Secondary Keywords: ${(ks.secondaryKeywords ?? []).join(', ')}
+- Search Intent: ${ks.searchIntent ?? ''}
+- Funnel Stage: ${ks.funnelStage ?? ''}
+- Commercial Priority: ${ks.commercialPriority ?? ''}
+- Claim Risk: ${ks.claimRisk ?? ''}
+- Claim Risk Notes: ${ks.claimRiskNotes ?? ''}
+- Recommended CTA: ${ks.recommendedCTA ?? ''}
+- Content Angle: ${ks.contentAngle ?? ''}
 
 APPROVED CONTENT BRIEF:
-Brief Title: ${input.approvedContentBrief.briefTitle}
-Angle: ${input.approvedContentBrief.angle}
-Reader Problem: ${input.approvedContentBrief.readerProblem}
-Decision Barrier Solved: ${input.approvedContentBrief.decisionBarrierSolved}
-Recommended Word Count: ${input.approvedContentBrief.recommendedWordCount}
-Recommended CTA: ${input.approvedContentBrief.recommendedCTA}
-Claim Risk Guidance: ${input.approvedContentBrief.claimRiskGuidance}
+Brief Title: ${cb.briefTitle ?? ''}
+Angle: ${cb.angle ?? ''}
+Reader Problem: ${cb.readerProblem ?? ''}
+Decision Barrier Solved: ${cb.decisionBarrierSolved ?? ''}
+Recommended Word Count: ${cb.recommendedWordCount ?? '2,500–3,500 words'}
+Recommended CTA: ${cb.recommendedCTA ?? ''}
+Claim Risk Guidance: ${cb.claimRiskGuidance ?? ''}
 
 OUTLINE:
-${outlineStr}
+${outlineStr || 'No outline provided'}
 
 FAQ PLAN:
-${faqStr}
+${faqStr || 'No FAQ plan provided'}
 
 MUST INCLUDE:
-${input.approvedContentBrief.mustInclude.map(m => `- ${m}`).join('\n')}
+${(cb.mustInclude ?? []).map(m => `- ${m}`).join('\n') || '- None specified'}
 
 MUST AVOID:
-${input.approvedContentBrief.mustAvoid.map(m => `- ${m}`).join('\n')}
+${(cb.mustAvoid ?? []).map(m => `- ${m}`).join('\n') || '- None specified'}
 
 QUALITY CHECKLIST:
-${input.approvedContentBrief.qualityChecklist.map(q => `- ${q}`).join('\n')}
+${(cb.qualityChecklist ?? []).map(q => `- ${q}`).join('\n') || '- None specified'}
 
 TASK:
 Write the full long-form SEO article following the approved brief and keyword strategy.

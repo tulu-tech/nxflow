@@ -175,39 +175,44 @@ Return strict JSON matching the schema provided.`;
 // ─── User Prompt Builder ─────────────────────────────────────────────────────
 
 export function buildContentBriefUserPrompt(input: ContentBriefInput): string {
-  return `Workspace Brand: ${input.workspace.brandName}
-Website: ${input.workspace.websiteUrl}
-Industry: ${input.workspace.industry}
-Business Type: ${input.workspace.businessType}
-Target Market: ${input.workspace.targetMarket}
-Tone of Voice: ${input.workspace.toneOfVoice}
-Core Offer: ${input.workspace.coreOffer}
-Conversion Goals: ${input.workspace.conversionGoals}
-Primary CTA: ${input.workspace.primaryCTA}
-Brand Differentiators: ${input.workspace.brandDifferentiators}
-Compliance Notes: ${input.workspace.complianceNotes}
+  const ws = input.workspace ?? {} as ContentBriefInput['workspace'];
+  const ks = input.keywordStrategy ?? {} as ContentBriefInput['keywordStrategy'];
+  const pages = input.sitemapPages ?? [];
+  const prior = input.priorContent ?? [];
 
-Selected Persona: ${input.selectedPersona}
-Persona Description: ${input.selectedPersonaDescription}
-Selected Topic: ${input.selectedTopic}
-Selected Topic ID: ${input.selectedTopicId}
-Selected Platform/Format: ${input.selectedPlatformFormat}
-Content Goal: ${input.contentGoal}
-MCM Rules Active: ${input.mcmWorkspaceRulesIfApplicable}
+  return `Workspace Brand: ${ws.brandName ?? ''}
+Website: ${ws.websiteUrl ?? ''}
+Industry: ${ws.industry ?? ''}
+Business Type: ${ws.businessType ?? ''}
+Target Market: ${ws.targetMarket ?? ''}
+Tone of Voice: ${ws.toneOfVoice ?? ''}
+Core Offer: ${ws.coreOffer ?? ''}
+Conversion Goals: ${ws.conversionGoals ?? ''}
+Primary CTA: ${ws.primaryCTA ?? ''}
+Brand Differentiators: ${ws.brandDifferentiators ?? ''}
+Compliance Notes: ${ws.complianceNotes ?? ''}
+
+Selected Persona: ${input.selectedPersona ?? ''}
+Persona Description: ${input.selectedPersonaDescription ?? ''}
+Selected Topic: ${input.selectedTopic ?? ''}
+Selected Topic ID: ${input.selectedTopicId ?? ''}
+Selected Platform/Format: ${input.selectedPlatformFormat ?? ''}
+Content Goal: ${input.contentGoal ?? ''}
+MCM Rules Active: ${input.mcmWorkspaceRulesIfApplicable ?? false}
 
 Approved Keyword Strategy:
-- Primary Keyword: ${input.keywordStrategy.primaryKeyword}
-- Secondary Keywords: ${input.keywordStrategy.secondaryKeywords.join(', ')}
-- Search Intent: ${input.keywordStrategy.searchIntent}
-- Funnel Stage: ${input.keywordStrategy.funnelStage}
-- Commercial Priority: ${input.keywordStrategy.commercialPriority}
-- Claim Risk: ${input.keywordStrategy.claimRisk}
-- Claim Risk Notes: ${input.keywordStrategy.claimRiskNotes}
-- Recommended CTA: ${input.keywordStrategy.recommendedCTA}
-- Content Angle: ${input.keywordStrategy.contentAngle}
+- Primary Keyword: ${ks.primaryKeyword ?? ''}
+- Secondary Keywords: ${(ks.secondaryKeywords ?? []).join(', ')}
+- Search Intent: ${ks.searchIntent ?? ''}
+- Funnel Stage: ${ks.funnelStage ?? ''}
+- Commercial Priority: ${ks.commercialPriority ?? ''}
+- Claim Risk: ${ks.claimRisk ?? ''}
+- Claim Risk Notes: ${ks.claimRiskNotes ?? ''}
+- Recommended CTA: ${ks.recommendedCTA ?? ''}
+- Content Angle: ${ks.contentAngle ?? ''}
 
-Sitemap Pages (for internal link context): ${input.sitemapPages.length > 0 ? input.sitemapPages.slice(0, 50).join('; ') : 'None'}
-Prior Content: ${input.priorContent.length > 0 ? input.priorContent.join('; ') : 'None'}
+Sitemap Pages (for internal link context): ${pages.length > 0 ? pages.slice(0, 50).join('; ') : 'None'}
+Prior Content: ${prior.length > 0 ? prior.join('; ') : 'None'}
 
 TASK:
 Create a platform-specific content brief for format "${input.selectedPlatformFormat}".

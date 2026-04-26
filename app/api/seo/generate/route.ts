@@ -895,29 +895,39 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
-    // Normalize: ensure body.workspace exists (AIStep may send workspaceData instead)
-    if (!body.workspace && body.workspaceData) {
-      body.workspace = {
-        workspaceId: body.workspaceData.id ?? '',
-        brandName: body.workspaceData.brandName ?? '',
-        websiteUrl: body.workspaceData.websiteUrl ?? '',
-        industry: body.workspaceData.industry ?? '',
-        businessType: body.workspaceData.businessType ?? '',
-        targetMarket: body.workspaceData.targetMarket ?? '',
-        targetCountries: body.workspaceData.targetCountries ?? [],
-        brandDifferentiators: body.workspaceData.brandDifferentiators ?? '',
-        complianceNotes: body.workspaceData.complianceNotes ?? '',
-        toneOfVoice: body.workspaceData.toneOfVoice ?? '',
-        coreOffer: body.workspaceData.coreOffer ?? '',
-        conversionGoals: body.workspaceData.conversionGoals ?? '',
-        primaryCTA: body.workspaceData.primaryCTA ?? '',
-      };
+    // ── Comprehensive payload normalization ────────────────────────────────────
+    // Ensures all nested objects prompt builders access have safe defaults.
+    // This single block prevents ALL "Cannot read property of undefined" crashes.
+
+    const emptyWs = { workspaceId: '', brandName: '', websiteUrl: '', industry: '', businessType: '', targetMarket: '', targetCountries: [] as string[], brandDifferentiators: '', complianceNotes: '', toneOfVoice: '', coreOffer: '', conversionGoals: '', primaryCTA: '' };
+    const emptyKs = { primaryKeyword: '', secondaryKeywords: [] as string[], searchIntent: '', funnelStage: '', commercialPriority: '', claimRisk: 'Low', claimRiskNotes: '', recommendedCTA: '', contentAngle: '' };
+    const emptyCb = { briefTitle: '', angle: '', readerProblem: '', decisionBarrierSolved: '', recommendedWordCount: '2,500–3,500 words', outline: [] as Array<{level:string;text:string;notes?:string}>, faqPlan: [] as Array<{question:string;answerDirection:string}>, recommendedCTA: '', mustInclude: [] as string[], mustAvoid: [] as string[], qualityChecklist: [] as string[], claimRiskGuidance: '' };
+
+    // Workspace: merge from workspaceData if workspace missing
+    if (!body.workspace) {
+      body.workspace = body.workspaceData ? { ...emptyWs, ...body.workspaceData, workspaceId: body.workspaceData.id ?? '' } : emptyWs;
     }
 
-    // Normalize: ensure body.keywordStrategy exists (may come as approvedKeywordStrategy)
-    if (!body.keywordStrategy && body.approvedKeywordStrategy) {
-      body.keywordStrategy = body.approvedKeywordStrategy;
-    }
+    // Keyword strategy: accept either name
+    if (!body.keywordStrategy && body.approvedKeywordStrategy) body.keywordStrategy = body.approvedKeywordStrategy;
+    if (!body.approvedKeywordStrategy && body.keywordStrategy) body.approvedKeywordStrategy = body.keywordStrategy;
+    // Ensure arrays exist
+    if (body.keywordStrategy) body.keywordStrategy.secondaryKeywords = body.keywordStrategy.secondaryKeywords ?? [];
+    if (body.approvedKeywordStrategy) body.approvedKeywordStrategy.secondaryKeywords = body.approvedKeywordStrategy.secondaryKeywords ?? [];
+
+    // Content brief defaults
+    if (!body.approvedContentBrief) body.approvedContentBrief = emptyCb;
+    body.approvedContentBrief.outline = body.approvedContentBrief.outline ?? [];
+    body.approvedContentBrief.faqPlan = body.approvedContentBrief.faqPlan ?? [];
+    body.approvedContentBrief.mustInclude = body.approvedContentBrief.mustInclude ?? [];
+    body.approvedContentBrief.mustAvoid = body.approvedContentBrief.mustAvoid ?? [];
+    body.approvedContentBrief.qualityChecklist = body.approvedContentBrief.qualityChecklist ?? [];
+
+    // Common arrays
+    body.sitemapPages = body.sitemapPages ?? [];
+    body.priorContent = body.priorContent ?? [];
+    body.priorPublishedContent = body.priorPublishedContent ?? [];
+    body.priorDraftContent = body.priorDraftContent ?? [];
 
     const apiKey = process.env.OPENAI_API_KEY;
 
