@@ -48,7 +48,7 @@ interface SEOState {
   projects: Record<string, SEOProject>;
   activeProjectId: string | null;
 
-  createProject: (name: string, workspace?: SEOWorkspace, targetPersonaId?: string) => string;
+  createProject: (name: string, workspace?: SEOWorkspace, targetPersonaId?: string, targetTopicId?: string) => string;
   deleteProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
 
@@ -95,7 +95,7 @@ export const useSEOStore = create<SEOState>()(
       projects: {},
       activeProjectId: null,
 
-      createProject: (name, workspace?, targetPersonaId?) => {
+      createProject: (name, workspace?, targetPersonaId?, targetTopicId?) => {
         const id = genId();
         const now = new Date().toISOString();
 
@@ -148,6 +148,7 @@ export const useSEOStore = create<SEOState>()(
           id,
           workspaceId: workspace?.id ?? null,
           targetPersonaId: targetPersonaId ?? null,
+          targetTopicId: targetTopicId ?? null,
           name,
           currentPhase: workspace ? 2 : 1,  // skip Brand Discovery if workspace provided
           status: workspace ? 'in-progress' : 'draft',

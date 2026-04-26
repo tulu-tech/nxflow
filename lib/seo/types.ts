@@ -193,6 +193,7 @@ export interface SEOProject {
   id: string;
   workspaceId: string | null;
   targetPersonaId: string | null;
+  targetTopicId: string | null;
   name: string;
   currentPhase: number;
   status: ProjectStatus;
