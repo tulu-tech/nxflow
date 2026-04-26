@@ -143,17 +143,32 @@ export function AIStep({ step, phase, workspace, project, persona, topic, platfo
     setError(null);
     setResult(null);
     try {
-      const payload = buildPayload(step, project, workspace, persona, topic, platformFormat, contentGoal);
+      const rawPayload = buildPayload(step, project, workspace, persona, topic, platformFormat, contentGoal);
+      // Safe serialize — strip circular refs and Zustand proxies
+      let bodyStr: string;
+      try {
+        const seen = new WeakSet();
+        bodyStr = JSON.stringify(rawPayload, (_key, value) => {
+          if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) return undefined; // skip circular
+            seen.add(value);
+          }
+          return value;
+        });
+      } catch (serErr) {
+        throw new Error(`Payload serialization failed: ${(serErr as Error).message}`);
+      }
       const res = await fetch('/api/seo/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: bodyStr,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'AI generation failed');
       setResult(data);
     } catch (err) {
-      setError((err as Error).message);
+      console.error('[AIStep] Generation error:', err);
+      setError((err as Error).message || 'Unknown error occurred');
     }
     setLoading(false);
   };
