@@ -92,47 +92,158 @@ function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ResultDisplay({ step, data }: { step: number; data: any }) {
   if (!data) return null;
-  const preview = (val: unknown): string => {
-    if (typeof val === 'string') return val.slice(0, 500);
-    return JSON.stringify(val, null, 2).slice(0, 800);
+
+  const str = (v: unknown): string => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    return JSON.stringify(v, null, 2).slice(0, 600);
   };
 
-  if (step === 5 && data.primaryKeyword) {
-    const pk = typeof data.primaryKeyword === 'string' ? data.primaryKeyword : data.primaryKeyword.keyword ?? JSON.stringify(data.primaryKeyword);
+  const label = (l: string, v: unknown) => v ? (
+    <div style={{ marginBottom: 4 }}><strong>{l}:</strong> <span style={{ color: 'var(--text-secondary)' }}>{str(v)}</span></div>
+  ) : null;
+
+  // Step 5: Keywords
+  if (step === 5) {
+    const pk = data.primaryKeyword;
+    const pkName = typeof pk === 'string' ? pk : pk?.keyword ?? '';
     const sks = Array.isArray(data.secondaryKeywords)
-      ? data.secondaryKeywords.map((sk: unknown) => typeof sk === 'string' ? sk : (sk as Record<string, string>)?.keyword ?? '').filter(Boolean)
-      : [];
-    const reason = typeof data.primaryKeyword === 'object' ? data.primaryKeyword.reason : data.reason;
+      ? data.secondaryKeywords.map((sk: unknown) => typeof sk === 'string' ? sk : (sk as Record<string, string>)?.keyword ?? '').filter(Boolean) : [];
     return (
       <div style={{ fontSize: 12 }}>
-        <div style={{ marginBottom: 8 }}><strong>Primary:</strong> <span style={{ color: '#00c875', fontWeight: 600 }}>{pk}</span></div>
-        {sks.length > 0 && <div style={{ marginBottom: 8 }}><strong>Secondary:</strong> {sks.join(', ')}</div>}
-        {reason && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{String(reason)}</div>}
+        <div style={{ marginBottom: 6 }}><strong>Primary:</strong> <span style={{ color: '#00c875', fontWeight: 700 }}>{pkName}</span> {pk?.tag && <span style={{ fontSize: 10, color: '#fdab3d' }}>({pk.tag})</span>}</div>
+        {pk?.volume && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Vol: {pk.volume} · KD: {pk.kd ?? '?'} · CPC: ${pk.cpc ?? '?'}</div>}
+        {sks.length > 0 && <div style={{ marginBottom: 6 }}><strong>Secondary ({sks.length}):</strong> <span style={{ fontSize: 11 }}>{sks.join(', ')}</span></div>}
+        {pk?.reason && <div style={{ color: 'var(--text-muted)', fontSize: 11, fontStyle: 'italic' }}>{str(pk.reason)}</div>}
+        {data.searchIntent && <div style={{ marginTop: 4, fontSize: 10 }}>Intent: {data.searchIntent} · Funnel: {data.funnelStage} · CTA: {data.recommendedCTA}</div>}
       </div>
     );
   }
-  if (step === 7 && (data.content || data.article || typeof data === 'string')) {
-    const content = data.content ?? data.article ?? data;
+
+  // Step 6: Content Brief
+  if (step === 6) {
+    const brief = data.brief ?? data;
     return (
-      <div style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)' }}>
-        {typeof content === 'string' ? content.slice(0, 2000) : preview(content)}
-        {typeof content === 'string' && content.length > 2000 && <div style={{ color: 'var(--text-muted)', marginTop: 8 }}>... ({content.length} chars total)</div>}
-      </div>
-    );
-  }
-  if (step === 12 && data.images) {
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        {data.images.map((img: { imageUrl?: string; altText?: string }, i: number) => (
-          <div key={i} style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-            {img.imageUrl && <img src={img.imageUrl} alt={img.altText ?? `Image ${i + 1}`} style={{ width: '100%', height: 80, objectFit: 'cover' }} />}
-            <div style={{ padding: 4, fontSize: 9, color: 'var(--text-muted)' }}>{img.altText ?? `Image ${i + 1}`}</div>
+      <div style={{ fontSize: 12 }}>
+        {label('Content Angle', brief.contentAngle)}
+        {label('Title', brief.h1 || brief.title || (brief.titleIdeas?.[0]))}
+        {label('Target Persona', brief.targetPersona)}
+        {label('Funnel Stage', brief.funnelStage)}
+        {label('Content Goal', brief.contentGoal)}
+        {Array.isArray(brief.outline) && (
+          <div style={{ marginTop: 6 }}>
+            <strong>Outline ({brief.outline.length} sections):</strong>
+            <div style={{ marginTop: 4, paddingLeft: 8, borderLeft: '2px solid var(--border-subtle)', fontSize: 11 }}>
+              {brief.outline.slice(0, 10).map((item: Record<string, string>, i: number) => (
+                <div key={i} style={{ marginBottom: 2, color: item.level === 'h2' ? 'var(--text-primary)' : 'var(--text-muted)', fontWeight: item.level === 'h2' ? 600 : 400, paddingLeft: item.level === 'h3' ? 12 : 0 }}>
+                  {item.text}
+                </div>
+              ))}
+              {brief.outline.length > 10 && <div style={{ color: 'var(--text-muted)' }}>+{brief.outline.length - 10} more...</div>}
+            </div>
           </div>
-        ))}
+        )}
       </div>
     );
   }
-  return <pre style={{ maxHeight: 300, overflow: 'auto', fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.1)', padding: 10, borderRadius: 6 }}>{preview(data)}</pre>;
+
+  // Step 7: Generated Content
+  if (step === 7) {
+    const content = data.content ?? data.article?.content ?? data.article ?? (typeof data === 'string' ? data : null);
+    const title = data.title ?? data.article?.title ?? data.metaTitle ?? '';
+    const wordCount = data.wordCount ?? data.article?.wordCount;
+    if (typeof content === 'string') {
+      return (
+        <div style={{ fontSize: 12 }}>
+          {title && <div style={{ fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>{str(title)}</div>}
+          {wordCount && <div style={{ fontSize: 10, color: '#00c875', marginBottom: 8 }}>📝 {wordCount} words</div>}
+          <div style={{ maxHeight: 280, overflow: 'auto', lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 8, background: 'rgba(0,0,0,0.08)', borderRadius: 6 }}>
+            {content.slice(0, 2000)}
+            {content.length > 2000 && <div style={{ color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>... ({content.length} chars total)</div>}
+          </div>
+        </div>
+      );
+    }
+    // If content is an object, show structured
+    return <div style={{ fontSize: 12 }}>{label('Title', title)}<pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre></div>;
+  }
+
+  // Steps 8-9: Link Plans
+  if (step === 8 || step === 9) {
+    const links = data.links ?? data.internalLinks ?? data.externalLinks ?? (Array.isArray(data) ? data : null);
+    const label2 = step === 8 ? 'Internal' : 'External';
+    if (Array.isArray(links)) {
+      return (
+        <div style={{ fontSize: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>{links.length} {label2} Links</div>
+          {links.slice(0, 8).map((link: Record<string, string>, i: number) => (
+            <div key={i} style={{ marginBottom: 4, paddingLeft: 8, borderLeft: '2px solid var(--border-subtle)' }}>
+              <div style={{ fontWeight: 600, fontSize: 11 }}>{link.anchorText || link.anchor || link.url}</div>
+              <div style={{ fontSize: 10, color: 'var(--accent)' }}>{link.url || link.targetUrl}</div>
+              {link.reason && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{link.reason}</div>}
+            </div>
+          ))}
+          {links.length > 8 && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>+{links.length - 8} more...</div>}
+        </div>
+      );
+    }
+    return <pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
+  }
+
+  // Step 10: Link Injection (content with links)
+  if (step === 10) {
+    const content = data.content ?? (typeof data === 'string' ? data : null);
+    if (typeof content === 'string') {
+      return (
+        <div style={{ maxHeight: 280, overflow: 'auto', fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 8, background: 'rgba(0,0,0,0.08)', borderRadius: 6 }}>
+          {content.slice(0, 2000)}
+          {content.length > 2000 && <div style={{ color: 'var(--text-muted)', marginTop: 8, fontStyle: 'italic' }}>... ({content.length} chars total)</div>}
+        </div>
+      );
+    }
+    return <pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
+  }
+
+  // Step 11: Image Plan
+  if (step === 11) {
+    const images = data.images ?? data.imagePrompts ?? (Array.isArray(data) ? data : null);
+    if (Array.isArray(images)) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {images.map((img: Record<string, string>, i: number) => (
+            <div key={i} style={{ padding: 8, borderRadius: 6, background: 'rgba(129,140,248,0.04)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2 }}>🖼️ Image {i + 1}: {img.placement || img.section || ''}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{img.description || img.prompt || ''}</div>
+              {img.altText && <div style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>Alt: {img.altText}</div>}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return <pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
+  }
+
+  // Step 12: Generated Images
+  if (step === 12) {
+    const images = data.images ?? data.imagePrompts ?? (Array.isArray(data) ? data : null);
+    if (Array.isArray(images)) {
+      return (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          {images.map((img: Record<string, string>, i: number) => (
+            <div key={i} style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+              {img.imageUrl && <img src={img.imageUrl} alt={img.altText ?? `Image ${i + 1}`} style={{ width: '100%', height: 100, objectFit: 'cover' }} />}
+              {!img.imageUrl && <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(129,140,248,0.06)', color: 'var(--text-muted)', fontSize: 10 }}>No URL</div>}
+              <div style={{ padding: 4, fontSize: 9, color: 'var(--text-muted)' }}>{img.altText ?? `Image ${i + 1}`}</div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+  }
+
+  // Fallback: formatted JSON
+  return <pre style={{ maxHeight: 300, overflow: 'auto', fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 10, borderRadius: 6 }}>{JSON.stringify(data, null, 2).slice(0, 1500)}</pre>;
 }
 
 export function AIStep({ step, phase, workspace, project, persona, topic, platformFormat, contentGoal, onApprove }: Props) {

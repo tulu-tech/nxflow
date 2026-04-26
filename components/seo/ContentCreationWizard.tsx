@@ -294,6 +294,7 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
       {/* ── STEPS 5–12: Live AI Steps ── */}
       {step >= 5 && step <= 12 && (
         <AIStep
+          key={step}
           step={step}
           phase={phase}
           workspace={workspace}
