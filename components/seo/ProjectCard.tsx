@@ -14,12 +14,16 @@ const statusLabels: Record<string, string> = {
   draft: 'Draft',
   'in-progress': 'In Progress',
   completed: 'Completed',
+  scheduled: 'Scheduled',
+  published: 'Published',
 };
 
 const statusClasses: Record<string, string> = {
   draft: 'seo-badge-draft',
   'in-progress': 'seo-badge-progress',
   completed: 'seo-badge-completed',
+  scheduled: 'seo-badge-progress',
+  published: 'seo-badge-completed',
 };
 
 export function ProjectCard({ project, workspaceId }: Props) {
@@ -73,6 +77,9 @@ export function ProjectCard({ project, workspaceId }: Props) {
 
       <div className="seo-project-card-meta">
         <span>Updated {relTime(project.updatedAt)}</span>
+        {project.createdByName && (
+          <span style={{ fontSize: 10, color: '#818cf8', marginLeft: 6 }}>by {project.createdByName}</span>
+        )}
         <span style={{ flex: 1 }} />
         <button
           className="seo-btn seo-btn-ghost"

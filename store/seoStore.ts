@@ -158,6 +158,8 @@ export const useSEOStore = create<SEOState>()(
           linkedContent: null,
           imagePlan: null,
           name,
+          createdBy: null,
+          createdByName: null,
           currentPhase: workspace ? 2 : 1,  // skip Brand Discovery if workspace provided
           status: workspace ? 'in-progress' : 'draft',
           brandIntake: intake,

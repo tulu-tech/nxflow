@@ -206,6 +206,8 @@ export interface SEOProject {
   imagePlan: Record<string, unknown>[] | null;
 
   name: string;
+  createdBy: string | null;
+  createdByName: string | null;
   currentPhase: number;
   status: ProjectStatus;
   brandIntake: BrandIntake;
