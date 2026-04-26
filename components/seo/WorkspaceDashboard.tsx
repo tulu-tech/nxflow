@@ -522,8 +522,8 @@ export function WorkspaceDashboard({ workspace }: Props) {
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: p.enabled ? 600 : 400,
                   border: `1px solid ${p.enabled ? 'var(--accent)' : 'var(--border)'}`,
-                  background: p.enabled ? 'rgba(129,140,248,0.12)' : 'transparent',
-                  color: p.enabled ? 'var(--accent)' : 'var(--text-muted)',
+                  background: p.enabled ? 'var(--accent)' : 'transparent',
+                  color: p.enabled ? '#ffffff' : 'var(--text-muted)',
                   cursor: 'pointer', transition: 'all 0.15s',
                 }}
               >
@@ -571,9 +571,9 @@ export function WorkspaceDashboard({ workspace }: Props) {
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {p.intentStages.map((s) => (
                         <span key={s} style={{
-                          fontSize: 9, padding: '1px 5px', borderRadius: 3,
-                          background: 'rgba(129,140,248,0.08)', color: 'var(--accent)',
-                          textTransform: 'capitalize',
+                          fontSize: 10, padding: '2px 6px', borderRadius: 3,
+                          background: 'rgba(129,140,248,0.15)', color: '#a5b4fc',
+                          textTransform: 'capitalize', fontWeight: 500,
                         }}>{s}</span>
                       ))}
                     </div>
