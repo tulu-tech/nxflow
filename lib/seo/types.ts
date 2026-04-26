@@ -194,6 +194,17 @@ export interface SEOProject {
   workspaceId: string | null;
   targetPersonaId: string | null;
   targetTopicId: string | null;
+
+  // New content flow fields
+  selectedPlatformFormat: string | null;
+  contentGoal: string | null;
+  keywordStrategy: Record<string, unknown> | null;
+  rawContent: string | null;
+  internalLinkPlan: Record<string, unknown> | null;
+  externalLinkPlan: Record<string, unknown> | null;
+  linkedContent: string | null;
+  imagePlan: Record<string, unknown>[] | null;
+
   name: string;
   currentPhase: number;
   status: ProjectStatus;
