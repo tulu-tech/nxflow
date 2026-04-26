@@ -9,6 +9,42 @@ import { MCM_WORKSPACE_ID } from '@/lib/seo/seeds/mcm';
 import { MCM_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/mcmPersonaTopics';
 import { AIStep } from './AIStep';
 import { ChevronLeft, ChevronRight, Check, RotateCcw, Download, FileText } from 'lucide-react';
+// ─── Inline Formatting Parser for DOCX ───────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseInlineFormatting(text: string, TextRun: any, ExternalHyperlink: any): any[] {
+  const result: unknown[] = [];
+  // Split by **bold** and [link](url) patterns
+  const pattern = /(\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\))/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    // Add plain text before match
+    if (match.index > lastIndex) {
+      result.push(new TextRun({ text: text.slice(lastIndex, match.index) }));
+    }
+    if (match[2]) {
+      // **bold**
+      result.push(new TextRun({ text: match[2], bold: true }));
+    } else if (match[3] && match[4]) {
+      // [link text](url)
+      result.push(new ExternalHyperlink({
+        link: match[4],
+        children: [new TextRun({ text: match[3], color: '2563EB', underline: {} })],
+      }));
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  // Remaining text
+  if (lastIndex < text.length) {
+    result.push(new TextRun({ text: text.slice(lastIndex) }));
+  }
+  if (result.length === 0) {
+    result.push(new TextRun({ text }));
+  }
+  return result;
+}
 
 // ─── Final Preview & Export (Step 13) ────────────────────────────────────────
 
@@ -36,58 +72,126 @@ function FinalPreview({ project, workspace, persona, topic }: {
   const kw = p.keywordStrategy?.primaryKeyword;
   const pkName = typeof kw === 'string' ? kw : kw?.keyword ?? '';
 
-  const exportDocx = () => {
-    // Build HTML content for .docx (Word can open HTML)
-    const imagesHtml = Array.isArray(imgs) && imgs.length > 0
-      ? `<h2>Images</h2>${imgs.map((img: Record<string, string>) =>
-          `<div style="margin:12px 0;"><img src="${img.imageUrl}" alt="${img.altText}" style="max-width:600px;border-radius:8px;" /><br/><small><b>Alt:</b> ${img.altText} | <b>File:</b> ${img.recommendedFileName}</small></div>`
-        ).join('')}`
-      : '';
-    const intLinksHtml = Array.isArray(intLinks) && intLinks.length > 0
-      ? `<h2>Internal Links</h2><ul>${intLinks.map((l: Record<string, string>) =>
-          `<li><a href="${l.targetUrl}">${l.anchorText}</a> — ${l.placementSection ?? ''}</li>`
-        ).join('')}</ul>`
-      : '';
-    const extLinksHtml = Array.isArray(extLinks) && extLinks.length > 0
-      ? `<h2>External Links</h2><ul>${extLinks.map((l: Record<string, string>) =>
-          `<li><a href="${l.targetUrl}">${l.anchorText}</a> — ${l.placementSection ?? ''}</li>`
-        ).join('')}</ul>`
-      : '';
-    const contentHtml = typeof content === 'string'
-      ? content.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>')
-      : JSON.stringify(content, null, 2);
+  const exportDocx = async () => {
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, ExternalHyperlink, AlignmentType, BorderStyle } = await import('docx');
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
-      <style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;line-height:1.8;color:#222;}
-      h1{font-size:28px;} h2{font-size:22px;color:#444;border-bottom:1px solid #ddd;padding-bottom:4px;}
-      img{max-width:100%;border-radius:8px;} a{color:#2563eb;} small{color:#666;}
-      .meta{color:#888;font-size:14px;margin-bottom:20px;}</style></head><body>
-      <h1>${title}</h1>
-      <div class="meta">
-        ${slug ? `<div>Slug: /${slug}</div>` : ''}
-        ${metaDesc ? `<div>Meta: ${metaDesc}</div>` : ''}
-        <div>Words: ${wordCount} | Keyword: ${pkName}</div>
-        ${persona ? `<div>Persona: ${persona.name}</div>` : ''}
-        ${topic ? `<div>Topic: ${topic.topicName ?? topic.topic}</div>` : ''}
-      </div>
-      <hr/>
-      <p>${contentHtml}</p>
-      ${imagesHtml}
-      ${intLinksHtml}
-      ${extLinksHtml}
-      </body></html>`;
+    // Parse content into paragraphs with formatting
+    const contentStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+    const contentParagraphs: InstanceType<typeof Paragraph>[] = [];
 
-    const blob = new Blob([html], { type: 'application/vnd.ms-word;charset=utf-8' });
+    for (const line of contentStr.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) { contentParagraphs.push(new Paragraph({ text: '' })); continue; }
+
+      // Headings
+      if (trimmed.startsWith('### ')) {
+        contentParagraphs.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: parseInlineFormatting(trimmed.slice(4), TextRun, ExternalHyperlink) }));
+      } else if (trimmed.startsWith('## ')) {
+        contentParagraphs.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: parseInlineFormatting(trimmed.slice(3), TextRun, ExternalHyperlink) }));
+      } else if (trimmed.startsWith('# ')) {
+        contentParagraphs.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: parseInlineFormatting(trimmed.slice(2), TextRun, ExternalHyperlink) }));
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+        contentParagraphs.push(new Paragraph({ bullet: { level: 0 }, children: parseInlineFormatting(trimmed.slice(2), TextRun, ExternalHyperlink) }));
+      } else {
+        contentParagraphs.push(new Paragraph({ children: parseInlineFormatting(trimmed, TextRun, ExternalHyperlink), spacing: { after: 120 } }));
+      }
+    }
+
+    // SEO Meta section
+    const metaSection = [
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: title, bold: true, size: 56 })] }),
+      new Paragraph({ children: [new TextRun({ text: `Slug: /${slug}`, color: '666666', size: 20 })], spacing: { after: 40 } }),
+      metaDesc ? new Paragraph({ children: [new TextRun({ text: `Meta Description: ${metaDesc}`, italics: true, color: '666666', size: 20 })], spacing: { after: 40 } }) : null,
+      new Paragraph({ children: [
+        new TextRun({ text: `${wordCount} words`, size: 20, color: '666666' }),
+        new TextRun({ text: ` · Primary Keyword: ${pkName}`, size: 20, color: '2563EB', bold: true }),
+        persona ? new TextRun({ text: ` · Persona: ${persona.name}`, size: 20, color: '666666' }) : null,
+      ].filter(Boolean) as InstanceType<typeof TextRun>[], spacing: { after: 80 } }),
+      new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: 'DDDDDD' } }, spacing: { after: 200 } }),
+    ].filter(Boolean) as InstanceType<typeof Paragraph>[];
+
+    // Internal links section
+    const intLinkSection: InstanceType<typeof Paragraph>[] = [];
+    if (Array.isArray(intLinks) && intLinks.length > 0) {
+      intLinkSection.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: `🔗 Internal Links (${intLinks.length})`, bold: true })] }));
+      for (const l of intLinks as Record<string, string>[]) {
+        intLinkSection.push(new Paragraph({ bullet: { level: 0 }, children: [
+          new ExternalHyperlink({ link: l.targetUrl, children: [new TextRun({ text: l.anchorText, color: '2563EB', underline: {} })] }),
+          new TextRun({ text: ` → ${l.targetUrl}`, color: '999999', size: 18 }),
+          l.placementSection ? new TextRun({ text: ` (${l.placementSection})`, italics: true, color: '999999', size: 18 }) : null,
+        ].filter(Boolean) as (InstanceType<typeof TextRun> | InstanceType<typeof ExternalHyperlink>)[] }));
+      }
+      intLinkSection.push(new Paragraph({ text: '' }));
+    }
+
+    // External links section
+    const extLinkSection: InstanceType<typeof Paragraph>[] = [];
+    if (Array.isArray(extLinks) && extLinks.length > 0) {
+      extLinkSection.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: `🌐 External Links (${extLinks.length})`, bold: true })] }));
+      for (const l of extLinks as Record<string, string>[]) {
+        extLinkSection.push(new Paragraph({ bullet: { level: 0 }, children: [
+          new ExternalHyperlink({ link: l.targetUrl, children: [new TextRun({ text: l.anchorText, color: '2563EB', underline: {} })] }),
+          new TextRun({ text: ` → ${l.targetUrl}`, color: '999999', size: 18 }),
+        ] }));
+      }
+      extLinkSection.push(new Paragraph({ text: '' }));
+    }
+
+    // Images section
+    const imgSection: InstanceType<typeof Paragraph>[] = [];
+    if (Array.isArray(imgs) && imgs.length > 0) {
+      imgSection.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: `🖼️ Images (${imgs.length})`, bold: true })] }));
+      for (const img of imgs as Record<string, string>[]) {
+        imgSection.push(new Paragraph({ children: [
+          new TextRun({ text: `[${img.imagePurpose}] `, bold: true }),
+          new TextRun({ text: img.altText }),
+        ], spacing: { after: 40 } }));
+        imgSection.push(new Paragraph({ children: [
+          new TextRun({ text: `URL: ${img.imageUrl}`, color: '2563EB', size: 18 }),
+          new TextRun({ text: ` | File: ${img.recommendedFileName}`, color: '999999', size: 18 }),
+        ], spacing: { after: 120 } }));
+      }
+    }
+
+    const doc = new Document({
+      creator: 'NxFlow SEO',
+      title: title,
+      description: metaDesc,
+      sections: [{
+        properties: {},
+        children: [...metaSection, ...contentParagraphs, ...intLinkSection, ...extLinkSection, ...imgSection],
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${slug || 'content'}.doc`;
+    a.download = `${slug || 'content'}.docx`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const exportHtml = () => {
-    const blob = new Blob([typeof content === 'string' ? content : JSON.stringify(content, null, 2)], { type: 'text/html;charset=utf-8' });
+    const contentStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+    // Convert markdown-ish bold/links to HTML
+    let htmlContent = contentStr
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br/>');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+      <style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;line-height:1.8;color:#222;}
+      h1{font-size:28px;} h2{font-size:22px;color:#444;border-bottom:1px solid #ddd;padding-bottom:4px;}
+      a{color:#2563eb;} strong{font-weight:700;}
+      .meta{color:#888;font-size:14px;margin-bottom:20px;}</style></head><body>
+      <h1>${title}</h1><p>${htmlContent}</p></body></html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
