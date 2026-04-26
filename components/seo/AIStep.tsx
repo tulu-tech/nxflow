@@ -31,42 +31,48 @@ const STEP_CONFIG: Record<number, { action: string; title: string; desc: string 
 function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace, persona: WorkspacePersona | undefined, topic: WorkspaceContentTopic | undefined, platformFormat: string | null, contentGoal: string) {
   const base = {
     workspaceData: {
-      id: workspace.id, brandName: workspace.brandName, websiteUrl: workspace.websiteUrl,
-      industry: workspace.industry, toneOfVoice: workspace.toneOfVoice, coreOffer: workspace.coreOffer,
-      primaryCTA: workspace.primaryCTA, brandDifferentiators: workspace.brandDifferentiators,
-      complianceNotes: workspace.complianceNotes, targetMarket: workspace.targetMarket,
+      id: workspace.id, brandName: workspace.brandName ?? '', websiteUrl: workspace.websiteUrl ?? '',
+      industry: workspace.industry ?? '', toneOfVoice: workspace.toneOfVoice ?? '', coreOffer: workspace.coreOffer ?? '',
+      primaryCTA: workspace.primaryCTA ?? '', brandDifferentiators: workspace.brandDifferentiators ?? '',
+      complianceNotes: workspace.complianceNotes ?? '', targetMarket: workspace.targetMarket ?? '',
     },
-    selectedPersona: persona ? { id: persona.id, name: persona.name, shortDescription: persona.shortDescription, claimRiskLevel: persona.claimRiskLevel, recommendedTone: persona.recommendedTone, defaultCTA: persona.defaultCTA } : null,
-    selectedTopic: topic ? { topicId: topic.topicId ?? topic.id, topicName: topic.topicName ?? topic.topic, topicCluster: topic.topicCluster ?? topic.category, defaultSearchIntent: topic.defaultSearchIntent, defaultCTA: topic.defaultCTA, claimRiskLevel: topic.claimRiskLevel, brandOrProductSignal: topic.brandOrProductSignal, linkIntent: topic.linkIntent, imageIntent: topic.imageIntent } : null,
+    selectedPersona: persona ? { id: persona.id, name: persona.name, shortDescription: persona.shortDescription ?? '', claimRiskLevel: persona.claimRiskLevel ?? 'low', recommendedTone: persona.recommendedTone ?? '', defaultCTA: persona.defaultCTA ?? '' } : null,
+    selectedTopic: topic ? { topicId: topic.topicId ?? topic.id, topicName: topic.topicName ?? topic.topic ?? '', topicCluster: topic.topicCluster ?? topic.category ?? '', defaultSearchIntent: topic.defaultSearchIntent ?? '', defaultCTA: topic.defaultCTA ?? '', claimRiskLevel: topic.claimRiskLevel ?? 'low', brandOrProductSignal: topic.brandOrProductSignal ?? '', linkIntent: topic.linkIntent ?? '', imageIntent: topic.imageIntent ?? '' } : null,
     selectedTopicId: topic?.topicId ?? topic?.id ?? null,
     selectedPlatformFormat: platformFormat,
     contentGoal,
   };
+
+  const kwList = (workspace.keywordList ?? []).filter(k => k.status === 'active').slice(0, 200);
+  const pages = workspace.discoveredPages ?? [];
 
   switch (step) {
     case 5: return {
       ...base,
       action: 'select-keywords-for-content',
       workspace: {
-        workspaceId: workspace.id, brandName: workspace.brandName, websiteUrl: workspace.websiteUrl,
-        industry: workspace.industry, businessType: workspace.businessType || '', targetMarket: workspace.targetMarket,
-        targetCountries: workspace.targetCountries || [], brandDifferentiators: workspace.brandDifferentiators,
-        complianceNotes: workspace.complianceNotes,
+        workspaceId: workspace.id, brandName: workspace.brandName ?? '', websiteUrl: workspace.websiteUrl ?? '',
+        industry: workspace.industry ?? '', businessType: workspace.businessType ?? '', targetMarket: workspace.targetMarket ?? '',
+        targetCountries: workspace.targetCountries ?? [], brandDifferentiators: workspace.brandDifferentiators ?? '',
+        complianceNotes: workspace.complianceNotes ?? '',
       },
-      keywordList: workspace.keywordList.filter(k => k.status === 'active').slice(0, 200).map(k => ({
-        keywordId: k.keywordId, keyword: k.keyword, normalizedKeyword: k.normalizedKeyword, tag: k.tag,
-        kd: k.kd, cpc: k.cpc, volume: k.volume,
-        usage: { usedAsPrimaryCount: k.usage.usedAsPrimaryCount, usedAsSecondaryCount: k.usage.usedAsSecondaryCount,
-          lastUsedAsPrimaryAt: k.usage.lastUsedAsPrimaryAt, lastUsedAsSecondaryAt: k.usage.lastUsedAsSecondaryAt, usedInContentIds: k.usage.usedInContentIds },
+      keywordList: kwList.map(k => ({
+        keywordId: k.keywordId, keyword: k.keyword, normalizedKeyword: k.normalizedKeyword ?? k.keyword.toLowerCase(), tag: k.tag ?? 'generic',
+        kd: k.kd ?? null, cpc: k.cpc ?? null, volume: k.volume ?? null,
+        usage: {
+          usedAsPrimaryCount: k.usage?.usedAsPrimaryCount ?? 0, usedAsSecondaryCount: k.usage?.usedAsSecondaryCount ?? 0,
+          lastUsedAsPrimaryAt: k.usage?.lastUsedAsPrimaryAt ?? null, lastUsedAsSecondaryAt: k.usage?.lastUsedAsSecondaryAt ?? null,
+          usedInContentIds: k.usage?.usedInContentIds ?? [],
+        },
       })),
       selectedPersona: persona?.name ?? '',
       selectedTopic: topic?.topicName ?? topic?.topic ?? '',
       selectedTopicId: topic?.topicId ?? topic?.id ?? '',
       selectedPlatformFormat: platformFormat ?? '',
-      sitemapPages: (workspace.discoveredPages ?? []).slice(0, 50).map(p => p.url),
+      sitemapPages: pages.slice(0, 50).map(p => p.url),
       priorPublishedContent: [],
       priorDraftContent: [],
-      mcmWorkspaceRulesIfApplicable: workspace.id === 'mcm-ws-001',
+      mcmWorkspaceRulesIfApplicable: workspace.id === 'mcm-ws-001' || workspace.id === 'mcm-default',
       allowPrimaryKeywordReuse: false,
     };
     case 6: return { ...base, action: 'generate-content-brief', approvedKeywordStrategy: project.keywordStrategy };
@@ -74,10 +80,10 @@ function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace
       const isArticle = platformFormat === 'article-blog';
       return { ...base, action: isArticle ? 'generate-long-form-seo-content' : 'generate-platform-content', approvedKeywordStrategy: project.keywordStrategy, approvedContentBrief: project.contentBrief, platformFormat };
     }
-    case 8: return { ...base, action: 'generate-internal-link-plan', generatedContent: project.rawContent ?? project.generatedArticle, approvedKeywordStrategy: project.keywordStrategy, sitemapPages: (workspace.discoveredPages ?? []).map(p => ({ url: p.url, pageType: p.pageType, title: p.title, detectedBrand: p.detectedBrand, detectedProduct: p.detectedProduct })) };
+    case 8: return { ...base, action: 'generate-internal-link-plan', generatedContent: project.rawContent ?? project.generatedArticle, approvedKeywordStrategy: project.keywordStrategy, sitemapPages: pages.map(p => ({ url: p.url, pageType: p.pageType, title: p.title, detectedBrand: p.detectedBrand ?? '', detectedProduct: p.detectedProduct ?? '' })) };
     case 9: return { ...base, action: 'generate-external-link-plan', generatedContent: project.rawContent ?? project.generatedArticle, approvedKeywordStrategy: project.keywordStrategy };
     case 10: return { ...base, action: 'inject-links', generatedContent: project.rawContent ?? project.generatedArticle, approvedInternalLinkPlan: project.internalLinkPlan, approvedExternalLinkPlan: project.externalLinkPlan };
-    case 11: return { ...base, action: 'generate-image-plan', linkedContent: project.linkedContent ?? project.rawContent, approvedKeywordStrategy: project.keywordStrategy, imageReferencePages: (workspace.discoveredPages ?? []).filter(p => ['product', 'collection', 'brand', 'local'].includes(p.pageType)).slice(0, 10).map(p => ({ url: p.url, pageType: p.pageType, title: p.title })) };
+    case 11: return { ...base, action: 'generate-image-plan', linkedContent: project.linkedContent ?? project.rawContent, approvedKeywordStrategy: project.keywordStrategy, imageReferencePages: pages.filter(p => ['product', 'collection', 'brand', 'local'].includes(p.pageType)).slice(0, 10).map(p => ({ url: p.url, pageType: p.pageType, title: p.title })) };
     case 12: return { ...base, action: 'generate-content-images', approvedImagePlan: project.imagePlan };
     default: return base;
   }
