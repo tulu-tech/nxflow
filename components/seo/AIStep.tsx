@@ -253,11 +253,13 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
           <div style={{ fontWeight: 600, marginBottom: 6, color: '#00c875' }}>✅ {links.length} {label2} Links</div>
           {data.notes && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, fontStyle: 'italic' }}>{str(data.notes)}</div>}
           {links.slice(0, 10).map((link: Record<string, string>, i: number) => (
-            <div key={i} style={{ marginBottom: 6, paddingLeft: 8, borderLeft: '2px solid var(--border-subtle)' }}>
-              <div style={{ fontWeight: 600, fontSize: 11 }}>{link.anchorText || link.anchor || `Link ${i+1}`}</div>
-              <div style={{ fontSize: 10, color: 'var(--accent)' }}>{link.targetUrl || link.url}</div>
-              {link.reason && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{link.reason}</div>}
-              {link.placementSection && <div style={{ fontSize: 10, color: '#fdab3d' }}>📍 {link.placementSection}</div>}
+            <div key={i} style={{ marginBottom: 8, paddingLeft: 8, borderLeft: `2px solid ${link.priority === 'High' ? '#00c875' : link.priority === 'Medium' ? '#fdab3d' : 'var(--border-subtle)'}` }}>
+              <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>{link.anchorText || link.anchor || link.pageTitle || `Link ${i+1}`}</div>
+              <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 1 }}>🔗 {link.targetUrl || link.url}</div>
+              {link.pageType && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#1e293b', color: '#94a3b8', marginRight: 4 }}>{link.pageType}</span>}
+              {link.priority && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: link.priority === 'High' ? '#065f46' : link.priority === 'Medium' ? '#78350f' : '#1e293b', color: link.priority === 'High' ? '#6ee7b7' : link.priority === 'Medium' ? '#fcd34d' : '#94a3b8' }}>{link.priority}</span>}
+              {(link.reason || link.placementReason) && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{link.reason || link.placementReason}</div>}
+              {link.placementSection && <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 1 }}>📍 {link.placementSection}</div>}
             </div>
           ))}
           {links.length > 10 && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>+{links.length - 10} more...</div>}
