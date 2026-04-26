@@ -98,11 +98,16 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
   };
 
   if (step === 5 && data.primaryKeyword) {
+    const pk = typeof data.primaryKeyword === 'string' ? data.primaryKeyword : data.primaryKeyword.keyword ?? JSON.stringify(data.primaryKeyword);
+    const sks = Array.isArray(data.secondaryKeywords)
+      ? data.secondaryKeywords.map((sk: unknown) => typeof sk === 'string' ? sk : (sk as Record<string, string>)?.keyword ?? '').filter(Boolean)
+      : [];
+    const reason = typeof data.primaryKeyword === 'object' ? data.primaryKeyword.reason : data.reason;
     return (
       <div style={{ fontSize: 12 }}>
-        <div style={{ marginBottom: 8 }}><strong>Primary:</strong> <span style={{ color: '#00c875', fontWeight: 600 }}>{data.primaryKeyword}</span></div>
-        {data.secondaryKeywords?.length > 0 && <div style={{ marginBottom: 8 }}><strong>Secondary:</strong> {data.secondaryKeywords.join(', ')}</div>}
-        {data.reason && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{data.reason}</div>}
+        <div style={{ marginBottom: 8 }}><strong>Primary:</strong> <span style={{ color: '#00c875', fontWeight: 600 }}>{pk}</span></div>
+        {sks.length > 0 && <div style={{ marginBottom: 8 }}><strong>Secondary:</strong> {sks.join(', ')}</div>}
+        {reason && <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{String(reason)}</div>}
       </div>
     );
   }
