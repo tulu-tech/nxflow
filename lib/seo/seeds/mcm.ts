@@ -328,7 +328,10 @@ export function buildMCMWorkspace(): Omit<SEOWorkspace, 'createdAt' | 'updatedAt
 
     // Sitemap
     sitemapUrl: 'https://www.massagechairsandmore.com/sitemap.xml',
+    sitemapStatus: 'idle',
     sitemapLastCheckedAt: null,
+    sitemapError: null,
+    discoveredPages: [],
     sitemapPages: [],
 
     // Assets

@@ -112,7 +112,7 @@ function parseKeywordFile(
 
 export function WorkspaceDashboard({ workspace }: Props) {
   const router = useRouter();
-  const { updateWorkspace, updateKeywordList, updateSitemap, togglePlatform } = useWorkspaceStore();
+  const { updateWorkspace, updateKeywordList, updateSitemap, setSitemapStatus, togglePlatform } = useWorkspaceStore();
   const { createProject, projects } = useSEOStore();
   const { addProjectToWorkspace } = useWorkspaceStore();
 
@@ -133,6 +133,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
   const [kwUploading, setKwUploading] = useState(false);
   const [kwError, setKwError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [showSitemapPages, setShowSitemapPages] = useState(false);
 
   // Create content panel state
   const [showCreatePanel, setShowCreatePanel] = useState(false);
@@ -223,9 +224,30 @@ export function WorkspaceDashboard({ workspace }: Props) {
     router.push(`/seoagent/workspace/${workspace.id}/project/${pid}`);
   };
 
-  // ── Sitemap save
+  // ── Sitemap fetch & parse
+  const handleSitemapFetch = async () => {
+    const url = sitemapInput.trim();
+    if (!url) return;
+    setSitemapStatus(workspace.id, 'fetching');
+    try {
+      const res = await fetch('/api/seo/sitemap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sitemapUrl: url, workspaceId: workspace.id }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setSitemapStatus(workspace.id, 'error', data.error || 'Failed to fetch sitemap');
+        return;
+      }
+      updateSitemap(workspace.id, url, data.pages);
+    } catch (err) {
+      setSitemapStatus(workspace.id, 'error', (err as Error).message);
+    }
+  };
+
   const handleSitemapSave = () => {
-    updateSitemap(workspace.id, sitemapInput.trim());
+    handleSitemapFetch();
   };
 
   return (
@@ -264,7 +286,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
         {[
           { icon: <Tag size={16} />, label: 'Keywords', value: workspace.keywordList.length, color: workspace.keywordList.length > 0 ? '#00c875' : 'var(--text-muted)', sub: workspace.keywordList.length > 0 ? `${new Set(workspace.keywordList.map(k => k.tag)).size} tags · ${workspace.keywordList.filter(k => k.usage.usedAsPrimaryCount > 0).length} used` : 'Not uploaded' },
           { icon: <FileText size={16} />, label: 'Projects', value: wsProjects.length, color: wsProjects.length > 0 ? '#818cf8' : 'var(--text-muted)', sub: `${wsProjects.filter(p => p.status === 'completed').length} completed` },
-          { icon: <Map size={16} />, label: 'Sitemap', value: workspace.sitemapUrl ? '✓' : '—', color: workspace.sitemapUrl ? '#00c875' : 'var(--text-muted)', sub: workspace.sitemapUrl ? workspace.sitemapPages.length + ' pages' : 'Not set' },
+          { icon: <Map size={16} />, label: 'Sitemap', value: workspace.sitemapUrl ? '✓' : '—', color: workspace.sitemapUrl ? '#00c875' : 'var(--text-muted)', sub: workspace.discoveredPages?.length > 0 ? workspace.discoveredPages.length + ' pages' : workspace.sitemapUrl ? 'Not fetched' : 'Not set' },
         ].map((stat, i) => (
           <div key={i} className="seo-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
             <div style={{ color: 'var(--text-muted)', marginBottom: 6 }}>{stat.icon}</div>
@@ -491,6 +513,9 @@ export function WorkspaceDashboard({ workspace }: Props) {
         <div className="seo-card">
           <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
             🗺️ Sitemap
+            {workspace.sitemapStatus === 'fetching' && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--accent)', marginLeft: 8 }}>Fetching...</span>}
+            {workspace.sitemapStatus === 'success' && <span style={{ fontSize: 11, fontWeight: 400, color: '#00c875', marginLeft: 8 }}>✓ Active</span>}
+            {workspace.sitemapStatus === 'error' && <span style={{ fontSize: 11, fontWeight: 400, color: '#f87171', marginLeft: 8 }}>✗ Error</span>}
           </h3>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input
@@ -500,14 +525,74 @@ export function WorkspaceDashboard({ workspace }: Props) {
               placeholder="https://example.com/sitemap.xml"
               style={{ flex: 1, fontSize: 12 }}
             />
-            <button className="seo-btn seo-btn-secondary seo-btn-sm" onClick={handleSitemapSave} disabled={!sitemapInput.trim()}>
-              Save
+            <button
+              className="seo-btn seo-btn-primary seo-btn-sm"
+              onClick={handleSitemapFetch}
+              disabled={!sitemapInput.trim() || workspace.sitemapStatus === 'fetching'}
+            >
+              {workspace.sitemapStatus === 'fetching' ? '⏳' : workspace.discoveredPages?.length > 0 ? '🔄 Refresh' : '📥 Fetch'}
             </button>
           </div>
+
+          {/* Error */}
+          {workspace.sitemapError && (
+            <div style={{ fontSize: 11, color: '#f87171', padding: '6px 8px', borderRadius: 4, background: 'rgba(239,68,68,0.06)', marginBottom: 8 }}>
+              {workspace.sitemapError}
+            </div>
+          )}
+
+          {/* Stats row */}
           {workspace.sitemapLastCheckedAt && (
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              Last checked: {new Date(workspace.sitemapLastCheckedAt).toLocaleDateString()}
-              {workspace.sitemapPages.length > 0 && ` · ${workspace.sitemapPages.length} pages found`}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+              <span>Last checked: {new Date(workspace.sitemapLastCheckedAt).toLocaleDateString()}</span>
+              <span>·</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{workspace.discoveredPages?.length ?? 0} pages</span>
+              {workspace.discoveredPages?.length > 0 && (() => {
+                const types: Record<string, number> = {};
+                workspace.discoveredPages.forEach((p) => { types[p.pageType] = (types[p.pageType] || 0) + 1; });
+                return Object.entries(types).map(([t, c]) => (
+                  <span key={t} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(129,140,248,0.08)' }}>{t}: {c}</span>
+                ));
+              })()}
+            </div>
+          )}
+
+          {/* Toggle pages list */}
+          {workspace.discoveredPages?.length > 0 && (
+            <div>
+              <button
+                className="seo-btn seo-btn-ghost seo-btn-sm"
+                onClick={() => setShowSitemapPages(!showSitemapPages)}
+                style={{ fontSize: 11, marginBottom: showSitemapPages ? 8 : 0 }}
+              >
+                {showSitemapPages ? '▼ Hide' : '▶ View'} Discovered Pages ({workspace.discoveredPages.length})
+              </button>
+              {showSitemapPages && (
+                <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 4 }}>
+                  {workspace.discoveredPages.map((p) => (
+                    <div key={p.pageId} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px',
+                      fontSize: 11, borderBottom: '1px solid var(--border-subtle)',
+                    }}>
+                      <span style={{
+                        fontSize: 9, padding: '1px 5px', borderRadius: 3, flexShrink: 0, minWidth: 52, textAlign: 'center',
+                        background: p.pageType === 'product' ? 'rgba(0,200,117,0.1)' : p.pageType === 'blog' ? 'rgba(129,140,248,0.1)' : p.pageType === 'collection' ? 'rgba(253,171,61,0.1)' : 'rgba(129,140,248,0.04)',
+                        color: p.pageType === 'product' ? '#00c875' : p.pageType === 'blog' ? 'var(--accent)' : p.pageType === 'collection' ? '#fdab3d' : 'var(--text-muted)',
+                      }}>
+                        {p.pageType}
+                      </span>
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+                        {p.path}
+                      </span>
+                      {p.detectedBrand && (
+                        <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(253,171,61,0.08)', color: '#fdab3d', flexShrink: 0 }}>
+                          {p.detectedBrand}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

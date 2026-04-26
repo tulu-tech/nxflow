@@ -228,6 +228,38 @@ export interface WorkspaceContentTopic {
   status: 'planned' | 'in-progress' | 'published' | 'archived';
 }
 
+// ─── Discovered Sitemap Page ─────────────────────────────────────────────────
+
+export type SitemapPageType =
+  | 'homepage'
+  | 'product'
+  | 'collection'
+  | 'blog'
+  | 'guide'
+  | 'local'
+  | 'brand'
+  | 'policy'
+  | 'contact'
+  | 'other';
+
+export interface DiscoveredPage {
+  pageId: string;
+  workspaceId: string;
+  url: string;
+  normalizedUrl: string;
+  title: string;
+  slug: string;
+  path: string;
+  pageType: SitemapPageType;
+  detectedBrand: string | null;
+  detectedProduct: string | null;
+  detectedTopic: string | null;
+  lastmod: string | null;
+  priority: number | null;
+  source: 'sitemap' | 'manual';
+  status: 'active' | 'removed';
+}
+
 // ─── Workspace ───────────────────────────────────────────────────────────────
 
 export interface SEOWorkspace {
@@ -256,7 +288,11 @@ export interface SEOWorkspace {
 
   // SEO Assets — Sitemap
   sitemapUrl: string;
+  sitemapStatus: 'idle' | 'fetching' | 'success' | 'error';
   sitemapLastCheckedAt: string | null;
+  sitemapError: string | null;
+  discoveredPages: DiscoveredPage[];
+  /** @deprecated use discoveredPages.length */
   sitemapPages: string[];
 
   // Assets

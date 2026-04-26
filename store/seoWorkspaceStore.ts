@@ -7,6 +7,7 @@ import type {
   WorkspaceAsset,
   ContentEntry,
   WorkspaceKeyword,
+  DiscoveredPage,
 } from '../lib/seo/workspaceTypes';
 import { ALL_PLATFORMS } from '../lib/seo/workspaceTypes';
 
@@ -32,7 +33,8 @@ interface WorkspaceState {
   recordKeywordUsage: (workspaceId: string, contentId: string, primaryKeywordId: string | null, secondaryKeywordIds: string[]) => void;
 
   // Sitemap management
-  updateSitemap: (id: string, url: string, pages?: string[]) => void;
+  updateSitemap: (id: string, url: string, pages?: DiscoveredPage[]) => void;
+  setSitemapStatus: (id: string, status: 'idle' | 'fetching' | 'success' | 'error', error?: string | null) => void;
 
   // Platform management
   togglePlatform: (id: string, platform: PlatformType, enabled: boolean) => void;
@@ -94,7 +96,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           keywordListUploadedAt: null,
           keywordListVersion: 0,
           sitemapUrl: data.sitemapUrl ?? '',
+          sitemapStatus: 'idle' as const,
           sitemapLastCheckedAt: null,
+          sitemapError: null,
+          discoveredPages: [],
           sitemapPages: [],
           assets: [],
           platforms: data.platforms ?? defaultPlatforms(),
@@ -162,8 +167,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((s) =>
           patchWorkspace(s, id, {
             sitemapUrl: url,
+            sitemapStatus: 'success' as const,
             sitemapLastCheckedAt: new Date().toISOString(),
-            sitemapPages: pages ?? s.workspaces[id]?.sitemapPages ?? [],
+            sitemapError: null,
+            discoveredPages: pages ?? s.workspaces[id]?.discoveredPages ?? [],
+            sitemapPages: (pages ?? s.workspaces[id]?.discoveredPages ?? []).map((p) => p.url),
+          })
+        ),
+
+      setSitemapStatus: (id, status, error) =>
+        set((s) =>
+          patchWorkspace(s, id, {
+            sitemapStatus: status,
+            sitemapError: error ?? null,
           })
         ),
 
