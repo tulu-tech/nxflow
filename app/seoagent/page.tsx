@@ -6,6 +6,7 @@ import { CreateWorkspaceForm } from '@/components/seo/CreateWorkspaceForm';
 import { useState, useEffect } from 'react';
 import { Building2 } from 'lucide-react';
 import { MCM_WORKSPACE_ID, buildMCMWorkspace } from '@/lib/seo/seeds/mcm';
+import { HOMC_WORKSPACE_ID, buildHOMCWorkspace } from '@/lib/seo/seeds/homc';
 
 export default function SEODashboard() {
   const { workspaces, createWorkspace } = useWorkspaceStore();
@@ -16,6 +17,10 @@ export default function SEODashboard() {
     if (!workspaces[MCM_WORKSPACE_ID]) {
       const mcm = buildMCMWorkspace();
       createWorkspace(mcm);
+    }
+    if (!workspaces[HOMC_WORKSPACE_ID]) {
+      const homc = buildHOMCWorkspace();
+      createWorkspace(homc);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

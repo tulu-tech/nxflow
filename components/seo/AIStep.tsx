@@ -29,7 +29,7 @@ const STEP_CONFIG: Record<number, { action: string; title: string; desc: string 
 };
 
 function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace, persona: WorkspacePersona | undefined, topic: WorkspaceContentTopic | undefined, platformFormat: string | null, contentGoal: string) {
-  const isMCM = workspace.id === 'mcm-ws-001' || workspace.id === 'mcm-default';
+  const isMassageChairWorkspace = workspace.id === 'mcm-ws-001' || workspace.id === 'mcm-default' || workspace.id === 'homc-default';
 
   // Shared workspace object — matches all prompt builder `workspace` fields
   const ws = {
@@ -92,7 +92,7 @@ function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace
     selectedTopicId: topicId,
     selectedPlatformFormat: platformFormat ?? '',
     contentGoal,
-    mcmWorkspaceRulesIfApplicable: isMCM,
+    mcmWorkspaceRulesIfApplicable: isMassageChairWorkspace,
   };
 
   switch (step) {

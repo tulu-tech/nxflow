@@ -10,6 +10,7 @@ import { IMAGE_REFERENCE_SYSTEM_PROMPT, buildImageReferenceUserPrompt, discoverI
 import { IMAGE_PLAN_SYSTEM_PROMPT, buildImagePlanUserPrompt, mockImagePlan, type ImagePlanInput } from '@/lib/seo/prompts/generateImagePlan';
 import { mockContentImages, generateContentImages, type ContentImagesInput } from '@/lib/seo/prompts/generateContentImages';
 import { getMCMGuardrails } from '@/lib/seo/guardrails/mcm';
+import { getHOMCGuardrails } from '@/lib/seo/guardrails/homc';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -988,36 +989,69 @@ export async function POST(req: NextRequest) {
         case 'generate-image-plan':
           return NextResponse.json(mockImagePlan(body as ImagePlanInput));
         case 'generate-content-images': {
-          // Scrape OG images from sitemap product pages to use as real image references
-          const sitemapPages = (body.sitemapPages ?? []) as Array<{ url: string; pageType: string; title: string }>;
-          const scrapedImages: string[] = [];
-          const productUrls = sitemapPages.filter(p => ['product', 'collection', 'brand'].includes(p.pageType)).slice(0, 8);
-          for (const page of productUrls) {
+          // ── OG Image Scraper ────────────────────────────────────────────
+          // Helper: scrape OG/product image from a URL
+          const scrapeOgImage = async (pageUrl: string): Promise<string | null> => {
+            if (!pageUrl || pageUrl.startsWith('data:')) return null;
             try {
-              const resp = await fetch(page.url, { headers: { 'User-Agent': 'NxFlow-Bot/1.0' }, signal: AbortSignal.timeout(3000) });
-              if (resp.ok) {
-                const html = await resp.text();
-                // Extract og:image
-                const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
-                if (ogMatch?.[1]) { scrapedImages.push(ogMatch[1]); continue; }
-                // Fallback: first large product image
-                const imgMatch = html.match(/<img[^>]*src=["'](https?:\/\/[^"']*(?:cdn\.shopify|product|upload)[^"']*\.(?:jpg|png|webp)[^"']*)["']/i);
-                if (imgMatch?.[1]) { scrapedImages.push(imgMatch[1]); continue; }
-              }
-            } catch { /* skip failed fetches */ }
-          }
-          // Enrich the approved image plan with scraped images
+              const resp = await fetch(pageUrl, {
+                headers: { 'User-Agent': 'NxFlow-Bot/1.0' },
+                signal: AbortSignal.timeout(4000),
+              });
+              if (!resp.ok) return null;
+              const html = await resp.text();
+              const ogMatch = html.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+              if (ogMatch?.[1]) return ogMatch[1];
+              const cdnMatch = html.match(/src=["'](https?:\/\/[^"']*(?:cdn\.shopify|product|upload|cdn)[^"']*\.(?:jpg|png|webp)[^"']*?)["']/i);
+              if (cdnMatch?.[1]) return cdnMatch[1];
+              return null;
+            } catch { return null; }
+          };
+
+          // 1. Scrape from image plan referencePageUrl entries (topic-specific)
           const enrichedPlan = (body.approvedImagePlan ?? []) as Array<Record<string, unknown>>;
-          enrichedPlan.forEach((item, idx) => {
-            const refs = (item.referenceImageUrls ?? []) as string[];
-            if (refs.length === 0 && scrapedImages[idx]) {
-              item.referenceImageUrls = [scrapedImages[idx]];
+          const planImages: (string | null)[] = [];
+          for (const planItem of enrichedPlan) {
+            const existingRefs = (planItem.referenceImageUrls ?? []) as string[];
+            if (existingRefs.length > 0) {
+              planImages.push(existingRefs[0]);
+            } else {
+              const refUrl = planItem.referencePageUrl as string;
+              const img = refUrl ? await scrapeOgImage(refUrl) : null;
+              planImages.push(img);
+              if (img) planItem.referenceImageUrls = [img];
             }
-          });
-          // Also pass scraped images for fallback padding
+          }
+
+          // 2. Scrape from sitemap pages as fallback pool
+          const sitemapPages = (body.sitemapPages ?? []) as Array<{ url: string; pageType: string; title: string }>;
+          const sitemapImgs: string[] = [];
+          const productUrls = sitemapPages
+            .filter(p => ['product', 'collection', 'brand'].includes(p.pageType))
+            .slice(0, 12);
+          for (const sp of productUrls) {
+            const img = await scrapeOgImage(sp.url);
+            if (img) sitemapImgs.push(img);
+            if (sitemapImgs.length >= 8) break;
+          }
+
+          // 3. Merge: plan images first, fill gaps from sitemap
+          const scrapedImages: string[] = [];
+          let smFallbackIdx = 0;
+          for (let i = 0; i < Math.max(enrichedPlan.length, 5); i++) {
+            if (planImages[i]) {
+              scrapedImages.push(planImages[i]!);
+            } else if (smFallbackIdx < sitemapImgs.length) {
+              scrapedImages.push(sitemapImgs[smFallbackIdx]);
+              if (enrichedPlan[i]) enrichedPlan[i].referenceImageUrls = [sitemapImgs[smFallbackIdx]];
+              smFallbackIdx++;
+            }
+          }
+
           (body as Record<string, unknown>).__scrapedProductImages = scrapedImages;
           return NextResponse.json(mockContentImages(body as ContentImagesInput));
         }
+
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -1076,7 +1110,7 @@ Rules:
 - NEVER link to homepage URLs (just "/" or root domain with no path)
 - Preserve all article formatting, headings, and structure exactly
 - Return JSON: { "content": "updated markdown content" }`
-      + getMCMGuardrails(body);
+      + getMCMGuardrails(body) + getHOMCGuardrails(body);
 
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -1107,7 +1141,7 @@ Rules:
     }
 
     // Standard AI generation
-    const guardrails = getMCMGuardrails(body);
+    const guardrails = getMCMGuardrails(body) + getHOMCGuardrails(body);
     const systemPrompt = buildSystemPrompt(action, body) + guardrails;
 
     // Use structured user prompt for keyword selection

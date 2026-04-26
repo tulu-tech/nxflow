@@ -6,7 +6,11 @@ import type { SEOWorkspace, WorkspaceContentTopic, WorkspacePersona } from '@/li
 import { useSEOStore } from '@/store/seoStore';
 import { CONTENT_PHASES, CONTENT_FORMATS, CONTENT_GOALS, type ContentFormatType } from '@/lib/seo/contentFlowTypes';
 import { MCM_WORKSPACE_ID } from '@/lib/seo/seeds/mcm';
+import { HOMC_WORKSPACE_ID } from '@/lib/seo/seeds/homc';
 import { MCM_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/mcmPersonaTopics';
+import { HOMC_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/homcPersonaTopics';
+import { buildMCMBlogHtml } from '@/lib/seo/templates/mcmBlogHtml';
+import { buildHOMCBlogHtml } from '@/lib/seo/templates/homcBlogHtml';
 import { AIStep } from './AIStep';
 import { ChevronLeft, ChevronRight, Check, RotateCcw, Download, FileText } from 'lucide-react';
 // ─── Inline Formatting Parser for DOCX ───────────────────────────────────────
@@ -46,6 +50,26 @@ function parseInlineFormatting(text: string, TextRun: any, ExternalHyperlink: an
   return result;
 }
 
+// ─── Content Marker Cleanup ──────────────────────────────────────────────────
+// Strips leftover AI pipeline markers that sometimes persist into final content.
+
+function cleanContentMarkers(raw: string): string {
+  let c = raw;
+  // Remove [IMAGE_OPPORTUNITY: ...] markers entirely (images handled separately)
+  c = c.replace(/\[IMAGE_OPPORTUNITY:\s*[^\]]*\]/g, '');
+  // Remove [INTERNAL_LINK_OPPORTUNITY: anchor | reason] — keep anchor text
+  c = c.replace(/\[INTERNAL_LINK_OPPORTUNITY:\s*([^|\]]+)(?:\|[^\]]*)?\]/g, '$1');
+  // Remove [EXTERNAL_LINK_OPPORTUNITY: claim | reason] — keep claim text
+  c = c.replace(/\[EXTERNAL_LINK_OPPORTUNITY:\s*([^|\]]+)(?:\|[^\]]*)?\]/g, '$1');
+  // Remove [IMAGE: ...] markers from mock content generation
+  c = c.replace(/\[IMAGE:\s*[^\]]*\]/g, '');
+  // Remove [LINK: anchor|url] markers not yet converted to markdown links
+  c = c.replace(/\[LINK:\s*([^|\]]+)\|([^\]]+)\]/g, '[$1]($2)');
+  // Clean up excessive blank lines left by removed markers
+  c = c.replace(/\n{3,}/g, '\n\n');
+  return c.trim();
+}
+
 // ─── Final Preview & Export (Step 13) ────────────────────────────────────────
 
 function FinalPreview({ project, workspace, persona, topic }: {
@@ -63,7 +87,8 @@ function FinalPreview({ project, workspace, persona, topic }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = project as any;
   const article = p.generatedArticle?.article ?? p.generatedArticle ?? {};
-  const content = p.linkedContent ?? article?.content ?? p.rawContent ?? '';
+  const rawContent = p.linkedContent ?? article?.content ?? p.rawContent ?? '';
+  const content = typeof rawContent === 'string' ? cleanContentMarkers(rawContent) : rawContent;
   const title = article?.title ?? article?.metaTitle ?? p.name ?? '';
   const metaDesc = article?.metaDescription ?? '';
   const slug = article?.slug ?? '';
@@ -188,7 +213,46 @@ function FinalPreview({ project, workspace, persona, topic }: {
 
   const exportHtml = () => {
     const contentStr = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
-    // Convert markdown-ish bold/links to HTML
+
+    // MCM workspace — use branded Shopify blog template
+    if (workspace.id === MCM_WORKSPACE_ID || workspace.id === 'mcm-ws-001') {
+      const imageList = Array.isArray(imgs) ? imgs.map((img: Record<string, string>) => ({
+        imageUrl: img.imageUrl ?? '',
+        altText: img.altText ?? '',
+        placementRecommendation: img.placementRecommendation ?? '',
+      })) : [];
+
+      const html = buildMCMBlogHtml(contentStr, title, imageList);
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug || 'content'}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // HOMC workspace — use HOMC branded Shopify blog template
+    if (workspace.id === HOMC_WORKSPACE_ID || workspace.id === 'homc-default') {
+      const imageList = Array.isArray(imgs) ? imgs.map((img: Record<string, string>) => ({
+        imageUrl: img.imageUrl ?? '',
+        altText: img.altText ?? '',
+        placementRecommendation: img.placementRecommendation ?? '',
+      })) : [];
+
+      const html = buildHOMCBlogHtml(contentStr, title, imageList);
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug || 'content'}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Generic export for other workspaces
     let htmlContent = contentStr
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
@@ -468,11 +532,20 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
 
   // Derived
   const isMCM = workspace.id === MCM_WORKSPACE_ID;
+  const isHOMC = workspace.id === HOMC_WORKSPACE_ID;
+  const isSeedWorkspace = isMCM || isHOMC;
   const persona: WorkspacePersona | undefined = workspace.personas.find((p) => p.id === personaId);
   const topic: WorkspaceContentTopic | undefined = workspace.contentTopics.find((t) => (t.topicId ?? t.id) === topicId);
 
-  const allowedTopicIds = isMCM && personaId ? (MCM_PERSONA_TOPIC_MAP[personaId] ?? []) : [];
-  const filteredTopics = isMCM && personaId
+  const getPersonaTopicMap = (): Record<string, string[]> => {
+    if (isMCM) return MCM_PERSONA_TOPIC_MAP;
+    if (isHOMC) return HOMC_PERSONA_TOPIC_MAP;
+    return {};
+  };
+
+  const personaTopicMap = getPersonaTopicMap();
+  const allowedTopicIds = isSeedWorkspace && personaId ? (personaTopicMap[personaId] ?? []) : [];
+  const filteredTopics = isSeedWorkspace && personaId
     ? workspace.contentTopics.filter((t) => allowedTopicIds.includes(t.topicId ?? t.id))
     : workspace.contentTopics;
 

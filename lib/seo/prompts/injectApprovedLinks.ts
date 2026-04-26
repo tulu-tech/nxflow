@@ -69,6 +69,14 @@ PLACEMENT PRIORITY:
 2. Then, for remaining approved links without markers, find the best natural placement in the content.
 3. If a link cannot be placed naturally, skip it and report in warnings.
 
+MANDATORY CLEANUP (do this AFTER all link insertion):
+- Remove ALL remaining [INTERNAL_LINK_OPPORTUNITY: ...] markers. If no matching link, keep only the anchor text portion.
+- Remove ALL remaining [EXTERNAL_LINK_OPPORTUNITY: ...] markers. If no matching link, keep only the claim text portion.
+- Remove ALL [IMAGE_OPPORTUNITY: ...] markers completely — images are handled in a separate step.
+- Remove ALL [IMAGE: ...] markers completely.
+- Convert any remaining [LINK: anchor|url] markers to proper markdown links [anchor](url).
+- Clean up excessive blank lines (3+ consecutive newlines → 2).
+
 Return strict JSON matching the schema provided.`;
 
 // ─── User Prompt Builder ─────────────────────────────────────────────────────
@@ -197,7 +205,14 @@ export function mockInjectLinks(input: InjectLinksInput): InjectLinksResult {
   // 5. Clean up any remaining opportunity markers that weren't matched
   content = content.replace(/\[INTERNAL_LINK_OPPORTUNITY:\s*([^|]+)\|[^\]]+\]/g, '$1');
   content = content.replace(/\[EXTERNAL_LINK_OPPORTUNITY:\s*([^|]+)\|[^\]]+\]/g, '$1');
-  // Also clean the [IMAGE_OPPORTUNITY: ...] markers (leave them — they're for later steps)
+  // 6. Clean [IMAGE_OPPORTUNITY: ...] markers — they've been consumed by image plan step
+  content = content.replace(/\[IMAGE_OPPORTUNITY:\s*[^\]]*\]/g, '');
+  // 7. Clean [IMAGE: ...] markers from legacy mock content
+  content = content.replace(/\[IMAGE:\s*[^\]]*\]/g, '');
+  // 8. Convert any remaining [LINK: anchor|url] markers to markdown links
+  content = content.replace(/\[LINK:\s*([^|]+)\|([^\]]+)\]/g, '[$1]($2)');
+  // 9. Clean excessive blank lines left by removed markers
+  content = content.replace(/\n{3,}/g, '\n\n');
 
   return {
     linkedContent: content,
