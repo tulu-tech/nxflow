@@ -155,38 +155,41 @@ export async function generateWithDalle(
 export function mockContentImages(input: ContentImagesInput): ContentImagesResult {
   const ws = input.workspace ?? {} as ContentImagesInput['workspace'];
   const brand = ws.brandName ?? '';
+  const websiteUrl = (ws.websiteUrl ?? '').replace(/\/$/, '');
   const topic = input.selectedTopic ?? brand;
   const pk = input.approvedKeywordStrategy?.primaryKeyword ?? topic;
   const secKws = input.approvedKeywordStrategy?.secondaryKeywords ?? [];
   const warnings: string[] = [];
   const plan = (input.approvedImagePlan ?? []).slice(0, 5);
 
-  // Helper: pick the best real image URL from plan item references
-  const pickRealImage = (item: ContentImagesInput['approvedImagePlan'][0]): string | null => {
+  // Collect sitemap product page URLs for image sourcing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sitemapPages: Array<{ url: string; pageType: string; title: string; images?: string[] }> = (input as any).sitemapPages ?? [];
+  const productPages = sitemapPages.filter(p => ['product', 'collection', 'brand'].includes(p.pageType));
+  // Pre-scraped OG images from the route handler
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scrapedImages: string[] = (input as any).__scrapedProductImages ?? [];
+
+  // Helper: pick the best real image URL
+  const pickRealImage = (item: ContentImagesInput['approvedImagePlan'][0], idx: number): string => {
+    // 1. From image plan reference images (enriched by OG scraper)
     const refs = item.referenceImageUrls ?? [];
-    if (refs.length > 0) return refs[0]; // Use first reference image from sitemap
-    return null;
+    if (refs.length > 0) return refs[0];
+    // 2. From scraped OG images
+    if (scrapedImages[idx]) return scrapedImages[idx];
+    // 3. From reference page URL
+    if (item.referencePageUrl) return item.referencePageUrl;
+    // 4. From sitemap product page URLs
+    if (productPages[idx]) return productPages[idx].url;
+    // 5. Placeholder
+    return `${websiteUrl}/cdn/shop/placeholder-${idx + 1}.jpg`;
   };
 
-  // Helper: Unsplash source URL (keyword-relevant stock photo, no API key needed)
-  const unsplashUrl = (query: string, w = 1200, h = 800): string => {
-    const q = encodeURIComponent(query.slice(0, 80));
-    return `https://source.unsplash.com/${w}x${h}/?${q}`;
-  };
-
-  const generatedImages: GeneratedImage[] = plan.map((item) => {
+  const generatedImages: GeneratedImage[] = plan.map((item, idx) => {
     const kw = item.relatedKeyword || pk;
     const altText = generateAltText(item.imagePurpose, kw, brand);
     const fileName = generateFileName(item.imagePurpose, kw, item.imageNumber);
-
-    // 1st priority: real reference image from sitemap
-    const realUrl = pickRealImage(item);
-    // 2nd priority: Unsplash with keyword search
-    const imageUrl = realUrl ?? unsplashUrl(`${kw} ${item.imagePurpose}`, 1200, 800);
-
-    if (realUrl) {
-      warnings.push(`Image #${item.imageNumber}: Using reference image from ${item.referencePageUrl ?? 'sitemap'}`);
-    }
+    const imageUrl = pickRealImage(item, idx);
 
     return {
       imageNumber: item.imageNumber,
@@ -204,27 +207,29 @@ export function mockContentImages(input: ContentImagesInput): ContentImagesResul
   const fallbackPurposes = ['hero', 'product', 'feature-detail', 'showroom', 'comparison'];
   const fallbackSections = ['Hero / Above the fold', 'Product detail section', 'Feature breakdown section', 'Expert guidance section', 'Comparison / CTA section'];
 
-  // Pad to 5 if plan had fewer — use topic context with Unsplash
+  // Pad to 5 if plan had fewer — use sitemap product pages
   while (generatedImages.length < 5) {
     const num = generatedImages.length + 1;
     const idx = num - 1;
     const purpose = fallbackPurposes[idx] ?? 'product';
     const kw = secKws[idx] ?? pk;
     const slug = kw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+    // Use scraped OG image > product page URL > placeholder
+    const ppUrl = scrapedImages[idx] ?? productPages[idx]?.url ?? `${websiteUrl}/cdn/shop/placeholder-${num}.jpg`;
     generatedImages.push({
       imageNumber: num,
       imagePurpose: purpose,
       promptUsed: `Premium ${purpose} image for ${pk} — ${brand}, editorial photography, photorealistic, 8k`,
-      imageUrl: unsplashUrl(`${kw} ${purpose}`, 1200, 800),
+      imageUrl: ppUrl,
       altText: generateAltText(purpose, kw, brand),
       recommendedFileName: `${slug}-${purpose}-${num}.webp`,
       relatedKeyword: kw,
       placementRecommendation: fallbackSections[idx] ?? 'Content section',
     });
-    warnings.push(`Image #${num}: Generated from topic context (no approved plan item).`);
+    warnings.push(`Image #${num}: Using product page URL from sitemap as reference (no AI generation without API key).`);
   }
 
-  warnings.push('⚠️ No DALL-E API key configured. Images sourced from sitemap references or Unsplash stock. Configure OPENAI_API_KEY for AI-generated images.');
+  warnings.push('⚠️ No DALL-E/GPT-Image API key configured. Images sourced from sitemap product pages. Configure OPENAI_API_KEY for AI-generated images.');
 
   return { generatedImages, warnings };
 }

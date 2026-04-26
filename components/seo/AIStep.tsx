@@ -140,7 +140,22 @@ function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace
     case 9: return { ...base, action: 'generate-external-link-plan', generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '', approvedKeywordStrategy: keywordStrategy };
     case 10: return { ...base, action: 'inject-links', generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '', approvedInternalLinkPlan: project.internalLinkPlan ?? [], approvedExternalLinkPlan: project.externalLinkPlan ?? [] };
     case 11: return { ...base, action: 'generate-image-plan', linkedContent: project.linkedContent ?? project.rawContent ?? '', approvedKeywordStrategy: keywordStrategy, imageReferencePages: pages.filter(p => ['product', 'collection', 'brand', 'local'].includes(p.pageType)).slice(0, 10).map(p => ({ url: p.url, pageType: p.pageType, title: p.title })) };
-    case 12: return { ...base, action: 'generate-content-images', approvedImagePlan: project.imagePlan ?? [] };
+    case 12: {
+      // project.imagePlan is the full response: { imagePlan: [...], warnings: [...] }
+      const rawPlan = project.imagePlan;
+      const planArray = Array.isArray(rawPlan) ? rawPlan : (rawPlan as unknown as Record<string, unknown>)?.imagePlan ?? [];
+      return {
+        ...base,
+        action: 'generate-content-images',
+        approvedImagePlan: planArray,
+        approvedKeywordStrategy: keywordStrategy,
+        // Pass sitemap product images as reference
+        sitemapPages: pages.filter(p => ['product', 'collection', 'brand'].includes(p.pageType)).slice(0, 20).map(p => ({
+          url: p.url, pageType: p.pageType, title: p.title,
+          images: (p as unknown as Record<string, unknown>).images ?? [],
+        })),
+      };
+    }
     default: return base;
   }
 }

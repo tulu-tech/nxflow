@@ -987,8 +987,37 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(discoverImageReferences(body as ImageReferenceInput));
         case 'generate-image-plan':
           return NextResponse.json(mockImagePlan(body as ImagePlanInput));
-        case 'generate-content-images':
+        case 'generate-content-images': {
+          // Scrape OG images from sitemap product pages to use as real image references
+          const sitemapPages = (body.sitemapPages ?? []) as Array<{ url: string; pageType: string; title: string }>;
+          const scrapedImages: string[] = [];
+          const productUrls = sitemapPages.filter(p => ['product', 'collection', 'brand'].includes(p.pageType)).slice(0, 8);
+          for (const page of productUrls) {
+            try {
+              const resp = await fetch(page.url, { headers: { 'User-Agent': 'NxFlow-Bot/1.0' }, signal: AbortSignal.timeout(3000) });
+              if (resp.ok) {
+                const html = await resp.text();
+                // Extract og:image
+                const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+                if (ogMatch?.[1]) { scrapedImages.push(ogMatch[1]); continue; }
+                // Fallback: first large product image
+                const imgMatch = html.match(/<img[^>]*src=["'](https?:\/\/[^"']*(?:cdn\.shopify|product|upload)[^"']*\.(?:jpg|png|webp)[^"']*)["']/i);
+                if (imgMatch?.[1]) { scrapedImages.push(imgMatch[1]); continue; }
+              }
+            } catch { /* skip failed fetches */ }
+          }
+          // Enrich the approved image plan with scraped images
+          const enrichedPlan = (body.approvedImagePlan ?? []) as Array<Record<string, unknown>>;
+          enrichedPlan.forEach((item, idx) => {
+            const refs = (item.referenceImageUrls ?? []) as string[];
+            if (refs.length === 0 && scrapedImages[idx]) {
+              item.referenceImageUrls = [scrapedImages[idx]];
+            }
+          });
+          // Also pass scraped images for fallback padding
+          (body as Record<string, unknown>).__scrapedProductImages = scrapedImages;
           return NextResponse.json(mockContentImages(body as ContentImagesInput));
+        }
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
