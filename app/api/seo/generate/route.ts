@@ -1080,8 +1080,8 @@ Rules:
     return NextResponse.json(content);
 
   } catch (err) {
-    console.error('[SEO Generate Error]', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[SEO Generate Error]', err instanceof Error ? err.message : err, err instanceof Error ? err.stack : '');
+    return NextResponse.json({ error: `Internal server error: ${err instanceof Error ? err.message : 'Unknown error'}` }, { status: 500 });
   }
 }
 

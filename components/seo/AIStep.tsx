@@ -44,7 +44,31 @@ function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace
   };
 
   switch (step) {
-    case 5: return { ...base, action: 'select-keywords-for-content', keywordList: workspace.keywordList.filter(k => k.status === 'active').slice(0, 200).map(k => ({ keyword: k.keyword, tag: k.tag, volume: k.volume, kd: k.kd, cpc: k.cpc, keywordId: k.keywordId, usedAsPrimary: k.usage.usedAsPrimaryCount, usedAsSecondary: k.usage.usedAsSecondaryCount })), sitemapPages: (workspace.discoveredPages ?? []).slice(0, 50).map(p => ({ url: p.url, pageType: p.pageType, title: p.title })) };
+    case 5: return {
+      ...base,
+      action: 'select-keywords-for-content',
+      workspace: {
+        workspaceId: workspace.id, brandName: workspace.brandName, websiteUrl: workspace.websiteUrl,
+        industry: workspace.industry, businessType: workspace.businessType || '', targetMarket: workspace.targetMarket,
+        targetCountries: workspace.targetCountries || [], brandDifferentiators: workspace.brandDifferentiators,
+        complianceNotes: workspace.complianceNotes,
+      },
+      keywordList: workspace.keywordList.filter(k => k.status === 'active').slice(0, 200).map(k => ({
+        keywordId: k.keywordId, keyword: k.keyword, normalizedKeyword: k.normalizedKeyword, tag: k.tag,
+        kd: k.kd, cpc: k.cpc, volume: k.volume,
+        usage: { usedAsPrimaryCount: k.usage.usedAsPrimaryCount, usedAsSecondaryCount: k.usage.usedAsSecondaryCount,
+          lastUsedAsPrimaryAt: k.usage.lastUsedAsPrimaryAt, lastUsedAsSecondaryAt: k.usage.lastUsedAsSecondaryAt, usedInContentIds: k.usage.usedInContentIds },
+      })),
+      selectedPersona: persona?.name ?? '',
+      selectedTopic: topic?.topicName ?? topic?.topic ?? '',
+      selectedTopicId: topic?.topicId ?? topic?.id ?? '',
+      selectedPlatformFormat: platformFormat ?? '',
+      sitemapPages: (workspace.discoveredPages ?? []).slice(0, 50).map(p => p.url),
+      priorPublishedContent: [],
+      priorDraftContent: [],
+      mcmWorkspaceRulesIfApplicable: workspace.id === 'mcm-ws-001',
+      allowPrimaryKeywordReuse: false,
+    };
     case 6: return { ...base, action: 'generate-content-brief', approvedKeywordStrategy: project.keywordStrategy };
     case 7: {
       const isArticle = platformFormat === 'article-blog';
