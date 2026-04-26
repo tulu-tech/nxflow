@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { KEYWORD_SELECTION_SYSTEM_PROMPT, buildKeywordSelectionUserPrompt, mockKeywordStrategy, type KeywordSelectionInput } from '@/lib/seo/prompts/selectKeywords';
 import { CONTENT_BRIEF_SYSTEM_PROMPT, buildContentBriefUserPrompt, mockContentBrief, type ContentBriefInput } from '@/lib/seo/prompts/generateBrief';
+import { LONG_FORM_CONTENT_SYSTEM_PROMPT, buildLongFormContentUserPrompt, mockLongFormContent, type LongFormContentInput } from '@/lib/seo/prompts/generateLongFormContent';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -913,6 +914,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(mockKeywordStrategy(body as KeywordSelectionInput));
         case 'generate-content-brief':
           return NextResponse.json(mockContentBrief(body as ContentBriefInput));
+        case 'generate-long-form-seo-content':
+          return NextResponse.json(mockLongFormContent(body as LongFormContentInput));
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -1002,6 +1005,8 @@ Rules:
       ? buildKeywordSelectionUserPrompt(body as KeywordSelectionInput)
       : action === 'generate-content-brief'
       ? buildContentBriefUserPrompt(body as ContentBriefInput)
+      : action === 'generate-long-form-seo-content'
+      ? buildLongFormContentUserPrompt(body as LongFormContentInput)
       : JSON.stringify(body);
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1016,8 +1021,8 @@ Rules:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },
         ],
-        temperature: action === 'article' ? 0.8 : action === 'select-keywords-for-content' ? 0.5 : action === 'generate-content-brief' ? 0.6 : 0.7,
-        max_tokens: action === 'article' ? 8000 : action === 'select-keywords-for-content' ? 6000 : action === 'generate-content-brief' ? 5000 : 4000,
+        temperature: action === 'article' || action === 'generate-long-form-seo-content' ? 0.8 : action === 'select-keywords-for-content' ? 0.5 : action === 'generate-content-brief' ? 0.6 : 0.7,
+        max_tokens: action === 'article' || action === 'generate-long-form-seo-content' ? 8000 : action === 'select-keywords-for-content' ? 6000 : action === 'generate-content-brief' ? 5000 : 4000,
         response_format: { type: 'json_object' },
       }),
     });
@@ -1117,6 +1122,9 @@ Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The ou
 
     case 'generate-content-brief':
       return CONTENT_BRIEF_SYSTEM_PROMPT;
+
+    case 'generate-long-form-seo-content':
+      return LONG_FORM_CONTENT_SYSTEM_PROMPT;
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';
