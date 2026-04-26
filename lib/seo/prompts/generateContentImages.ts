@@ -29,6 +29,10 @@ export interface ContentImagesInput {
     websiteUrl: string;
     industry: string;
   };
+  // Topic context for fallback image generation
+  selectedTopic?: string;
+  selectedPersona?: string;
+  approvedKeywordStrategy?: { primaryKeyword?: string; secondaryKeywords?: string[] };
 }
 
 export interface GeneratedImage {
@@ -146,13 +150,18 @@ export async function generateWithDalle(
 // ─── Mock Response (no API key) ──────────────────────────────────────────────
 
 export function mockContentImages(input: ContentImagesInput): ContentImagesResult {
-  const brand = input.workspace.brandName;
+  const ws = input.workspace ?? {} as ContentImagesInput['workspace'];
+  const brand = ws.brandName ?? '';
+  const topic = input.selectedTopic ?? brand;
+  const pk = input.approvedKeywordStrategy?.primaryKeyword ?? topic;
+  const secKws = input.approvedKeywordStrategy?.secondaryKeywords ?? [];
   const warnings: string[] = [];
+  const plan = (input.approvedImagePlan ?? []).slice(0, 5);
 
-  const generatedImages: GeneratedImage[] = input.approvedImagePlan.slice(0, 5).map((item) => {
-    const altText = generateAltText(item.imagePurpose, item.relatedKeyword, brand);
-    const fileName = generateFileName(item.imagePurpose, item.relatedKeyword, item.imageNumber);
-    const imageUrl = generatePlaceholderUrl(item.imagePurpose, item.relatedKeyword, item.aspectRatio);
+  const generatedImages: GeneratedImage[] = plan.map((item) => {
+    const altText = generateAltText(item.imagePurpose, item.relatedKeyword || pk, brand);
+    const fileName = generateFileName(item.imagePurpose, item.relatedKeyword || pk, item.imageNumber);
+    const imageUrl = generatePlaceholderUrl(item.imagePurpose, item.relatedKeyword || pk, item.aspectRatio);
 
     return {
       imageNumber: item.imageNumber,
@@ -161,25 +170,33 @@ export function mockContentImages(input: ContentImagesInput): ContentImagesResul
       imageUrl,
       altText,
       recommendedFileName: fileName,
-      relatedKeyword: item.relatedKeyword,
+      relatedKeyword: item.relatedKeyword || pk,
       placementRecommendation: item.placementRecommendation,
     };
   });
 
-  // Pad to 5 if plan had fewer
+  // Topic-aware fallback purposes (not generic "lifestyle")
+  const fallbackPurposes = ['hero', 'product', 'feature-detail', 'showroom', 'comparison'];
+  const fallbackSections = ['Hero / Above the fold', 'Product detail section', 'Feature breakdown section', 'Expert guidance section', 'Comparison / CTA section'];
+
+  // Pad to 5 if plan had fewer — use topic context
   while (generatedImages.length < 5) {
     const num = generatedImages.length + 1;
+    const idx = num - 1;
+    const purpose = fallbackPurposes[idx] ?? 'product';
+    const kw = secKws[idx] ?? pk;
+    const slug = kw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
     generatedImages.push({
       imageNumber: num,
-      imagePurpose: 'lifestyle',
-      promptUsed: `Premium ${brand} lifestyle image #${num}`,
-      imageUrl: generatePlaceholderUrl('extra', `${brand}-${num}`, '16:9'),
-      altText: `${brand} premium experience`,
-      recommendedFileName: `${brand.toLowerCase().replace(/\s+/g, '-')}-image-${num}.webp`,
-      relatedKeyword: brand,
-      placementRecommendation: 'Supplementary image',
+      imagePurpose: purpose,
+      promptUsed: `Premium ${purpose} image for ${pk} — ${brand}, editorial photography, photorealistic, 8k`,
+      imageUrl: generatePlaceholderUrl(purpose, kw, '16:9'),
+      altText: generateAltText(purpose, kw, brand),
+      recommendedFileName: `${slug}-${purpose}-${num}.webp`,
+      relatedKeyword: kw,
+      placementRecommendation: fallbackSections[idx] ?? 'Content section',
     });
-    warnings.push(`Image plan had fewer than 5 items — padded image #${num} with generic lifestyle concept.`);
+    warnings.push(`Image #${num}: Generated from topic context (no approved plan item).`);
   }
 
   warnings.push('Images generated as placeholders (no DALL-E API key). Replace with DALL-E generated images when API key is configured.');
@@ -240,17 +257,20 @@ export async function generateContentImages(
   }
 
   // Pad if needed
+  const pk2 = input.approvedKeywordStrategy?.primaryKeyword ?? input.selectedTopic ?? brand;
+  const fallbackPurposes2 = ['hero', 'product', 'feature-detail', 'showroom', 'comparison'];
   while (generatedImages.length < 5) {
     const num = generatedImages.length + 1;
+    const purpose = fallbackPurposes2[num - 1] ?? 'product';
     generatedImages.push({
       imageNumber: num,
-      imagePurpose: 'lifestyle',
-      promptUsed: `Premium ${brand} lifestyle image #${num}`,
-      imageUrl: generatePlaceholderUrl('extra', `${brand}-${num}`, '16:9'),
-      altText: `${brand} premium experience`,
-      recommendedFileName: `${brand.toLowerCase().replace(/\s+/g, '-')}-image-${num}.webp`,
-      relatedKeyword: brand,
-      placementRecommendation: 'Supplementary image',
+      imagePurpose: purpose,
+      promptUsed: `Premium ${purpose} image for ${pk2} — ${brand}`,
+      imageUrl: generatePlaceholderUrl(purpose, pk2, '16:9'),
+      altText: generateAltText(purpose, pk2, brand),
+      recommendedFileName: generateFileName(purpose, pk2, num),
+      relatedKeyword: pk2,
+      placementRecommendation: 'Content section',
     });
     warnings.push(`Image plan had fewer than 5 items — padded image #${num}.`);
   }
