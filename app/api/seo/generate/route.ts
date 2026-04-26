@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { KEYWORD_SELECTION_SYSTEM_PROMPT, buildKeywordSelectionUserPrompt, mockKeywordStrategy, type KeywordSelectionInput } from '@/lib/seo/prompts/selectKeywords';
 import { CONTENT_BRIEF_SYSTEM_PROMPT, buildContentBriefUserPrompt, mockContentBrief, type ContentBriefInput } from '@/lib/seo/prompts/generateBrief';
 import { LONG_FORM_CONTENT_SYSTEM_PROMPT, buildLongFormContentUserPrompt, mockLongFormContent, type LongFormContentInput } from '@/lib/seo/prompts/generateLongFormContent';
+import { PLATFORM_CONTENT_SYSTEM_PROMPT, buildPlatformContentUserPrompt, mockPlatformContent, type PlatformContentInput } from '@/lib/seo/prompts/generatePlatformContent';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -916,6 +917,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(mockContentBrief(body as ContentBriefInput));
         case 'generate-long-form-seo-content':
           return NextResponse.json(mockLongFormContent(body as LongFormContentInput));
+        case 'generate-platform-content':
+          return NextResponse.json(mockPlatformContent(body as PlatformContentInput));
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -1007,6 +1010,8 @@ Rules:
       ? buildContentBriefUserPrompt(body as ContentBriefInput)
       : action === 'generate-long-form-seo-content'
       ? buildLongFormContentUserPrompt(body as LongFormContentInput)
+      : action === 'generate-platform-content'
+      ? buildPlatformContentUserPrompt(body as PlatformContentInput)
       : JSON.stringify(body);
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1125,6 +1130,9 @@ Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The ou
 
     case 'generate-long-form-seo-content':
       return LONG_FORM_CONTENT_SYSTEM_PROMPT;
+
+    case 'generate-platform-content':
+      return PLATFORM_CONTENT_SYSTEM_PROMPT;
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';
