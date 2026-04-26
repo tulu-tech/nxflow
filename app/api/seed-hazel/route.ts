@@ -8,7 +8,6 @@ export async function GET() {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const BOARD_ID  = 'b-hazel-apr27';
-  const WS_ID     = 'ws1';
   const HAZEL_ID  = 'u1';
 
   const G_ADS     = 'g-hz-ads';
@@ -84,31 +83,31 @@ export async function GET() {
 
   const results: string[] = [];
 
-  // 1. Board
-  const { error: boardErr } = await supabase.from('boards').insert({
-    id: BOARD_ID, workspace_id: WS_ID,
+  // 1. Board — upsert
+  const { error: boardErr } = await supabase.from('boards').upsert({
+    id: BOARD_ID, workspace_id: 'ws1',
     name: 'Hazel — 27 April – 1 May',
     description: "Hazel's weekly task board for April 27 – May 1, 2026",
     columns: COLUMNS,
     group_order: [G_ADS, G_CONTENT, G_SEO, G_RUNFLAT],
     created_at: now,
-  });
-  results.push(boardErr ? `Board: ${boardErr.message}` : '✅ Board created');
+  }, { onConflict: 'id' });
+  results.push(boardErr ? `Board: ${boardErr.message}` : '✅ Board upserted');
 
-  // 2. Groups
+  // 2. Groups — upsert
   const groups = [
     { id: G_ADS, board_id: BOARD_ID, name: 'Google Ads Campaign Fixes', color: '#e11d48', task_order: adsTasks.map(t => t.id), collapsed: false, position: 0 },
     { id: G_CONTENT, board_id: BOARD_ID, name: 'Content Publishing', color: '#059669', task_order: contentTasks.map(t => t.id), collapsed: false, position: 1 },
     { id: G_SEO, board_id: BOARD_ID, name: 'SEO Technical Fixes', color: '#6366f1', task_order: seoTasks.map(t => t.id), collapsed: false, position: 2 },
     { id: G_RUNFLAT, board_id: BOARD_ID, name: 'Runflat Content Writing', color: '#f59e0b', task_order: runflatTasks.map(t => t.id), collapsed: false, position: 3 },
   ];
-  const { error: groupErr } = await supabase.from('groups').insert(groups);
-  results.push(groupErr ? `Groups: ${groupErr.message}` : '✅ 4 groups created');
+  const { error: groupErr } = await supabase.from('groups').upsert(groups, { onConflict: 'id' });
+  results.push(groupErr ? `Groups: ${groupErr.message}` : '✅ 4 groups upserted');
 
-  // 3. Tasks
+  // 3. Tasks — upsert
   const allTasks = [...adsTasks, ...contentTasks, ...seoTasks, ...runflatTasks];
-  const { error: taskErr } = await supabase.from('tasks').insert(allTasks);
-  results.push(taskErr ? `Tasks: ${taskErr.message}` : `✅ ${allTasks.length} tasks created`);
+  const { error: taskErr } = await supabase.from('tasks').upsert(allTasks, { onConflict: 'id' });
+  results.push(taskErr ? `Tasks: ${taskErr.message}` : `✅ ${allTasks.length} tasks upserted`);
 
   return NextResponse.json({ success: !boardErr && !groupErr && !taskErr, results });
 }
