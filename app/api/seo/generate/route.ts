@@ -9,6 +9,7 @@ import { INJECT_LINKS_SYSTEM_PROMPT, buildInjectLinksUserPrompt, mockInjectLinks
 import { IMAGE_REFERENCE_SYSTEM_PROMPT, buildImageReferenceUserPrompt, discoverImageReferences, type ImageReferenceInput } from '@/lib/seo/prompts/discoverImageReferences';
 import { IMAGE_PLAN_SYSTEM_PROMPT, buildImagePlanUserPrompt, mockImagePlan, type ImagePlanInput } from '@/lib/seo/prompts/generateImagePlan';
 import { mockContentImages, generateContentImages, type ContentImagesInput } from '@/lib/seo/prompts/generateContentImages';
+import { getMCMGuardrails } from '@/lib/seo/guardrails/mcm';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -994,7 +995,8 @@ Rules:
 - For any remaining links in the plan, find the best natural anchor text in the article and wrap it with the markdown link
 - NEVER link to homepage URLs (just "/" or root domain with no path)
 - Preserve all article formatting, headings, and structure exactly
-- Return JSON: { "content": "updated markdown content" }`;
+- Return JSON: { "content": "updated markdown content" }`
+      + getMCMGuardrails(body);
 
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -1025,7 +1027,8 @@ Rules:
     }
 
     // Standard AI generation
-    const systemPrompt = buildSystemPrompt(action, body);
+    const guardrails = getMCMGuardrails(body);
+    const systemPrompt = buildSystemPrompt(action, body) + guardrails;
 
     // Use structured user prompt for keyword selection
     const userContent = action === 'select-keywords-for-content'
