@@ -29,33 +29,76 @@ const STEP_CONFIG: Record<number, { action: string; title: string; desc: string 
 };
 
 function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace, persona: WorkspacePersona | undefined, topic: WorkspaceContentTopic | undefined, platformFormat: string | null, contentGoal: string) {
-  const base = {
-    workspaceData: {
-      id: workspace.id, brandName: workspace.brandName ?? '', websiteUrl: workspace.websiteUrl ?? '',
-      industry: workspace.industry ?? '', toneOfVoice: workspace.toneOfVoice ?? '', coreOffer: workspace.coreOffer ?? '',
-      primaryCTA: workspace.primaryCTA ?? '', brandDifferentiators: workspace.brandDifferentiators ?? '',
-      complianceNotes: workspace.complianceNotes ?? '', targetMarket: workspace.targetMarket ?? '',
-    },
-    selectedPersona: persona ? { id: persona.id, name: persona.name, shortDescription: persona.shortDescription ?? '', claimRiskLevel: persona.claimRiskLevel ?? 'low', recommendedTone: persona.recommendedTone ?? '', defaultCTA: persona.defaultCTA ?? '' } : null,
-    selectedTopic: topic ? { topicId: topic.topicId ?? topic.id, topicName: topic.topicName ?? topic.topic ?? '', topicCluster: topic.topicCluster ?? topic.category ?? '', defaultSearchIntent: topic.defaultSearchIntent ?? '', defaultCTA: topic.defaultCTA ?? '', claimRiskLevel: topic.claimRiskLevel ?? 'low', brandOrProductSignal: topic.brandOrProductSignal ?? '', linkIntent: topic.linkIntent ?? '', imageIntent: topic.imageIntent ?? '' } : null,
-    selectedTopicId: topic?.topicId ?? topic?.id ?? null,
-    selectedPlatformFormat: platformFormat,
-    contentGoal,
+  const isMCM = workspace.id === 'mcm-ws-001' || workspace.id === 'mcm-default';
+
+  // Shared workspace object — matches all prompt builder `workspace` fields
+  const ws = {
+    workspaceId: workspace.id, brandName: workspace.brandName ?? '', websiteUrl: workspace.websiteUrl ?? '',
+    industry: workspace.industry ?? '', businessType: workspace.businessType ?? '', targetMarket: workspace.targetMarket ?? '',
+    targetCountries: workspace.targetCountries ?? [], brandDifferentiators: workspace.brandDifferentiators ?? '',
+    complianceNotes: workspace.complianceNotes ?? '', toneOfVoice: workspace.toneOfVoice ?? '', coreOffer: workspace.coreOffer ?? '',
+    conversionGoals: '', primaryCTA: workspace.primaryCTA ?? '',
+  };
+
+  const personaName = persona?.name ?? '';
+  const personaDesc = persona?.shortDescription ?? '';
+  const topicName = topic?.topicName ?? topic?.topic ?? '';
+  const topicId = topic?.topicId ?? topic?.id ?? '';
+
+  // Extract keyword strategy as flat strings from project.keywordStrategy (which is the raw AI response)
+  const ks = project.keywordStrategy as Record<string, unknown> | null;
+  const pkObj = (ks?.primaryKeyword ?? {}) as Record<string, unknown>;
+  const keywordStrategy = {
+    primaryKeyword: (typeof pkObj === 'string' ? pkObj : pkObj?.keyword as string) ?? '',
+    secondaryKeywords: Array.isArray(ks?.secondaryKeywords)
+      ? (ks.secondaryKeywords as Array<Record<string, string>>).map(sk => typeof sk === 'string' ? sk : sk?.keyword ?? '').filter(Boolean)
+      : [],
+    searchIntent: (ks?.searchIntent as string) ?? '',
+    funnelStage: (ks?.funnelStage as string) ?? '',
+    commercialPriority: (ks?.commercialPriority as string) ?? '',
+    claimRisk: (ks?.claimRisk as string) ?? 'Low',
+    claimRiskNotes: (ks?.claimRiskNotes as string) ?? '',
+    recommendedCTA: (ks?.recommendedCTA as string) ?? '',
+    contentAngle: (ks?.contentAngle as string) ?? '',
+  };
+
+  // Extract content brief safely
+  const cb = (project.contentBrief ?? {}) as Record<string, unknown>;
+  const approvedContentBrief = {
+    briefTitle: (cb.briefTitle as string) ?? '',
+    angle: (cb.angle as string) ?? '',
+    readerProblem: (cb.readerProblem as string) ?? '',
+    decisionBarrierSolved: (cb.decisionBarrierSolved as string) ?? '',
+    recommendedWordCount: (cb.recommendedWordCount as string) ?? '2,500–3,500 words',
+    outline: Array.isArray(cb.outline) ? cb.outline as Array<{ level: string; text: string; notes?: string }> : [],
+    faqPlan: Array.isArray(cb.faqPlan) ? cb.faqPlan as Array<{ question: string; answerDirection: string }> : [],
+    recommendedCTA: (cb.recommendedCTA as string) ?? keywordStrategy.recommendedCTA,
+    mustInclude: Array.isArray(cb.mustInclude) ? cb.mustInclude as string[] : [],
+    mustAvoid: Array.isArray(cb.mustAvoid) ? cb.mustAvoid as string[] : [],
+    qualityChecklist: Array.isArray(cb.qualityChecklist) ? cb.qualityChecklist as string[] : [],
+    claimRiskGuidance: (cb.claimRiskGuidance as string) ?? '',
   };
 
   const kwList = (workspace.keywordList ?? []).filter(k => k.status === 'active').slice(0, 200);
   const pages = workspace.discoveredPages ?? [];
 
+  // Base includes workspaceData for guardrails detection
+  const base = {
+    workspaceData: { id: workspace.id, brandName: ws.brandName },
+    workspace: ws,
+    selectedPersona: personaName,
+    selectedPersonaDescription: personaDesc,
+    selectedTopic: topicName,
+    selectedTopicId: topicId,
+    selectedPlatformFormat: platformFormat ?? '',
+    contentGoal,
+    mcmWorkspaceRulesIfApplicable: isMCM,
+  };
+
   switch (step) {
     case 5: return {
       ...base,
       action: 'select-keywords-for-content',
-      workspace: {
-        workspaceId: workspace.id, brandName: workspace.brandName ?? '', websiteUrl: workspace.websiteUrl ?? '',
-        industry: workspace.industry ?? '', businessType: workspace.businessType ?? '', targetMarket: workspace.targetMarket ?? '',
-        targetCountries: workspace.targetCountries ?? [], brandDifferentiators: workspace.brandDifferentiators ?? '',
-        complianceNotes: workspace.complianceNotes ?? '',
-      },
       keywordList: kwList.map(k => ({
         keywordId: k.keywordId, keyword: k.keyword, normalizedKeyword: k.normalizedKeyword ?? k.keyword.toLowerCase(), tag: k.tag ?? 'generic',
         kd: k.kd ?? null, cpc: k.cpc ?? null, volume: k.volume ?? null,
@@ -65,26 +108,39 @@ function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace
           usedInContentIds: k.usage?.usedInContentIds ?? [],
         },
       })),
-      selectedPersona: persona?.name ?? '',
-      selectedTopic: topic?.topicName ?? topic?.topic ?? '',
-      selectedTopicId: topic?.topicId ?? topic?.id ?? '',
-      selectedPlatformFormat: platformFormat ?? '',
       sitemapPages: pages.slice(0, 50).map(p => p.url),
       priorPublishedContent: [],
       priorDraftContent: [],
-      mcmWorkspaceRulesIfApplicable: workspace.id === 'mcm-ws-001' || workspace.id === 'mcm-default',
       allowPrimaryKeywordReuse: false,
     };
-    case 6: return { ...base, action: 'generate-content-brief', approvedKeywordStrategy: project.keywordStrategy };
+    case 6: return {
+      ...base,
+      action: 'generate-content-brief',
+      keywordStrategy,
+      sitemapPages: pages.slice(0, 50).map(p => p.url),
+      priorContent: [],
+    };
     case 7: {
       const isArticle = platformFormat === 'article-blog';
-      return { ...base, action: isArticle ? 'generate-long-form-seo-content' : 'generate-platform-content', approvedKeywordStrategy: project.keywordStrategy, approvedContentBrief: project.contentBrief, platformFormat };
+      return {
+        ...base,
+        action: isArticle ? 'generate-long-form-seo-content' : 'generate-platform-content',
+        platformFormat: platformFormat ?? '',
+        approvedKeywordStrategy: keywordStrategy,
+        approvedContentBrief,
+      };
     }
-    case 8: return { ...base, action: 'generate-internal-link-plan', generatedContent: project.rawContent ?? project.generatedArticle, approvedKeywordStrategy: project.keywordStrategy, sitemapPages: pages.map(p => ({ url: p.url, pageType: p.pageType, title: p.title, detectedBrand: p.detectedBrand ?? '', detectedProduct: p.detectedProduct ?? '' })) };
-    case 9: return { ...base, action: 'generate-external-link-plan', generatedContent: project.rawContent ?? project.generatedArticle, approvedKeywordStrategy: project.keywordStrategy };
-    case 10: return { ...base, action: 'inject-links', generatedContent: project.rawContent ?? project.generatedArticle, approvedInternalLinkPlan: project.internalLinkPlan, approvedExternalLinkPlan: project.externalLinkPlan };
-    case 11: return { ...base, action: 'generate-image-plan', linkedContent: project.linkedContent ?? project.rawContent, approvedKeywordStrategy: project.keywordStrategy, imageReferencePages: pages.filter(p => ['product', 'collection', 'brand', 'local'].includes(p.pageType)).slice(0, 10).map(p => ({ url: p.url, pageType: p.pageType, title: p.title })) };
-    case 12: return { ...base, action: 'generate-content-images', approvedImagePlan: project.imagePlan };
+    case 8: return {
+      ...base,
+      action: 'generate-internal-link-plan',
+      generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '',
+      approvedKeywordStrategy: keywordStrategy,
+      sitemapPages: pages.map(p => ({ url: p.url, pageType: p.pageType, title: p.title, detectedBrand: p.detectedBrand ?? '', detectedProduct: p.detectedProduct ?? '' })),
+    };
+    case 9: return { ...base, action: 'generate-external-link-plan', generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '', approvedKeywordStrategy: keywordStrategy };
+    case 10: return { ...base, action: 'inject-links', generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '', approvedInternalLinkPlan: project.internalLinkPlan ?? [], approvedExternalLinkPlan: project.externalLinkPlan ?? [] };
+    case 11: return { ...base, action: 'generate-image-plan', linkedContent: project.linkedContent ?? project.rawContent ?? '', approvedKeywordStrategy: keywordStrategy, imageReferencePages: pages.filter(p => ['product', 'collection', 'brand', 'local'].includes(p.pageType)).slice(0, 10).map(p => ({ url: p.url, pageType: p.pageType, title: p.title })) };
+    case 12: return { ...base, action: 'generate-content-images', approvedImagePlan: project.imagePlan ?? [] };
     default: return base;
   }
 }
