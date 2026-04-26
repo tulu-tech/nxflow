@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ProjectCard } from './ProjectCard';
+import { ContentTracker } from './ContentTracker';
 import { BusinessType } from '@/lib/seo/types';
 import { MCM_WORKSPACE_ID } from '@/lib/seo/seeds/mcm';
 import { MCM_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/mcmPersonaTopics';
@@ -285,7 +286,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
         {[
           { icon: <Tag size={16} />, label: 'Keywords', value: workspace.keywordList.length, color: workspace.keywordList.length > 0 ? '#00c875' : 'var(--text-muted)', sub: workspace.keywordList.length > 0 ? `${new Set(workspace.keywordList.map(k => k.tag)).size} tags · ${workspace.keywordList.filter(k => k.usage.usedAsPrimaryCount > 0).length} used` : 'Not uploaded' },
-          { icon: <FileText size={16} />, label: 'Projects', value: wsProjects.length, color: wsProjects.length > 0 ? '#818cf8' : 'var(--text-muted)', sub: `${wsProjects.filter(p => p.status === 'completed').length} completed` },
+          { icon: <FileText size={16} />, label: 'Content', value: (workspace.generatedContent ?? []).length, color: (workspace.generatedContent ?? []).length > 0 ? '#818cf8' : 'var(--text-muted)', sub: `${(workspace.generatedContent ?? []).filter(c => c.contentStatus === 'published').length} published · ${(workspace.generatedContent ?? []).filter(c => c.contentStatus === 'draft').length} draft` },
           { icon: <Map size={16} />, label: 'Sitemap', value: workspace.sitemapUrl ? '✓' : '—', color: workspace.sitemapUrl ? '#00c875' : 'var(--text-muted)', sub: workspace.discoveredPages?.length > 0 ? workspace.discoveredPages.length + ' pages' : workspace.sitemapUrl ? 'Not fetched' : 'Not set' },
         ].map((stat, i) => (
           <div key={i} className="seo-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
@@ -763,6 +764,9 @@ export function WorkspaceDashboard({ workspace }: Props) {
           )}
         </div>
       </div>
+
+      {/* Content Tracker */}
+      <ContentTracker workspaceId={workspace.id} content={workspace.generatedContent ?? []} />
 
       {/* Content Projects */}
       <div style={{ marginBottom: 24 }}>

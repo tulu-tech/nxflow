@@ -71,7 +71,7 @@ export interface WorkspaceAsset {
 
 // ─── Content Status ──────────────────────────────────────────────────────────
 
-export type ContentStatus = 'draft' | 'scheduled' | 'published';
+export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'archived';
 
 export interface ContentEntry {
   projectId: string;
@@ -91,6 +91,85 @@ export interface ContentEntry {
   primaryKeywordKD?: number | null;
   primaryKeywordCPC?: number | null;
   generatedAt?: string;
+}
+
+// ─── Generated Content Tracking ─────────────────────────────────────────────
+
+export type ContentPlatformFormat =
+  | 'article-blog'
+  | 'text-post'
+  | 'image-post'
+  | 'short-video'
+  | 'long-video'
+  | 'instagram-story'
+  | 'linkedin-story'
+  | 'static-infographic'
+  | 'multi-image-carousel'
+  | 'pdf-carousel'
+  | 'poll-quiz'
+  | 'qa-session'
+  | 'comment-engagement';
+
+export const CONTENT_FORMAT_LABELS: Record<ContentPlatformFormat, string> = {
+  'article-blog': 'Article / Blog',
+  'text-post': 'Text Post',
+  'image-post': 'Image Post',
+  'short-video': 'Short Video',
+  'long-video': 'Long-Form Video',
+  'instagram-story': 'Instagram Story',
+  'linkedin-story': 'LinkedIn Story',
+  'static-infographic': 'Infographic',
+  'multi-image-carousel': 'Image Carousel',
+  'pdf-carousel': 'PDF Carousel',
+  'poll-quiz': 'Poll / Quiz',
+  'qa-session': 'Q&A Session',
+  'comment-engagement': 'Comment Engagement',
+};
+
+export interface WorkspaceContent {
+  contentId: string;
+  workspaceId: string;
+
+  // Persona & Topic
+  selectedPersona: string;
+  selectedTopicId: string;
+  selectedTopicName: string;
+  selectedPlatformFormat: ContentPlatformFormat;
+
+  // Keyword Strategy
+  primaryKeyword: string;
+  primaryKeywordId: string;
+  primaryKeywordTag: string;
+  primaryKeywordVolume: number | null;
+  primaryKeywordKD: number | null;
+  primaryKeywordCPC: number | null;
+  secondaryKeywords: string[];
+  secondaryKeywordIds: string[];
+  keywordSelectionReason: string;
+  keywordSelectionMetadata: Record<string, unknown>;
+
+  // Status & Scheduling
+  contentStatus: ContentStatus;
+  scheduledDate: string | null;
+  publishedDate: string | null;
+  platform: string;
+
+  // Content Data
+  contentTitle: string;
+  contentSlug: string;
+  contentPreview: string;
+  contentBrief: Record<string, unknown> | null;
+  rawContent: string;
+  internalLinkPlan: Array<Record<string, unknown>>;
+  externalLinkPlan: Array<Record<string, unknown>>;
+  linkedContent: string;
+  imagePlan: Array<Record<string, unknown>>;
+  generatedImages: Array<Record<string, unknown>>;
+  finalContent: string;
+
+  // Timestamps
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Workspace Keyword System ────────────────────────────────────────────────
@@ -308,6 +387,9 @@ export interface SEOWorkspace {
   // Content Operations
   projectIds: string[];
   contentEntries: ContentEntry[];
+
+  // Generated Content Tracking
+  generatedContent: WorkspaceContent[];
 
   // Timestamps
   createdAt: string;

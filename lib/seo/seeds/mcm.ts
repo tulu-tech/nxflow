@@ -347,5 +347,6 @@ export function buildMCMWorkspace(): Omit<SEOWorkspace, 'createdAt' | 'updatedAt
     // Content
     projectIds: [],
     contentEntries: [],
+    generatedContent: [],
   };
 }

@@ -8,6 +8,8 @@ import type {
   ContentEntry,
   WorkspaceKeyword,
   DiscoveredPage,
+  WorkspaceContent,
+  ContentStatus,
 } from '../lib/seo/workspaceTypes';
 import { ALL_PLATFORMS } from '../lib/seo/workspaceTypes';
 
@@ -47,6 +49,12 @@ interface WorkspaceState {
   addProjectToWorkspace: (workspaceId: string, projectId: string) => void;
   removeProjectFromWorkspace: (workspaceId: string, projectId: string) => void;
   updateContentEntry: (workspaceId: string, entry: ContentEntry) => void;
+
+  // Generated content tracking
+  addGeneratedContent: (workspaceId: string, content: WorkspaceContent) => void;
+  updateGeneratedContent: (workspaceId: string, contentId: string, patch: Partial<WorkspaceContent>) => void;
+  updateContentStatus: (workspaceId: string, contentId: string, status: ContentStatus, date?: string) => void;
+  deleteGeneratedContent: (workspaceId: string, contentId: string) => void;
 }
 
 // ─── Helper to patch workspace ───────────────────────────────────────────────
@@ -107,6 +115,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           contentTopics: data.contentTopics ?? [],
           projectIds: [],
           contentEntries: [],
+          generatedContent: [],
           createdAt: now,
           updatedAt: now,
         };
@@ -245,6 +254,55 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             entries.push(entry);
           }
           return patchWorkspace(s, workspaceId, { contentEntries: entries });
+        }),
+
+      addGeneratedContent: (workspaceId, content) =>
+        set((s) => {
+          const ws = s.workspaces[workspaceId];
+          if (!ws) return s;
+          const existing = ws.generatedContent ?? [];
+          return patchWorkspace(s, workspaceId, {
+            generatedContent: [content, ...existing],
+          });
+        }),
+
+      updateGeneratedContent: (workspaceId, contentId, patch) =>
+        set((s) => {
+          const ws = s.workspaces[workspaceId];
+          if (!ws) return s;
+          const content = (ws.generatedContent ?? []).map((c) =>
+            c.contentId === contentId
+              ? { ...c, ...patch, updatedAt: new Date().toISOString() }
+              : c
+          );
+          return patchWorkspace(s, workspaceId, { generatedContent: content });
+        }),
+
+      updateContentStatus: (workspaceId, contentId, status, date) =>
+        set((s) => {
+          const ws = s.workspaces[workspaceId];
+          if (!ws) return s;
+          const now = new Date().toISOString();
+          const content = (ws.generatedContent ?? []).map((c) => {
+            if (c.contentId !== contentId) return c;
+            return {
+              ...c,
+              contentStatus: status,
+              scheduledDate: status === 'scheduled' ? (date ?? now) : c.scheduledDate,
+              publishedDate: status === 'published' ? (date ?? now) : c.publishedDate,
+              updatedAt: now,
+            };
+          });
+          return patchWorkspace(s, workspaceId, { generatedContent: content });
+        }),
+
+      deleteGeneratedContent: (workspaceId, contentId) =>
+        set((s) => {
+          const ws = s.workspaces[workspaceId];
+          if (!ws) return s;
+          return patchWorkspace(s, workspaceId, {
+            generatedContent: (ws.generatedContent ?? []).filter((c) => c.contentId !== contentId),
+          });
         }),
     }),
     { name: 'nxflow-seo-workspaces', version: 2 }
