@@ -54,6 +54,12 @@ function FinalPreview({ project, workspace, persona, topic }: {
   persona: WorkspacePersona | undefined;
   topic: WorkspaceContentTopic | undefined;
 }) {
+  const { updateProjectField } = useSEOStore();
+  const pid = project.id;
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [isScheduled, setIsScheduled] = useState(project.status === 'scheduled');
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = project as any;
   const article = p.generatedArticle?.article ?? p.generatedArticle ?? {};
@@ -71,6 +77,14 @@ function FinalPreview({ project, workspace, persona, topic }: {
   // Keyword
   const kw = p.keywordStrategy?.primaryKeyword;
   const pkName = typeof kw === 'string' ? kw : kw?.keyword ?? '';
+
+  const handleSchedule = () => {
+    if (!scheduleDate) return;
+    updateProjectField(pid, 'scheduledDate', scheduleDate);
+    updateProjectField(pid, 'status', 'scheduled');
+    setIsScheduled(true);
+    setShowScheduler(false);
+  };
 
   const exportDocx = async () => {
     const { Document, Packer, Paragraph, TextRun, HeadingLevel, ExternalHyperlink, AlignmentType, BorderStyle } = await import('docx');
@@ -275,12 +289,59 @@ function FinalPreview({ project, workspace, persona, topic }: {
         )}
       </div>
 
-      {/* Export bar */}
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: 12, borderRadius: 8, background: '#065f46', border: '1px solid #00c875' }}>
-        <button className="seo-btn seo-btn-primary" onClick={exportDocx} style={{ background: '#00c875', border: 'none', fontWeight: 700 }}>
-          <Download size={14} /> Download .DOC (Full Content + Images + Links)
-        </button>
-      </div>
+      {/* Action bar */}
+      {isScheduled ? (
+        <div style={{ padding: 16, borderRadius: 8, background: '#065f46', border: '1px solid #00c875', textAlign: 'center' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#00c875', marginBottom: 4 }}>✅ Scheduled!</div>
+          <div style={{ fontSize: 12, color: '#6ee7b7' }}>
+            This content is scheduled for <strong>{new Date(project.scheduledDate ?? '').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>
+          </div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Return to workspace to manage scheduled posts.</div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
+            <button className="seo-btn seo-btn-ghost" onClick={exportDocx} style={{ fontSize: 11 }}>
+              <Download size={12} /> Download .DOCX
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Schedule section */}
+          {showScheduler ? (
+            <div style={{ padding: 14, borderRadius: 8, background: '#1e293b', border: '1px solid #3730a3' }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: '#818cf8', marginBottom: 8 }}>📅 Schedule This Post</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #334155', background: '#0f172a', color: '#e2e8f0', fontSize: 13 }}
+                />
+                <button
+                  className="seo-btn seo-btn-primary"
+                  onClick={handleSchedule}
+                  disabled={!scheduleDate}
+                  style={{ background: scheduleDate ? '#6366f1' : '#334155', border: 'none', fontWeight: 700, opacity: scheduleDate ? 1 : 0.5 }}
+                >
+                  <Check size={14} /> Confirm Schedule
+                </button>
+                <button className="seo-btn seo-btn-ghost" onClick={() => setShowScheduler(false)} style={{ fontSize: 11 }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: 12, borderRadius: 8, background: '#1e1e2e', border: '1px solid var(--border-subtle)' }}>
+              <button className="seo-btn seo-btn-primary" onClick={exportDocx} style={{ background: '#00c875', border: 'none', fontWeight: 700 }}>
+                <Download size={14} /> Download .DOCX
+              </button>
+              <button className="seo-btn seo-btn-primary" onClick={() => setShowScheduler(true)} style={{ background: '#6366f1', border: 'none', fontWeight: 700 }}>
+                📅 Schedule This Post
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

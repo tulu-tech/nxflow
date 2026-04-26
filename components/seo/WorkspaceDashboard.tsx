@@ -128,7 +128,7 @@ function parseKeywordFile(
 export function WorkspaceDashboard({ workspace }: Props) {
   const router = useRouter();
   const { updateWorkspace, updateKeywordList, updateSitemap, setSitemapStatus, togglePlatform } = useWorkspaceStore();
-  const { createProject, projects } = useSEOStore();
+  const { createProject, projects, updateProjectField } = useSEOStore();
   const { addProjectToWorkspace } = useWorkspaceStore();
 
   const [editingBrand, setEditingBrand] = useState(false);
@@ -872,26 +872,110 @@ export function WorkspaceDashboard({ workspace }: Props) {
           </div>
         )}
 
-        {wsProjects.length > 0 ? (
-          <div className="seo-projects-grid">
-            {wsProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} workspaceId={workspace.id} />
-            ))}
-          </div>
-        ) : (
-          <div className="seo-card" style={{ textAlign: 'center', padding: '32px 24px' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-              No content yet
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Create your first SEO content project for {workspace.brandName}
-            </div>
-            <button className="seo-btn seo-btn-primary" onClick={handleStartCreate}>
-              <Plus size={14} /> Create Content
-            </button>
-          </div>
-        )}
+        {(() => {
+          const scheduled = wsProjects.filter(p => p.status === 'scheduled');
+          const published = wsProjects.filter(p => p.status === 'published');
+          const drafts = wsProjects.filter(p => !['scheduled', 'published'].includes(p.status));
+
+          const handlePublish = (projectId: string) => {
+            updateProjectField(projectId, 'status', 'published');
+            updateProjectField(projectId, 'publishedDate', new Date().toISOString());
+          };
+
+          return (
+            <>
+              {/* Scheduled Posts */}
+              {scheduled.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 14 }}>📅</span>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, color: '#818cf8', margin: 0 }}>Scheduled ({scheduled.length})</h4>
+                  </div>
+                  <div className="seo-projects-grid">
+                    {scheduled.map((project) => (
+                      <div key={project.id} style={{ position: 'relative' }}>
+                        <div style={{
+                          position: 'absolute', top: 8, right: 8, zIndex: 2,
+                          display: 'flex', gap: 4, alignItems: 'center',
+                        }}>
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: '#3730a3', color: '#c7d2fe', fontWeight: 600,
+                          }}>
+                            📅 {project.scheduledDate ? new Date(project.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handlePublish(project.id); }}
+                            style={{
+                              fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                              background: '#065f46', color: '#6ee7b7', fontWeight: 700,
+                              border: '1px solid #00c875', cursor: 'pointer',
+                            }}
+                          >
+                            ✅ Publish
+                          </button>
+                        </div>
+                        <ProjectCard project={project} workspaceId={workspace.id} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Published Posts */}
+              {published.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 14 }}>✅</span>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, color: '#00c875', margin: 0 }}>Published ({published.length})</h4>
+                  </div>
+                  <div className="seo-projects-grid">
+                    {published.map((project) => (
+                      <div key={project.id} style={{ position: 'relative' }}>
+                        <div style={{
+                          position: 'absolute', top: 8, right: 8, zIndex: 2,
+                          fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                          background: '#065f46', color: '#6ee7b7', fontWeight: 600,
+                        }}>
+                          ✅ Published {project.publishedDate ? new Date(project.publishedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                        </div>
+                        <ProjectCard project={project} workspaceId={workspace.id} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Draft / In-Progress */}
+              {drafts.length > 0 ? (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 14 }}>📝</span>
+                    <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Drafts ({drafts.length})</h4>
+                  </div>
+                  <div className="seo-projects-grid">
+                    {drafts.map((project) => (
+                      <ProjectCard key={project.id} project={project} workspaceId={workspace.id} />
+                    ))}
+                  </div>
+                </div>
+              ) : wsProjects.length === 0 ? (
+                <div className="seo-card" style={{ textAlign: 'center', padding: '32px 24px' }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                    No content yet
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+                    Create your first SEO content project for {workspace.brandName}
+                  </div>
+                  <button className="seo-btn seo-btn-primary" onClick={handleStartCreate}>
+                    <Plus size={14} /> Create Content
+                  </button>
+                </div>
+              ) : null}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

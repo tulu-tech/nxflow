@@ -176,6 +176,8 @@ export const useSEOStore = create<SEOState>()(
           linkPlan: null,
           revisionNotes: [],
           finalOutput: null,
+          scheduledDate: null,
+          publishedDate: null,
           createdAt: now,
           updatedAt: now,
         };

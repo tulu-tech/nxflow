@@ -1,7 +1,7 @@
 // ─── Enums & Literals ────────────────────────────────────────────────────────
 
 export type BusinessType = 'B2B' | 'B2C' | 'B2G' | 'Both';
-export type ProjectStatus = 'draft' | 'in-progress' | 'completed';
+export type ProjectStatus = 'draft' | 'in-progress' | 'completed' | 'scheduled' | 'published';
 export type SearchIntent = 'informational' | 'navigational' | 'commercial' | 'transactional';
 export type FunnelStage = 'top' | 'middle' | 'bottom';
 export type KeywordCategory = 'primary' | 'secondary' | 'supporting';
@@ -224,6 +224,8 @@ export interface SEOProject {
   linkPlan: LinkPlan | null;
   revisionNotes: RevisionNote[];
   finalOutput: PublishPackage | null;
+  scheduledDate: string | null;
+  publishedDate: string | null;
   createdAt: string;
   updatedAt: string;
 }
