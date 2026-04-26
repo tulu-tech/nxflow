@@ -376,9 +376,9 @@ export function AIStep({ step, phase, workspace, project, persona, topic, platfo
 
       {/* Context badges */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-        {persona && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(129,140,248,0.1)', color: 'var(--accent)' }}>👤 {persona.name}</span>}
-        {topic && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(253,171,61,0.1)', color: '#fdab3d' }}>📚 {topic.topicName ?? topic.topic}</span>}
-        {platformFormat && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(0,200,117,0.1)', color: '#00c875' }}>📡 {platformFormat}</span>}
+        {persona && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: '#3730a3', color: '#c7d2fe', fontWeight: 500 }}>👤 {persona.name}</span>}
+        {topic && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: '#78350f', color: '#fcd34d', fontWeight: 500 }}>📚 {topic.topicName ?? topic.topic}</span>}
+        {platformFormat && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 4, background: '#065f46', color: '#6ee7b7', fontWeight: 500 }}>📡 {platformFormat}</span>}
       </div>
 
       {/* Error */}

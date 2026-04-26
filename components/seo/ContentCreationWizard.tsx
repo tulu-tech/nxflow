@@ -29,9 +29,9 @@ function WizardNav({ step, maxStep }: { step: number; maxStep: number }) {
           <div key={p.step} style={{
             display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px',
             borderRadius: 6, fontSize: 11, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap',
-            background: active ? 'rgba(129,140,248,0.12)' : done ? 'rgba(0,200,117,0.06)' : 'transparent',
-            color: active ? 'var(--accent)' : done ? '#00c875' : locked ? 'var(--text-muted)' : 'var(--text-secondary)',
-            border: active ? '1px solid var(--accent)' : '1px solid transparent',
+            background: active ? '#3730a3' : done ? 'rgba(0,200,117,0.08)' : 'transparent',
+            color: active ? '#c7d2fe' : done ? '#00c875' : locked ? 'var(--text-muted)' : 'var(--text-secondary)',
+            border: active ? '1px solid #6366f1' : '1px solid transparent',
             opacity: locked ? 0.4 : 1,
           }}>
             <span style={{ fontSize: 13 }}>{done ? '✓' : p.icon}</span>
