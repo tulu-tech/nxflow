@@ -1,4 +1,4 @@
-import { BusinessType, KeywordEntry } from './types';
+import { BusinessType } from './types';
 
 // ─── Platform Types ──────────────────────────────────────────────────────────
 
@@ -80,6 +80,45 @@ export interface ContentEntry {
   platform?: PlatformType;
   scheduledAt?: string;
   publishedAt?: string;
+  // Tracking fields for dashboard display
+  targetPersonaId?: string;
+  targetPersonaName?: string;
+  targetTopicId?: string;
+  targetTopicName?: string;
+  primaryKeyword?: string;
+  primaryKeywordTag?: string;
+  primaryKeywordVolume?: number | null;
+  primaryKeywordKD?: number | null;
+  primaryKeywordCPC?: number | null;
+  generatedAt?: string;
+}
+
+// ─── Workspace Keyword System ────────────────────────────────────────────────
+
+export type WorkspaceKeywordStatus = 'active' | 'archived';
+
+export interface WorkspaceKeywordUsage {
+  usedAsPrimaryCount: number;
+  usedAsSecondaryCount: number;
+  lastUsedAsPrimaryAt: string | null;
+  lastUsedAsSecondaryAt: string | null;
+  usedInContentIds: string[];
+}
+
+export interface WorkspaceKeyword {
+  keywordId: string;
+  workspaceId: string;
+  keyword: string;
+  normalizedKeyword: string;
+  tag: string;
+  kd: number | null;
+  cpc: number | null;
+  volume: number | null;
+  sourceFile: string;
+  uploadedAt: string;
+  keywordListVersion: number;
+  status: WorkspaceKeywordStatus;
+  usage: WorkspaceKeywordUsage;
 }
 
 // ─── Persona Library ─────────────────────────────────────────────────────────
@@ -134,7 +173,7 @@ export interface SEOWorkspace {
   complianceNotes: string;
 
   // SEO Assets — Keywords
-  keywordList: KeywordEntry[];
+  keywordList: WorkspaceKeyword[];
   keywordListUploadedAt: string | null;
   keywordListVersion: number;
 

@@ -124,6 +124,26 @@ export const useSEOStore = create<SEOState>()(
             }
           : emptyIntake();
 
+        // Map workspace keywords (WorkspaceKeyword) to project-level KeywordEntry
+        const projectKeywords: KeywordEntry[] = workspace?.keywordList
+          ? workspace.keywordList
+              .filter((wk) => wk.status === 'active')
+              .map((wk, idx) => ({
+                id: wk.keywordId,
+                keyword: wk.keyword,
+                searchIntent: 'informational' as const,
+                funnelStage: 'top' as const,
+                businessRelevance: 7,
+                conversionValue: wk.cpc && wk.cpc > 2 ? 8 : 5,
+                contentOpportunity: '',
+                category: idx === 0 ? 'primary' as const : idx < 5 ? 'secondary' as const : 'supporting' as const,
+                searchVolume: wk.volume ?? undefined,
+                keywordDifficulty: wk.kd ?? undefined,
+                cpc: wk.cpc ?? undefined,
+                validationStatus: 'approved' as const,
+              }))
+          : [];
+
         const project: SEOProject = {
           id,
           workspaceId: workspace?.id ?? null,
@@ -132,10 +152,11 @@ export const useSEOStore = create<SEOState>()(
           currentPhase: workspace ? 2 : 1,  // skip Brand Discovery if workspace provided
           status: workspace ? 'in-progress' : 'draft',
           brandIntake: intake,
-          keywords: workspace?.keywordList ?? [],
+          keywords: projectKeywords,
           keywordClusters: [],
           primaryKeyword: null,
           secondaryKeywords: [],
+          contentKeywordRecord: null,
           briefSelections: { contentTopics: [], targetOrganizations: [], targetJobTitles: [], contentFormat: [] },
           userBriefInput: '',
           contentBrief: null,

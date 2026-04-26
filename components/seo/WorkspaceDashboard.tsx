@@ -1,8 +1,7 @@
 'use client';
 
-import type { SEOWorkspace } from '@/lib/seo/workspaceTypes';
+import type { SEOWorkspace, WorkspaceKeyword } from '@/lib/seo/workspaceTypes';
 import { PLATFORM_LABELS, PLATFORM_ICONS, PlatformType } from '@/lib/seo/workspaceTypes';
-import { KeywordEntry } from '@/lib/seo/types';
 import { useWorkspaceStore } from '@/store/seoWorkspaceStore';
 import { useSEOStore } from '@/store/seoStore';
 import { useRouter } from 'next/navigation';
@@ -25,55 +24,86 @@ function normalizeHeader(h: string): string {
   return h.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function parseKeywordFile(buffer: ArrayBuffer): KeywordEntry[] {
+function normalizeKeyword(kw: string): string {
+  return kw.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function parseKeywordFile(
+  buffer: ArrayBuffer,
+  workspaceId: string,
+  version: number,
+  fileName: string,
+): { keywords: WorkspaceKeyword[]; errors: string[] } {
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
-  if (raw.length === 0) return [];
+  if (raw.length === 0) return { keywords: [], errors: ['File is empty.'] };
 
   const headers = Object.keys(raw[0]);
   const colMap: Record<string, string> = {};
   for (const h of headers) {
     const norm = normalizeHeader(h);
     if (norm.includes('keyword') && !norm.includes('diff')) colMap.keyword = h;
+    else if (norm === 'tag' || norm === 'tags' || norm === 'label' || norm === 'category') colMap.tag = h;
     else if (norm.includes('volume') || norm === 'searchvolume' || norm === 'sv') colMap.volume = h;
     else if (norm.includes('difficulty') || norm === 'kd' || norm === 'keyworddiff') colMap.kd = h;
     else if (norm.includes('cpc') || norm.includes('cost')) colMap.cpc = h;
-    else if (norm.includes('intent') || norm === 'searchintent') colMap.intent = h;
   }
   if (!colMap.keyword) colMap.keyword = headers[0];
 
-  return raw
-    .filter((row) => row[colMap.keyword])
-    .map((row, idx) => {
-      const kw = String(row[colMap.keyword]).trim();
-      const volume = colMap.volume ? Number(row[colMap.volume]) || 0 : undefined;
-      const kd = colMap.kd ? Number(row[colMap.kd]) || 0 : undefined;
-      const cpc = colMap.cpc ? Number(row[colMap.cpc]) || 0 : undefined;
-      const intentRaw = colMap.intent ? String(row[colMap.intent] || '') : '';
-      const v = intentRaw.toLowerCase().trim();
-      const intent =
-        v.startsWith('info') || v === 'i' ? 'informational' as const :
-        v.startsWith('nav') || v === 'n' ? 'navigational' as const :
-        v.startsWith('comm') || v === 'c' ? 'commercial' as const :
-        v.startsWith('trans') || v === 't' ? 'transactional' as const :
-        'informational' as const;
+  const errors: string[] = [];
+  const now = new Date().toISOString();
+  const seen = new Set<string>();
 
-      return {
-        id: `kw-${idx}`,
-        keyword: kw,
-        searchIntent: intent,
-        funnelStage: intent === 'transactional' ? 'bottom' as const : intent === 'commercial' || intent === 'navigational' ? 'middle' as const : 'top' as const,
-        businessRelevance: 7,
-        conversionValue: intent === 'transactional' ? 9 : intent === 'commercial' ? 7 : 5,
-        contentOpportunity: '',
-        category: idx === 0 ? 'primary' as const : idx < 5 ? 'secondary' as const : 'supporting' as const,
-        searchVolume: volume,
-        keywordDifficulty: kd,
-        cpc: cpc,
-        validationStatus: 'approved' as const,
-      };
+  const keywords: WorkspaceKeyword[] = [];
+
+  for (let idx = 0; idx < raw.length; idx++) {
+    const row = raw[idx];
+    const kwRaw = row[colMap.keyword];
+    if (!kwRaw || !String(kwRaw).trim()) {
+      errors.push(`Row ${idx + 2}: Missing keyword — skipped.`);
+      continue;
+    }
+    const kw = String(kwRaw).trim();
+    const normalized = normalizeKeyword(kw);
+
+    // Deduplicate
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    const tagRaw = colMap.tag ? String(row[colMap.tag] ?? '').trim() : '';
+    if (!tagRaw) {
+      errors.push(`Row ${idx + 2}: "${kw}" has no tag — defaulting to "untagged".`);
+    }
+
+    const volumeRaw = colMap.volume ? row[colMap.volume] : null;
+    const kdRaw = colMap.kd ? row[colMap.kd] : null;
+    const cpcRaw = colMap.cpc ? row[colMap.cpc] : null;
+
+    keywords.push({
+      keywordId: `wk-${version}-${idx}`,
+      workspaceId,
+      keyword: kw,
+      normalizedKeyword: normalized,
+      tag: tagRaw || 'untagged',
+      kd: kdRaw !== null && kdRaw !== '' && !isNaN(Number(kdRaw)) ? Number(kdRaw) : null,
+      cpc: cpcRaw !== null && cpcRaw !== '' && !isNaN(Number(cpcRaw)) ? Number(cpcRaw) : null,
+      volume: volumeRaw !== null && volumeRaw !== '' && !isNaN(Number(volumeRaw)) ? Number(volumeRaw) : null,
+      sourceFile: fileName,
+      uploadedAt: now,
+      keywordListVersion: version,
+      status: 'active',
+      usage: {
+        usedAsPrimaryCount: 0,
+        usedAsSecondaryCount: 0,
+        lastUsedAsPrimaryAt: null,
+        lastUsedAsSecondaryAt: null,
+        usedInContentIds: [],
+      },
     });
+  }
+
+  return { keywords, errors };
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -127,11 +157,15 @@ export function WorkspaceDashboard({ workspace }: Props) {
     setKwError(null);
     try {
       const buffer = await file.arrayBuffer();
-      const parsed = parseKeywordFile(buffer);
-      if (parsed.length === 0) {
-        setKwError('No keywords found in file.');
+      const nextVersion = workspace.keywordListVersion + 1;
+      const { keywords, errors } = parseKeywordFile(buffer, workspace.id, nextVersion, file.name);
+      if (keywords.length === 0) {
+        setKwError(errors.length > 0 ? errors.join(' ') : 'No keywords found in file.');
       } else {
-        updateKeywordList(workspace.id, parsed);
+        updateKeywordList(workspace.id, keywords);
+        if (errors.length > 0) {
+          setKwError(`Imported ${keywords.length} keywords. Warnings: ${errors.slice(0, 3).join(' ')}${errors.length > 3 ? ` +${errors.length - 3} more` : ''}`);
+        }
       }
     } catch {
       setKwError('Failed to parse file.');
@@ -196,7 +230,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
       {/* Overview stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
         {[
-          { icon: <Tag size={16} />, label: 'Keywords', value: workspace.keywordList.length, color: workspace.keywordList.length > 0 ? '#00c875' : 'var(--text-muted)', sub: workspace.keywordListUploadedAt ? `v${workspace.keywordListVersion}` : 'Not uploaded' },
+          { icon: <Tag size={16} />, label: 'Keywords', value: workspace.keywordList.length, color: workspace.keywordList.length > 0 ? '#00c875' : 'var(--text-muted)', sub: workspace.keywordList.length > 0 ? `${new Set(workspace.keywordList.map(k => k.tag)).size} tags · ${workspace.keywordList.filter(k => k.usage.usedAsPrimaryCount > 0).length} used` : 'Not uploaded' },
           { icon: <FileText size={16} />, label: 'Projects', value: wsProjects.length, color: wsProjects.length > 0 ? '#818cf8' : 'var(--text-muted)', sub: `${wsProjects.filter(p => p.status === 'completed').length} completed` },
           { icon: <Map size={16} />, label: 'Sitemap', value: workspace.sitemapUrl ? '✓' : '—', color: workspace.sitemapUrl ? '#00c875' : 'var(--text-muted)', sub: workspace.sitemapUrl ? workspace.sitemapPages.length + ' pages' : 'Not set' },
         ].map((stat, i) => (
@@ -336,44 +370,84 @@ export function WorkspaceDashboard({ workspace }: Props) {
           )}
 
           {workspace.keywordList.length > 0 ? (
-            <div style={{ maxHeight: 220, overflow: 'auto', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
-              <table className="seo-table">
-                <thead>
-                  <tr>
-                    <th>Keyword</th>
-                    <th style={{ width: 70 }}>Vol</th>
-                    <th style={{ width: 50 }}>KD</th>
-                    <th style={{ width: 80 }}>Intent</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workspace.keywordList.slice(0, 15).map((kw) => (
-                    <tr key={kw.id}>
-                      <td style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 12 }}>{kw.keyword}</td>
-                      <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{kw.searchVolume?.toLocaleString() ?? '—'}</td>
-                      <td style={{ fontSize: 11, fontWeight: 600, color: (kw.keywordDifficulty || 0) > 70 ? '#e2445c' : (kw.keywordDifficulty || 0) > 40 ? '#fdab3d' : '#00c875' }}>
-                        {kw.keywordDifficulty ?? '—'}
-                      </td>
-                      <td>
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(129,140,248,0.12)', color: 'var(--accent)', textTransform: 'capitalize' }}>
-                          {kw.searchIntent}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {workspace.keywordList.length > 15 && (
+            <div>
+              {/* Tag summary */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                {(() => {
+                  const tags: Record<string, number> = {};
+                  workspace.keywordList.forEach((kw) => { tags[kw.tag] = (tags[kw.tag] || 0) + 1; });
+                  return Object.entries(tags).sort((a, b) => b[1] - a[1]).map(([tag, count]) => (
+                    <span key={tag} style={{
+                      fontSize: 10, padding: '2px 6px', borderRadius: 3,
+                      background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)',
+                    }}>
+                      {tag} ({count})
+                    </span>
+                  ));
+                })()}
+              </div>
+              <div style={{ maxHeight: 260, overflow: 'auto', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+                <table className="seo-table">
+                  <thead>
                     <tr>
-                      <td colSpan={4} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', padding: 8 }}>
-                        +{workspace.keywordList.length - 15} more
-                      </td>
+                      <th>Keyword</th>
+                      <th style={{ width: 80 }}>Tag</th>
+                      <th style={{ width: 60 }}>Vol</th>
+                      <th style={{ width: 40 }}>KD</th>
+                      <th style={{ width: 50 }}>CPC</th>
+                      <th style={{ width: 50 }}>Used</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {workspace.keywordList.slice(0, 20).map((kw) => (
+                      <tr key={kw.keywordId} style={{ opacity: kw.usage.usedAsPrimaryCount > 0 ? 0.65 : 1 }}>
+                        <td style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 12 }}>
+                          {kw.keyword}
+                          {kw.usage.usedAsPrimaryCount > 0 && (
+                            <span style={{ fontSize: 9, color: '#fdab3d', marginLeft: 4 }}>⚡ primary</span>
+                          )}
+                        </td>
+                        <td>
+                          <span style={{
+                            fontSize: 10, padding: '1px 5px', borderRadius: 3,
+                            background: 'rgba(129,140,248,0.10)', color: 'var(--accent)',
+                          }}>
+                            {kw.tag}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {kw.volume?.toLocaleString() ?? '—'}
+                        </td>
+                        <td style={{
+                          fontSize: 11, fontWeight: 600,
+                          color: (kw.kd || 0) > 70 ? '#e2445c' : (kw.kd || 0) > 40 ? '#fdab3d' : '#00c875',
+                        }}>
+                          {kw.kd ?? '—'}
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : '—'}
+                        </td>
+                        <td style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>
+                          {kw.usage.usedAsPrimaryCount + kw.usage.usedAsSecondaryCount > 0
+                            ? `${kw.usage.usedAsPrimaryCount}p/${kw.usage.usedAsSecondaryCount}s`
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                    {workspace.keywordList.length > 20 && (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', padding: 8 }}>
+                          +{workspace.keywordList.length - 20} more keywords
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
-              No keywords uploaded yet. Upload a .xlsx or .csv file.
+              No keywords uploaded yet. Upload a .xlsx or .csv file with columns: keyword, tag, volume, kd, cpc
             </div>
           )}
         </div>

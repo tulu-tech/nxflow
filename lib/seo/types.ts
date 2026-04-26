@@ -172,6 +172,21 @@ export interface PublishPackage {
   exportedAt: string;
 }
 
+// ─── Content Keyword Record ──────────────────────────────────────────────────
+
+export interface ContentKeywordRecord {
+  primaryKeyword: string;
+  primaryKeywordId: string | null;
+  primaryKeywordTag: string;
+  primaryKeywordVolume: number | null;
+  primaryKeywordKD: number | null;
+  primaryKeywordCPC: number | null;
+  secondaryKeywords: string[];
+  secondaryKeywordIds: string[];
+  keywordSelectionReason: string;
+  keywordSelectionMetadata: Record<string, unknown>;
+}
+
 // ─── Project ─────────────────────────────────────────────────────────────────
 
 export interface SEOProject {
@@ -186,6 +201,7 @@ export interface SEOProject {
   keywordClusters: KeywordCluster[];
   primaryKeyword: string | null;
   secondaryKeywords: string[];
+  contentKeywordRecord: ContentKeywordRecord | null;
   briefSelections: BriefSelections;
   userBriefInput: string;
   contentBrief: ContentBrief | null;

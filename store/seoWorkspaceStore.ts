@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { KeywordEntry } from '../lib/seo/types';
 import type {
   SEOWorkspace,
   PlatformConfig,
   PlatformType,
   WorkspaceAsset,
   ContentEntry,
+  WorkspaceKeyword,
 } from '../lib/seo/workspaceTypes';
 import { ALL_PLATFORMS } from '../lib/seo/workspaceTypes';
 
@@ -28,7 +28,8 @@ interface WorkspaceState {
   deleteWorkspace: (id: string) => void;
 
   // Keyword management
-  updateKeywordList: (id: string, keywords: KeywordEntry[]) => void;
+  updateKeywordList: (id: string, keywords: WorkspaceKeyword[]) => void;
+  recordKeywordUsage: (workspaceId: string, contentId: string, primaryKeywordId: string | null, secondaryKeywordIds: string[]) => void;
 
   // Sitemap management
   updateSitemap: (id: string, url: string, pages?: string[]) => void;
@@ -130,6 +131,33 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           });
         }),
 
+      recordKeywordUsage: (workspaceId, contentId, primaryKeywordId, secondaryKeywordIds) =>
+        set((s) => {
+          const ws = s.workspaces[workspaceId];
+          if (!ws) return s;
+          const now = new Date().toISOString();
+          const updatedList = ws.keywordList.map((kw) => {
+            const isPrimary = kw.keywordId === primaryKeywordId;
+            const isSecondary = secondaryKeywordIds.includes(kw.keywordId);
+            if (!isPrimary && !isSecondary) return kw;
+            const usedInContentIds = kw.usage.usedInContentIds.includes(contentId)
+              ? kw.usage.usedInContentIds
+              : [...kw.usage.usedInContentIds, contentId];
+            return {
+              ...kw,
+              usage: {
+                ...kw.usage,
+                usedAsPrimaryCount: kw.usage.usedAsPrimaryCount + (isPrimary ? 1 : 0),
+                usedAsSecondaryCount: kw.usage.usedAsSecondaryCount + (isSecondary ? 1 : 0),
+                lastUsedAsPrimaryAt: isPrimary ? now : kw.usage.lastUsedAsPrimaryAt,
+                lastUsedAsSecondaryAt: isSecondary ? now : kw.usage.lastUsedAsSecondaryAt,
+                usedInContentIds,
+              },
+            };
+          });
+          return patchWorkspace(s, workspaceId, { keywordList: updatedList });
+        }),
+
       updateSitemap: (id, url, pages) =>
         set((s) =>
           patchWorkspace(s, id, {
@@ -203,6 +231,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return patchWorkspace(s, workspaceId, { contentEntries: entries });
         }),
     }),
-    { name: 'nxflow-seo-workspaces', version: 1 }
+    { name: 'nxflow-seo-workspaces', version: 2 }
   )
 );
