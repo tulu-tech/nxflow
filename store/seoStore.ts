@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import {
   SEOProject,
   BrandIntake,
+  BusinessType,
   BriefSelections,
   KeywordEntry,
   ContentBrief,
@@ -13,6 +14,7 @@ import {
   RevisionNote,
   PublishPackage,
 } from '../lib/seo/types';
+import type { SEOWorkspace } from '../lib/seo/workspaceTypes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,7 +48,7 @@ interface SEOState {
   projects: Record<string, SEOProject>;
   activeProjectId: string | null;
 
-  createProject: (name: string) => string;
+  createProject: (name: string, workspace?: SEOWorkspace) => string;
   deleteProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
 
@@ -93,16 +95,43 @@ export const useSEOStore = create<SEOState>()(
       projects: {},
       activeProjectId: null,
 
-      createProject: (name) => {
+      createProject: (name, workspace?) => {
         const id = genId();
         const now = new Date().toISOString();
+
+        // Build brandIntake from workspace if provided
+        const intake: BrandIntake = workspace
+          ? {
+              brandName: workspace.brandName,
+              websiteUrl: workspace.websiteUrl,
+              industry: workspace.industry,
+              products: workspace.coreOffer,
+              keyProducts: '',
+              targetAudience: workspace.targetMarket,
+              painPoints: '',
+              businessType: workspace.businessType as BusinessType,
+              targetCountries: workspace.targetCountries,
+              targetLanguage: 'English',
+              businessGoal: workspace.conversionGoals,
+              competitors: '',
+              toneOfVoice: workspace.toneOfVoice,
+              articleStyle: workspace.articleStyle,
+              pageType: 'blog',
+              priorityTopic: '',
+              internalPages: '',
+              domainAuthority: '',
+              specialFocus: workspace.brandDifferentiators,
+            }
+          : emptyIntake();
+
         const project: SEOProject = {
           id,
+          workspaceId: workspace?.id ?? null,
           name,
-          currentPhase: 1,
-          status: 'draft',
-          brandIntake: emptyIntake(),
-          keywords: [],
+          currentPhase: workspace ? 2 : 1,  // skip Brand Discovery if workspace provided
+          status: workspace ? 'in-progress' : 'draft',
+          brandIntake: intake,
+          keywords: workspace?.keywordList ?? [],
           keywordClusters: [],
           primaryKeyword: null,
           secondaryKeywords: [],

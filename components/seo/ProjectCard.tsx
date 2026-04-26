@@ -7,6 +7,7 @@ import { Trash2 } from 'lucide-react';
 
 interface Props {
   project: SEOProject;
+  workspaceId?: string;
 }
 
 const statusLabels: Record<string, string> = {
@@ -21,7 +22,7 @@ const statusClasses: Record<string, string> = {
   completed: 'seo-badge-completed',
 };
 
-export function ProjectCard({ project }: Props) {
+export function ProjectCard({ project, workspaceId }: Props) {
   const router = useRouter();
   const { deleteProject } = useSEOStore();
 
@@ -33,10 +34,15 @@ export function ProjectCard({ project }: Props) {
     return `${Math.floor(diff / 86400000)}d ago`;
   };
 
+  const wid = workspaceId || project.workspaceId;
+  const href = wid
+    ? `/seoagent/workspace/${wid}/project/${project.id}`
+    : `/seoagent/project/${project.id}`;
+
   return (
     <div
       className="seo-card seo-card-clickable"
-      onClick={() => router.push(`/seoagent/project/${project.id}`)}
+      onClick={() => router.push(href)}
     >
       <div className="seo-project-card-header">
         <span className="seo-project-card-name">{project.name}</span>
@@ -82,3 +88,4 @@ export function ProjectCard({ project }: Props) {
     </div>
   );
 }
+
