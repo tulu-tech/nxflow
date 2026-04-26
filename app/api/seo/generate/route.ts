@@ -895,6 +895,30 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
+    // Normalize: ensure body.workspace exists (AIStep may send workspaceData instead)
+    if (!body.workspace && body.workspaceData) {
+      body.workspace = {
+        workspaceId: body.workspaceData.id ?? '',
+        brandName: body.workspaceData.brandName ?? '',
+        websiteUrl: body.workspaceData.websiteUrl ?? '',
+        industry: body.workspaceData.industry ?? '',
+        businessType: body.workspaceData.businessType ?? '',
+        targetMarket: body.workspaceData.targetMarket ?? '',
+        targetCountries: body.workspaceData.targetCountries ?? [],
+        brandDifferentiators: body.workspaceData.brandDifferentiators ?? '',
+        complianceNotes: body.workspaceData.complianceNotes ?? '',
+        toneOfVoice: body.workspaceData.toneOfVoice ?? '',
+        coreOffer: body.workspaceData.coreOffer ?? '',
+        conversionGoals: body.workspaceData.conversionGoals ?? '',
+        primaryCTA: body.workspaceData.primaryCTA ?? '',
+      };
+    }
+
+    // Normalize: ensure body.keywordStrategy exists (may come as approvedKeywordStrategy)
+    if (!body.keywordStrategy && body.approvedKeywordStrategy) {
+      body.keywordStrategy = body.approvedKeywordStrategy;
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
