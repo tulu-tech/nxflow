@@ -676,7 +676,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
       </div>
 
       {/* Content Tracker */}
-      <ContentTracker workspaceId={workspace.id} content={workspace.generatedContent ?? []} />
+      <ContentTracker workspaceId={workspace.id} workspaceName={workspace.brandName} content={workspace.generatedContent ?? []} />
 
       {/* Content Projects */}
       <div style={{ marginBottom: 24 }}>

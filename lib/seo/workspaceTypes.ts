@@ -167,6 +167,11 @@ export interface WorkspaceContent {
   generatedImages: Array<Record<string, unknown>>;
   finalContent: string;
 
+  // DOCX Export
+  docxGenerated: boolean;
+  docxFileUrl: string | null;
+  docxGeneratedAt: string | null;
+
   // Timestamps
   createdAt: string;
   updatedAt: string;

@@ -4,10 +4,12 @@ import { useState, useMemo } from 'react';
 import type { WorkspaceContent, ContentStatus, ContentPlatformFormat } from '@/lib/seo/workspaceTypes';
 import { CONTENT_FORMAT_LABELS } from '@/lib/seo/workspaceTypes';
 import { useWorkspaceStore } from '@/store/seoWorkspaceStore';
-import { FileText, Filter, Eye, Pencil, Calendar, CheckCircle, Archive, Copy, Link, Image, Tag, X } from 'lucide-react';
+import { generateContentDocx, buildDocxFileName } from '@/lib/seo/docxExport';
+import { FileText, Filter, Eye, Pencil, Calendar, CheckCircle, Archive, Copy, Link, Image, Tag, X, Download } from 'lucide-react';
 
 interface Props {
   workspaceId: string;
+  workspaceName: string;
   content: WorkspaceContent[];
 }
 
@@ -18,7 +20,7 @@ const STATUS_COLORS: Record<ContentStatus, { bg: string; text: string; label: st
   archived: { bg: 'rgba(128,128,128,0.1)', text: '#888', label: 'Archived' },
 };
 
-export function ContentTracker({ workspaceId, content }: Props) {
+export function ContentTracker({ workspaceId, workspaceName, content }: Props) {
   const { updateContentStatus, deleteGeneratedContent, addGeneratedContent } = useWorkspaceStore();
   const [statusFilter, setStatusFilter] = useState<ContentStatus | 'all'>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
@@ -64,6 +66,23 @@ export function ContentTracker({ workspaceId, content }: Props) {
       updatedAt: new Date().toISOString(),
     };
     addGeneratedContent(workspaceId, dup);
+  };
+
+  const handleDocxExport = async (item: WorkspaceContent, wsName: string) => {
+    try {
+      const blob = await generateContentDocx(item, wsName);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = buildDocxFileName(wsName, item.contentSlug || item.contentTitle);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('DOCX export failed:', err);
+      alert('DOCX export failed. Check console for details.');
+    }
   };
 
   if (items.length === 0) return null;
@@ -216,6 +235,11 @@ export function ContentTracker({ workspaceId, content }: Props) {
                     <button className="seo-btn seo-btn-ghost seo-btn-sm" style={{ fontSize: 10, color: '#f87171' }} onClick={() => { if (confirm('Delete this content item?')) deleteGeneratedContent(workspaceId, item.contentId); }}>
                       <X size={10} /> Delete
                     </button>
+                    {(item.finalContent || item.linkedContent || item.rawContent) && (
+                      <button className="seo-btn seo-btn-secondary seo-btn-sm" style={{ fontSize: 10 }} onClick={() => handleDocxExport(item, workspaceName)}>
+                        <Download size={10} /> Download DOCX
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
