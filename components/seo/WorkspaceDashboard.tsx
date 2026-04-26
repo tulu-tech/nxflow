@@ -13,6 +13,7 @@ import {
 import * as XLSX from 'xlsx';
 import { ProjectCard } from './ProjectCard';
 import { ContentTracker } from './ContentTracker';
+import { KeywordManager } from './KeywordManager';
 import { BusinessType } from '@/lib/seo/types';
 import { MCM_WORKSPACE_ID } from '@/lib/seo/seeds/mcm';
 import { MCM_PERSONA_TOPIC_MAP } from '@/lib/seo/seeds/mcmPersonaTopics';
@@ -83,19 +84,32 @@ function parseKeywordFile(
     const kdRaw = colMap.kd ? row[colMap.kd] : null;
     const cpcRaw = colMap.cpc ? row[colMap.cpc] : null;
 
+    const volVal = volumeRaw !== null && volumeRaw !== '' && !isNaN(Number(volumeRaw)) ? Number(volumeRaw) : null;
+    const kdVal = kdRaw !== null && kdRaw !== '' && !isNaN(Number(kdRaw)) ? Number(kdRaw) : null;
+    const cpcVal = cpcRaw !== null && cpcRaw !== '' && !isNaN(Number(cpcRaw)) ? Number(cpcRaw) : null;
+    const tagVal = tagRaw || 'untagged';
+
+    // dataCompleteness: keyword always present=1, tag, kd, cpc, volume each add 0.2
+    let completeness = 0.2; // keyword present
+    if (tagVal !== 'untagged') completeness += 0.2;
+    if (kdVal !== null) completeness += 0.2;
+    if (cpcVal !== null) completeness += 0.2;
+    if (volVal !== null) completeness += 0.2;
+
     keywords.push({
       keywordId: `wk-${version}-${idx}`,
       workspaceId,
       keyword: kw,
       normalizedKeyword: normalized,
-      tag: tagRaw || 'untagged',
-      kd: kdRaw !== null && kdRaw !== '' && !isNaN(Number(kdRaw)) ? Number(kdRaw) : null,
-      cpc: cpcRaw !== null && cpcRaw !== '' && !isNaN(Number(cpcRaw)) ? Number(cpcRaw) : null,
-      volume: volumeRaw !== null && volumeRaw !== '' && !isNaN(Number(volumeRaw)) ? Number(volumeRaw) : null,
+      tag: tagVal,
+      kd: kdVal,
+      cpc: cpcVal,
+      volume: volVal,
       sourceFile: fileName,
       uploadedAt: now,
       keywordListVersion: version,
       status: 'active',
+      dataCompleteness: Math.round(completeness * 100) / 100,
       usage: {
         usedAsPrimaryCount: 0,
         usedAsSecondaryCount: 0,
@@ -394,118 +408,14 @@ export function WorkspaceDashboard({ workspace }: Props) {
           )}
         </div>
 
-        {/* Keyword List Card */}
-        <div className="seo-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              📊 Keyword List
-              {workspace.keywordList.length > 0 && (
-                <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
-                  v{workspace.keywordListVersion} · {workspace.keywordList.length} keywords
-                </span>
-              )}
-            </h3>
-            <div>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleKwUpload} style={{ display: 'none' }} />
-              <button
-                className="seo-btn seo-btn-secondary seo-btn-sm"
-                onClick={() => fileRef.current?.click()}
-                disabled={kwUploading}
-              >
-                <Upload size={12} />
-                {kwUploading ? 'Uploading…' : workspace.keywordList.length > 0 ? 'Replace' : 'Upload'}
-              </button>
-            </div>
-          </div>
-
-          {kwError && (
-            <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: 12, marginBottom: 10 }}>
-              {kwError}
-            </div>
-          )}
-
-          {workspace.keywordList.length > 0 ? (
-            <div>
-              {/* Tag summary */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-                {(() => {
-                  const tags: Record<string, number> = {};
-                  workspace.keywordList.forEach((kw) => { tags[kw.tag] = (tags[kw.tag] || 0) + 1; });
-                  return Object.entries(tags).sort((a, b) => b[1] - a[1]).map(([tag, count]) => (
-                    <span key={tag} style={{
-                      fontSize: 10, padding: '2px 6px', borderRadius: 3,
-                      background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)',
-                    }}>
-                      {tag} ({count})
-                    </span>
-                  ));
-                })()}
-              </div>
-              <div style={{ maxHeight: 260, overflow: 'auto', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
-                <table className="seo-table">
-                  <thead>
-                    <tr>
-                      <th>Keyword</th>
-                      <th style={{ width: 80 }}>Tag</th>
-                      <th style={{ width: 60 }}>Vol</th>
-                      <th style={{ width: 40 }}>KD</th>
-                      <th style={{ width: 50 }}>CPC</th>
-                      <th style={{ width: 50 }}>Used</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {workspace.keywordList.slice(0, 20).map((kw) => (
-                      <tr key={kw.keywordId} style={{ opacity: kw.usage.usedAsPrimaryCount > 0 ? 0.65 : 1 }}>
-                        <td style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 12 }}>
-                          {kw.keyword}
-                          {kw.usage.usedAsPrimaryCount > 0 && (
-                            <span style={{ fontSize: 9, color: '#fdab3d', marginLeft: 4 }}>⚡ primary</span>
-                          )}
-                        </td>
-                        <td>
-                          <span style={{
-                            fontSize: 10, padding: '1px 5px', borderRadius: 3,
-                            background: 'rgba(129,140,248,0.10)', color: 'var(--accent)',
-                          }}>
-                            {kw.tag}
-                          </span>
-                        </td>
-                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {kw.volume?.toLocaleString() ?? '—'}
-                        </td>
-                        <td style={{
-                          fontSize: 11, fontWeight: 600,
-                          color: (kw.kd || 0) > 70 ? '#e2445c' : (kw.kd || 0) > 40 ? '#fdab3d' : '#00c875',
-                        }}>
-                          {kw.kd ?? '—'}
-                        </td>
-                        <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : '—'}
-                        </td>
-                        <td style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>
-                          {kw.usage.usedAsPrimaryCount + kw.usage.usedAsSecondaryCount > 0
-                            ? `${kw.usage.usedAsPrimaryCount}p/${kw.usage.usedAsSecondaryCount}s`
-                            : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                    {workspace.keywordList.length > 20 && (
-                      <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-muted)', padding: 8 }}>
-                          +{workspace.keywordList.length - 20} more keywords
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
-              No keywords uploaded yet. Upload a .xlsx or .csv file with columns: keyword, tag, volume, kd, cpc
-            </div>
-          )}
-        </div>
+        {/* Keyword Library */}
+        <KeywordManager
+          workspaceId={workspace.id}
+          keywords={workspace.keywordList}
+          versions={workspace.keywordVersions ?? []}
+          currentVersion={workspace.keywordListVersion}
+          lastUploadedAt={workspace.keywordListUploadedAt}
+        />
       </div>
 
       {/* Second row: Sitemap + Platforms */}

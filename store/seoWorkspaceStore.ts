@@ -10,6 +10,7 @@ import type {
   DiscoveredPage,
   WorkspaceContent,
   ContentStatus,
+  KeywordListVersion,
 } from '../lib/seo/workspaceTypes';
 import { ALL_PLATFORMS } from '../lib/seo/workspaceTypes';
 
@@ -31,7 +32,12 @@ interface WorkspaceState {
   deleteWorkspace: (id: string) => void;
 
   // Keyword management
-  updateKeywordList: (id: string, keywords: WorkspaceKeyword[]) => void;
+  updateKeywordList: (id: string, keywords: WorkspaceKeyword[], fileName?: string) => void;
+  replaceKeywordList: (id: string, keywords: WorkspaceKeyword[], fileName: string) => void;
+  mergeKeywordList: (id: string, keywords: WorkspaceKeyword[], fileName: string) => void;
+  archiveKeywordVersion: (id: string, versionId: string) => void;
+  activateKeywordVersion: (id: string, versionId: string) => void;
+  archiveKeyword: (workspaceId: string, keywordId: string) => void;
   recordKeywordUsage: (workspaceId: string, contentId: string, primaryKeywordId: string | null, secondaryKeywordIds: string[]) => void;
 
   // Sitemap management
@@ -103,6 +109,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           keywordList: data.keywordList ?? [],
           keywordListUploadedAt: null,
           keywordListVersion: 0,
+          keywordVersions: [],
           sitemapUrl: data.sitemapUrl ?? '',
           sitemapStatus: 'idle' as const,
           sitemapLastCheckedAt: null,
@@ -134,15 +141,109 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return { workspaces: rest };
         }),
 
-      updateKeywordList: (id, keywords) =>
+      updateKeywordList: (id, keywords, fileName) =>
         set((s) => {
           const ws = s.workspaces[id];
           if (!ws) return s;
+          const nextVersion = ws.keywordListVersion + 1;
+          const version: KeywordListVersion = {
+            versionId: genId(),
+            workspaceId: id,
+            fileName: fileName ?? 'upload',
+            uploadedAt: new Date().toISOString(),
+            keywordCount: keywords.length,
+            activeKeywordCount: keywords.filter(k => k.status === 'active').length,
+            archivedKeywordCount: keywords.filter(k => k.status === 'archived').length,
+            status: 'active',
+          };
+          // Archive prior active versions
+          const versions = (ws.keywordVersions ?? []).map(v => v.status === 'active' ? { ...v, status: 'archived' as const } : v);
           return patchWorkspace(s, id, {
             keywordList: keywords,
             keywordListUploadedAt: new Date().toISOString(),
-            keywordListVersion: ws.keywordListVersion + 1,
+            keywordListVersion: nextVersion,
+            keywordVersions: [...versions, version],
           });
+        }),
+
+      replaceKeywordList: (id, keywords, fileName) =>
+        set((s) => {
+          const ws = s.workspaces[id];
+          if (!ws) return s;
+          const nextVersion = ws.keywordListVersion + 1;
+          const version: KeywordListVersion = {
+            versionId: genId(),
+            workspaceId: id,
+            fileName,
+            uploadedAt: new Date().toISOString(),
+            keywordCount: keywords.length,
+            activeKeywordCount: keywords.length,
+            archivedKeywordCount: 0,
+            status: 'active',
+          };
+          const versions = (ws.keywordVersions ?? []).map(v => v.status === 'active' ? { ...v, status: 'archived' as const } : v);
+          return patchWorkspace(s, id, {
+            keywordList: keywords.map(k => ({ ...k, keywordListVersion: nextVersion })),
+            keywordListUploadedAt: new Date().toISOString(),
+            keywordListVersion: nextVersion,
+            keywordVersions: [...versions, version],
+          });
+        }),
+
+      mergeKeywordList: (id, newKeywords, fileName) =>
+        set((s) => {
+          const ws = s.workspaces[id];
+          if (!ws) return s;
+          const nextVersion = ws.keywordListVersion + 1;
+          const existingNorms = new Set(ws.keywordList.map(k => k.normalizedKeyword));
+          const toAdd = newKeywords.filter(k => !existingNorms.has(k.normalizedKeyword));
+          const merged = [...ws.keywordList, ...toAdd.map(k => ({ ...k, keywordListVersion: nextVersion }))];
+          const version: KeywordListVersion = {
+            versionId: genId(),
+            workspaceId: id,
+            fileName,
+            uploadedAt: new Date().toISOString(),
+            keywordCount: merged.length,
+            activeKeywordCount: merged.filter(k => k.status === 'active').length,
+            archivedKeywordCount: merged.filter(k => k.status === 'archived').length,
+            status: 'active',
+          };
+          const versions = (ws.keywordVersions ?? []).map(v => v.status === 'active' ? { ...v, status: 'archived' as const } : v);
+          return patchWorkspace(s, id, {
+            keywordList: merged,
+            keywordListUploadedAt: new Date().toISOString(),
+            keywordListVersion: nextVersion,
+            keywordVersions: [...versions, version],
+          });
+        }),
+
+      archiveKeywordVersion: (id, versionId) =>
+        set((s) => {
+          const ws = s.workspaces[id];
+          if (!ws) return s;
+          const versions = (ws.keywordVersions ?? []).map(v => v.versionId === versionId ? { ...v, status: 'archived' as const } : v);
+          return patchWorkspace(s, id, { keywordVersions: versions });
+        }),
+
+      activateKeywordVersion: (id, versionId) =>
+        set((s) => {
+          const ws = s.workspaces[id];
+          if (!ws) return s;
+          const versions = (ws.keywordVersions ?? []).map(v => ({
+            ...v,
+            status: v.versionId === versionId ? 'active' as const : 'archived' as const,
+          }));
+          return patchWorkspace(s, id, { keywordVersions: versions });
+        }),
+
+      archiveKeyword: (workspaceId, keywordId) =>
+        set((s) => {
+          const ws = s.workspaces[workspaceId];
+          if (!ws) return s;
+          const keywordList = ws.keywordList.map(k =>
+            k.keywordId === keywordId ? { ...k, status: 'archived' as const } : k
+          );
+          return patchWorkspace(s, workspaceId, { keywordList });
         }),
 
       recordKeywordUsage: (workspaceId, contentId, primaryKeywordId, secondaryKeywordIds) =>

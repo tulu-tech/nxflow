@@ -325,6 +325,7 @@ export function buildMCMWorkspace(): Omit<SEOWorkspace, 'createdAt' | 'updatedAt
     keywordList: [],
     keywordListUploadedAt: null,
     keywordListVersion: 0,
+    keywordVersions: [],
 
     // Sitemap
     sitemapUrl: 'https://www.massagechairsandmore.com/sitemap.xml',

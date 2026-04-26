@@ -197,7 +197,19 @@ export interface WorkspaceKeyword {
   uploadedAt: string;
   keywordListVersion: number;
   status: WorkspaceKeywordStatus;
+  dataCompleteness: number; // 0–1 ratio of filled fields
   usage: WorkspaceKeywordUsage;
+}
+
+export interface KeywordListVersion {
+  versionId: string;
+  workspaceId: string;
+  fileName: string;
+  uploadedAt: string;
+  keywordCount: number;
+  activeKeywordCount: number;
+  archivedKeywordCount: number;
+  status: 'active' | 'archived';
 }
 
 // ─── Persona Library ─────────────────────────────────────────────────────────
@@ -364,6 +376,7 @@ export interface SEOWorkspace {
   keywordList: WorkspaceKeyword[];
   keywordListUploadedAt: string | null;
   keywordListVersion: number;
+  keywordVersions: KeywordListVersion[];
 
   // SEO Assets — Sitemap
   sitemapUrl: string;
