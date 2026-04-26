@@ -92,8 +92,16 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
   const { updateProjectField } = useSEOStore();
   const pid = project.id;
 
-  const [step, setStep] = useState(1);
-  const [maxStep, setMaxStep] = useState(1);
+  // Calculate initial step — skip steps already completed during project creation
+  const initialStep = (() => {
+    if (project.targetPersonaId && project.targetTopicId && project.selectedPlatformFormat) return 4;
+    if (project.targetPersonaId && project.targetTopicId) return 3;
+    if (project.targetPersonaId) return 2;
+    return 1;
+  })();
+
+  const [step, setStep] = useState(initialStep);
+  const [maxStep, setMaxStep] = useState(initialStep);
 
   // Local selections (persisted to store on advance)
   const [personaId, setPersonaId] = useState<string | null>(project.targetPersonaId);
