@@ -4,6 +4,7 @@ import { CONTENT_BRIEF_SYSTEM_PROMPT, buildContentBriefUserPrompt, mockContentBr
 import { LONG_FORM_CONTENT_SYSTEM_PROMPT, buildLongFormContentUserPrompt, mockLongFormContent, type LongFormContentInput } from '@/lib/seo/prompts/generateLongFormContent';
 import { PLATFORM_CONTENT_SYSTEM_PROMPT, buildPlatformContentUserPrompt, mockPlatformContent, type PlatformContentInput } from '@/lib/seo/prompts/generatePlatformContent';
 import { INTERNAL_LINK_PLAN_SYSTEM_PROMPT, buildInternalLinkPlanUserPrompt, mockInternalLinkPlan, type InternalLinkPlanInput } from '@/lib/seo/prompts/generateInternalLinkPlan';
+import { EXTERNAL_LINK_PLAN_SYSTEM_PROMPT, buildExternalLinkPlanUserPrompt, mockExternalLinkPlan, type ExternalLinkPlanInput } from '@/lib/seo/prompts/generateExternalLinkPlan';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -922,6 +923,8 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(mockPlatformContent(body as PlatformContentInput));
         case 'generate-internal-link-plan':
           return NextResponse.json(mockInternalLinkPlan(body as InternalLinkPlanInput));
+        case 'generate-external-link-plan':
+          return NextResponse.json(mockExternalLinkPlan(body as ExternalLinkPlanInput));
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -1017,6 +1020,8 @@ Rules:
       ? buildPlatformContentUserPrompt(body as PlatformContentInput)
       : action === 'generate-internal-link-plan'
       ? buildInternalLinkPlanUserPrompt(body as InternalLinkPlanInput)
+      : action === 'generate-external-link-plan'
+      ? buildExternalLinkPlanUserPrompt(body as ExternalLinkPlanInput)
       : JSON.stringify(body);
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1141,6 +1146,9 @@ Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The ou
 
     case 'generate-internal-link-plan':
       return INTERNAL_LINK_PLAN_SYSTEM_PROMPT;
+
+    case 'generate-external-link-plan':
+      return EXTERNAL_LINK_PLAN_SYSTEM_PROMPT;
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';
