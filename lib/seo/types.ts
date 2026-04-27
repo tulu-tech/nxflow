@@ -1,7 +1,7 @@
 // ─── Enums & Literals ────────────────────────────────────────────────────────
 
 export type BusinessType = 'B2B' | 'B2C' | 'B2G' | 'Both';
-export type ProjectStatus = 'draft' | 'in-progress' | 'completed';
+export type ProjectStatus = 'draft' | 'in-progress' | 'completed' | 'scheduled' | 'published';
 export type SearchIntent = 'informational' | 'navigational' | 'commercial' | 'transactional';
 export type FunnelStage = 'top' | 'middle' | 'bottom';
 export type KeywordCategory = 'primary' | 'secondary' | 'supporting';
@@ -172,11 +172,42 @@ export interface PublishPackage {
   exportedAt: string;
 }
 
+// ─── Content Keyword Record ──────────────────────────────────────────────────
+
+export interface ContentKeywordRecord {
+  primaryKeyword: string;
+  primaryKeywordId: string | null;
+  primaryKeywordTag: string;
+  primaryKeywordVolume: number | null;
+  primaryKeywordKD: number | null;
+  primaryKeywordCPC: number | null;
+  secondaryKeywords: string[];
+  secondaryKeywordIds: string[];
+  keywordSelectionReason: string;
+  keywordSelectionMetadata: Record<string, unknown>;
+}
+
 // ─── Project ─────────────────────────────────────────────────────────────────
 
 export interface SEOProject {
   id: string;
+  workspaceId: string | null;
+  targetPersonaId: string | null;
+  targetTopicId: string | null;
+
+  // New content flow fields
+  selectedPlatformFormat: string | null;
+  contentGoal: string | null;
+  keywordStrategy: Record<string, unknown> | null;
+  rawContent: string | null;
+  internalLinkPlan: Record<string, unknown> | null;
+  externalLinkPlan: Record<string, unknown> | null;
+  linkedContent: string | null;
+  imagePlan: Record<string, unknown>[] | null;
+
   name: string;
+  createdBy: string | null;
+  createdByName: string | null;
   currentPhase: number;
   status: ProjectStatus;
   brandIntake: BrandIntake;
@@ -184,6 +215,7 @@ export interface SEOProject {
   keywordClusters: KeywordCluster[];
   primaryKeyword: string | null;
   secondaryKeywords: string[];
+  contentKeywordRecord: ContentKeywordRecord | null;
   briefSelections: BriefSelections;
   userBriefInput: string;
   contentBrief: ContentBrief | null;
@@ -194,6 +226,8 @@ export interface SEOProject {
   linkPlan: LinkPlan | null;
   revisionNotes: RevisionNote[];
   finalOutput: PublishPackage | null;
+  scheduledDate: string | null;
+  publishedDate: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import {
   SEOProject,
   BrandIntake,
+  BusinessType,
   BriefSelections,
   KeywordEntry,
   ContentBrief,
@@ -13,6 +14,7 @@ import {
   RevisionNote,
   PublishPackage,
 } from '../lib/seo/types';
+import type { SEOWorkspace } from '../lib/seo/workspaceTypes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,7 +48,7 @@ interface SEOState {
   projects: Record<string, SEOProject>;
   activeProjectId: string | null;
 
-  createProject: (name: string) => string;
+  createProject: (name: string, workspace?: SEOWorkspace, targetPersonaId?: string, targetTopicId?: string) => string;
   deleteProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
 
@@ -93,19 +95,79 @@ export const useSEOStore = create<SEOState>()(
       projects: {},
       activeProjectId: null,
 
-      createProject: (name) => {
+      createProject: (name, workspace?, targetPersonaId?, targetTopicId?) => {
         const id = genId();
         const now = new Date().toISOString();
+
+        // Build brandIntake from workspace if provided
+        const intake: BrandIntake = workspace
+          ? {
+              brandName: workspace.brandName,
+              websiteUrl: workspace.websiteUrl,
+              industry: workspace.industry,
+              products: workspace.coreOffer,
+              keyProducts: '',
+              targetAudience: workspace.targetMarket,
+              painPoints: '',
+              businessType: workspace.businessType as BusinessType,
+              targetCountries: workspace.targetCountries,
+              targetLanguage: 'English',
+              businessGoal: workspace.conversionGoals,
+              competitors: '',
+              toneOfVoice: workspace.toneOfVoice,
+              articleStyle: workspace.articleStyle,
+              pageType: 'blog',
+              priorityTopic: '',
+              internalPages: '',
+              domainAuthority: '',
+              specialFocus: workspace.brandDifferentiators,
+            }
+          : emptyIntake();
+
+        // Map workspace keywords (WorkspaceKeyword) to project-level KeywordEntry
+        const projectKeywords: KeywordEntry[] = workspace?.keywordList
+          ? workspace.keywordList
+              .filter((wk) => wk.status === 'active')
+              .map((wk, idx) => ({
+                id: wk.keywordId,
+                keyword: wk.keyword,
+                searchIntent: 'informational' as const,
+                funnelStage: 'top' as const,
+                businessRelevance: 7,
+                conversionValue: wk.cpc && wk.cpc > 2 ? 8 : 5,
+                contentOpportunity: '',
+                category: idx === 0 ? 'primary' as const : idx < 5 ? 'secondary' as const : 'supporting' as const,
+                searchVolume: wk.volume ?? undefined,
+                keywordDifficulty: wk.kd ?? undefined,
+                cpc: wk.cpc ?? undefined,
+                validationStatus: 'approved' as const,
+              }))
+          : [];
+
         const project: SEOProject = {
           id,
+          workspaceId: workspace?.id ?? null,
+          targetPersonaId: targetPersonaId ?? null,
+          targetTopicId: targetTopicId ?? null,
+          selectedPlatformFormat: null,
+          contentGoal: null,
+          keywordStrategy: null,
+          rawContent: null,
+          internalLinkPlan: null,
+          externalLinkPlan: null,
+          linkedContent: null,
+          imagePlan: null,
           name,
-          currentPhase: 1,
-          status: 'draft',
-          brandIntake: emptyIntake(),
-          keywords: [],
+          createdBy: null,
+          createdByName: null,
+          currentPhase: workspace ? 2 : 1,  // skip Brand Discovery if workspace provided
+          status: workspace ? 'in-progress' : 'draft',
+          brandIntake: intake,
+          keywords: projectKeywords,
           keywordClusters: [],
           primaryKeyword: null,
           secondaryKeywords: [],
+          contentKeywordRecord: null,
           briefSelections: { contentTopics: [], targetOrganizations: [], targetJobTitles: [], contentFormat: [] },
           userBriefInput: '',
           contentBrief: null,
@@ -116,6 +178,8 @@ export const useSEOStore = create<SEOState>()(
           linkPlan: null,
           revisionNotes: [],
           finalOutput: null,
+          scheduledDate: null,
+          publishedDate: null,
           createdAt: now,
           updatedAt: now,
         };

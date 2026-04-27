@@ -1,90 +1,82 @@
 'use client';
 
-import { useSEOStore } from '@/store/seoStore';
-import { ProjectCard } from '@/components/seo/ProjectCard';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useWorkspaceStore } from '@/store/seoWorkspaceStore';
+import { WorkspaceCard } from '@/components/seo/WorkspaceCard';
+import { CreateWorkspaceForm } from '@/components/seo/CreateWorkspaceForm';
+import { useState, useEffect } from 'react';
+import { Building2 } from 'lucide-react';
+import { MCM_WORKSPACE_ID, buildMCMWorkspace } from '@/lib/seo/seeds/mcm';
+import { HOMC_WORKSPACE_ID, buildHOMCWorkspace } from '@/lib/seo/seeds/homc';
 
 export default function SEODashboard() {
-  const { projects, createProject } = useSEOStore();
-  const router = useRouter();
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState('');
+  const { workspaces, createWorkspace } = useWorkspaceStore();
+  const [showCreate, setShowCreate] = useState(false);
 
-  const projectList = Object.values(projects).sort(
+  // Auto-seed MCM workspace on first ever load
+  useEffect(() => {
+    if (!workspaces[MCM_WORKSPACE_ID]) {
+      const mcm = buildMCMWorkspace();
+      createWorkspace(mcm);
+    }
+    if (!workspaces[HOMC_WORKSPACE_ID]) {
+      const homc = buildHOMCWorkspace();
+      createWorkspace(homc);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const workspaceList = Object.values(workspaces).sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 
-  const handleCreate = () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const id = createProject(trimmed);
-    setName('');
-    setCreating(false);
-    router.push(`/seoagent/project/${id}`);
+  const handleCreate = (data: Parameters<typeof createWorkspace>[0]) => {
+    createWorkspace(data);
+    setShowCreate(false);
   };
 
   return (
     <>
       {/* Hero */}
       <div className="seo-hero">
-        <h1>SEO Content Generator</h1>
+        <h1>SEO Content Agent</h1>
         <p>
-          AI-powered content workflow that produces high-ranking, publish-ready SEO articles — from keyword discovery to final output.
+          Multi-client SEO content workspace — manage brands, keywords, and generate high-ranking content at scale.
         </p>
-        {!creating ? (
+        {!showCreate && (
           <button
             className="seo-btn seo-btn-primary seo-btn-lg"
-            onClick={() => setCreating(true)}
+            onClick={() => setShowCreate(true)}
           >
-            + New Project
+            <Building2 size={16} /> Create Workspace
           </button>
-        ) : (
-          <div style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate();
-                if (e.key === 'Escape') {
-                  setCreating(false);
-                  setName('');
-                }
-              }}
-              placeholder="Project name…"
-              className="seo-input"
-              style={{ width: 280 }}
-            />
-            <button className="seo-btn seo-btn-primary" onClick={handleCreate}>
-              Create
-            </button>
-            <button
-              className="seo-btn seo-btn-secondary"
-              onClick={() => { setCreating(false); setName(''); }}
-            >
-              Cancel
-            </button>
-          </div>
         )}
       </div>
 
-      {/* Projects */}
-      {projectList.length > 0 ? (
-        <div className="seo-projects-grid">
-          {projectList.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      ) : (
-        <div className="seo-empty-state">
-          <div className="seo-empty-state-icon">📊</div>
-          <div className="seo-empty-state-title">No projects yet</div>
-          <div className="seo-empty-state-desc">
-            Create your first SEO content project to start generating high-ranking, publish-ready articles.
-          </div>
+      {/* Create workspace form */}
+      {showCreate && (
+        <div style={{ marginBottom: 24 }}>
+          <CreateWorkspaceForm
+            onSubmit={handleCreate}
+            onCancel={() => setShowCreate(false)}
+          />
         </div>
       )}
+
+      {/* Workspaces */}
+      {workspaceList.length > 0 ? (
+        <div className="seo-projects-grid">
+          {workspaceList.map((ws) => (
+            <WorkspaceCard key={ws.id} workspace={ws} />
+          ))}
+        </div>
+      ) : !showCreate ? (
+        <div className="seo-empty-state">
+          <div className="seo-empty-state-icon">🏢</div>
+          <div className="seo-empty-state-title">No workspaces yet</div>
+          <div className="seo-empty-state-desc">
+            Create a workspace for each client or brand. Upload keywords once, then generate unlimited content.
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -6,6 +6,7 @@ interface Props {
   intake: BrandIntake;
   onChange: (field: keyof BrandIntake, value: unknown) => void;
   onContinue: () => void;
+  isFromWorkspace?: boolean;
 }
 
 const PAGE_TYPES: { value: PageType; label: string }[] = [
@@ -18,11 +19,21 @@ const PAGE_TYPES: { value: PageType; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export function BrandIntakeForm({ intake, onChange, onContinue }: Props) {
+export function BrandIntakeForm({ intake, onChange, onContinue, isFromWorkspace }: Props) {
   const isValid = intake.brandName.trim();
 
   return (
     <div className="seo-form">
+      {isFromWorkspace && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 8, marginBottom: 16,
+          background: 'rgba(0,200,117,0.08)', border: '1px solid rgba(0,200,117,0.2)',
+          display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#00c875',
+        }}>
+          ✅ <strong>Pre-filled from workspace.</strong>
+          <span style={{ color: 'var(--text-muted)' }}>You can edit any field for this specific project.</span>
+        </div>
+      )}
       <div className="seo-form-section">
         <div className="seo-form-row">
           <div className="seo-form-group">

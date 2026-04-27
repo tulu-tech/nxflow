@@ -1,4 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { KEYWORD_SELECTION_SYSTEM_PROMPT, buildKeywordSelectionUserPrompt, mockKeywordStrategy, type KeywordSelectionInput } from '@/lib/seo/prompts/selectKeywords';
+import { CONTENT_BRIEF_SYSTEM_PROMPT, buildContentBriefUserPrompt, mockContentBrief, type ContentBriefInput } from '@/lib/seo/prompts/generateBrief';
+import { LONG_FORM_CONTENT_SYSTEM_PROMPT, buildLongFormContentUserPrompt, mockLongFormContent, type LongFormContentInput } from '@/lib/seo/prompts/generateLongFormContent';
+import { PLATFORM_CONTENT_SYSTEM_PROMPT, buildPlatformContentUserPrompt, mockPlatformContent, type PlatformContentInput } from '@/lib/seo/prompts/generatePlatformContent';
+import { INTERNAL_LINK_PLAN_SYSTEM_PROMPT, buildInternalLinkPlanUserPrompt, mockInternalLinkPlan, type InternalLinkPlanInput } from '@/lib/seo/prompts/generateInternalLinkPlan';
+import { EXTERNAL_LINK_PLAN_SYSTEM_PROMPT, buildExternalLinkPlanUserPrompt, mockExternalLinkPlan, type ExternalLinkPlanInput } from '@/lib/seo/prompts/generateExternalLinkPlan';
+import { INJECT_LINKS_SYSTEM_PROMPT, buildInjectLinksUserPrompt, mockInjectLinks as mockInjectApprovedLinks, type InjectLinksInput } from '@/lib/seo/prompts/injectApprovedLinks';
+import { IMAGE_REFERENCE_SYSTEM_PROMPT, buildImageReferenceUserPrompt, discoverImageReferences, type ImageReferenceInput } from '@/lib/seo/prompts/discoverImageReferences';
+import { IMAGE_PLAN_SYSTEM_PROMPT, buildImagePlanUserPrompt, mockImagePlan, type ImagePlanInput } from '@/lib/seo/prompts/generateImagePlan';
+import { mockContentImages, generateContentImages, type ContentImagesInput } from '@/lib/seo/prompts/generateContentImages';
+import { getMCMGuardrails } from '@/lib/seo/guardrails/mcm';
+import { getHOMCGuardrails } from '@/lib/seo/guardrails/homc';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -884,6 +896,57 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action } = body;
 
+    // ── Comprehensive payload normalization ────────────────────────────────────
+    // Ensures all nested objects prompt builders access have safe defaults.
+    // This single block prevents ALL "Cannot read property of undefined" crashes.
+
+    const emptyWs = { workspaceId: '', brandName: '', websiteUrl: '', industry: '', businessType: '', targetMarket: '', targetCountries: [] as string[], brandDifferentiators: '', complianceNotes: '', toneOfVoice: '', coreOffer: '', conversionGoals: '', primaryCTA: '' };
+    const emptyKs = { primaryKeyword: '', secondaryKeywords: [] as string[], searchIntent: '', funnelStage: '', commercialPriority: '', claimRisk: 'Low', claimRiskNotes: '', recommendedCTA: '', contentAngle: '' };
+    const emptyCb = { briefTitle: '', angle: '', readerProblem: '', decisionBarrierSolved: '', recommendedWordCount: '2,500–3,500 words', outline: [] as Array<{level:string;text:string;notes?:string}>, faqPlan: [] as Array<{question:string;answerDirection:string}>, recommendedCTA: '', mustInclude: [] as string[], mustAvoid: [] as string[], qualityChecklist: [] as string[], claimRiskGuidance: '' };
+
+    // Workspace: merge from workspaceData if workspace missing
+    if (!body.workspace) {
+      body.workspace = body.workspaceData ? { ...emptyWs, ...body.workspaceData, workspaceId: body.workspaceData.id ?? '' } : emptyWs;
+    }
+
+    // Keyword strategy: accept either name
+    if (!body.keywordStrategy && body.approvedKeywordStrategy) body.keywordStrategy = body.approvedKeywordStrategy;
+    if (!body.approvedKeywordStrategy && body.keywordStrategy) body.approvedKeywordStrategy = body.keywordStrategy;
+    // Ensure arrays exist
+    if (body.keywordStrategy) body.keywordStrategy.secondaryKeywords = body.keywordStrategy.secondaryKeywords ?? [];
+    if (body.approvedKeywordStrategy) body.approvedKeywordStrategy.secondaryKeywords = body.approvedKeywordStrategy.secondaryKeywords ?? [];
+
+    // Content brief defaults
+    if (!body.approvedContentBrief) body.approvedContentBrief = emptyCb;
+    body.approvedContentBrief.outline = body.approvedContentBrief.outline ?? [];
+    body.approvedContentBrief.faqPlan = body.approvedContentBrief.faqPlan ?? [];
+    body.approvedContentBrief.mustInclude = body.approvedContentBrief.mustInclude ?? [];
+    body.approvedContentBrief.mustAvoid = body.approvedContentBrief.mustAvoid ?? [];
+    body.approvedContentBrief.qualityChecklist = body.approvedContentBrief.qualityChecklist ?? [];
+
+    // Common arrays
+    body.sitemapPages = body.sitemapPages ?? [];
+    body.priorContent = body.priorContent ?? [];
+    body.priorPublishedContent = body.priorPublishedContent ?? [];
+    body.priorDraftContent = body.priorDraftContent ?? [];
+
+    // Image plan: ensure it's always an array
+    if (!Array.isArray(body.approvedImagePlan)) {
+      // Could be an object with imagePlan array inside
+      if (body.approvedImagePlan?.imagePlan && Array.isArray(body.approvedImagePlan.imagePlan)) {
+        body.approvedImagePlan = body.approvedImagePlan.imagePlan;
+      } else {
+        body.approvedImagePlan = [];
+      }
+    }
+    // Link plans: ensure arrays
+    if (!Array.isArray(body.approvedInternalLinkPlan)) {
+      body.approvedInternalLinkPlan = body.approvedInternalLinkPlan?.internalLinkPlan ?? body.approvedInternalLinkPlan?.links ?? [];
+    }
+    if (!Array.isArray(body.approvedExternalLinkPlan)) {
+      body.approvedExternalLinkPlan = body.approvedExternalLinkPlan?.externalLinkPlan ?? body.approvedExternalLinkPlan?.links ?? [];
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -907,6 +970,88 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ linkPlan: mockLinkPlan(body) });
         case 'inject-links':
           return NextResponse.json(mockInjectLinks(body));
+        case 'select-keywords-for-content':
+          return NextResponse.json(mockKeywordStrategy(body as KeywordSelectionInput));
+        case 'generate-content-brief':
+          return NextResponse.json(mockContentBrief(body as ContentBriefInput));
+        case 'generate-long-form-seo-content':
+          return NextResponse.json(mockLongFormContent(body as LongFormContentInput));
+        case 'generate-platform-content':
+          return NextResponse.json(mockPlatformContent(body as PlatformContentInput));
+        case 'generate-internal-link-plan':
+          return NextResponse.json(mockInternalLinkPlan(body as InternalLinkPlanInput));
+        case 'generate-external-link-plan':
+          return NextResponse.json(mockExternalLinkPlan(body as ExternalLinkPlanInput));
+        case 'inject-approved-links':
+          return NextResponse.json(mockInjectApprovedLinks(body as InjectLinksInput));
+        case 'discover-image-references':
+          return NextResponse.json(discoverImageReferences(body as ImageReferenceInput));
+        case 'generate-image-plan':
+          return NextResponse.json(mockImagePlan(body as ImagePlanInput));
+        case 'generate-content-images': {
+          // ── OG Image Scraper ────────────────────────────────────────────
+          // Helper: scrape OG/product image from a URL
+          const scrapeOgImage = async (pageUrl: string): Promise<string | null> => {
+            if (!pageUrl || pageUrl.startsWith('data:')) return null;
+            try {
+              const resp = await fetch(pageUrl, {
+                headers: { 'User-Agent': 'NxFlow-Bot/1.0' },
+                signal: AbortSignal.timeout(4000),
+              });
+              if (!resp.ok) return null;
+              const html = await resp.text();
+              const ogMatch = html.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+              if (ogMatch?.[1]) return ogMatch[1];
+              const cdnMatch = html.match(/src=["'](https?:\/\/[^"']*(?:cdn\.shopify|product|upload|cdn)[^"']*\.(?:jpg|png|webp)[^"']*?)["']/i);
+              if (cdnMatch?.[1]) return cdnMatch[1];
+              return null;
+            } catch { return null; }
+          };
+
+          // 1. Scrape from image plan referencePageUrl entries (topic-specific)
+          const enrichedPlan = (body.approvedImagePlan ?? []) as Array<Record<string, unknown>>;
+          const planImages: (string | null)[] = [];
+          for (const planItem of enrichedPlan) {
+            const existingRefs = (planItem.referenceImageUrls ?? []) as string[];
+            if (existingRefs.length > 0) {
+              planImages.push(existingRefs[0]);
+            } else {
+              const refUrl = planItem.referencePageUrl as string;
+              const img = refUrl ? await scrapeOgImage(refUrl) : null;
+              planImages.push(img);
+              if (img) planItem.referenceImageUrls = [img];
+            }
+          }
+
+          // 2. Scrape from sitemap pages as fallback pool
+          const sitemapPages = (body.sitemapPages ?? []) as Array<{ url: string; pageType: string; title: string }>;
+          const sitemapImgs: string[] = [];
+          const productUrls = sitemapPages
+            .filter(p => ['product', 'collection', 'brand'].includes(p.pageType))
+            .slice(0, 12);
+          for (const sp of productUrls) {
+            const img = await scrapeOgImage(sp.url);
+            if (img) sitemapImgs.push(img);
+            if (sitemapImgs.length >= 8) break;
+          }
+
+          // 3. Merge: plan images first, fill gaps from sitemap
+          const scrapedImages: string[] = [];
+          let smFallbackIdx = 0;
+          for (let i = 0; i < Math.max(enrichedPlan.length, 5); i++) {
+            if (planImages[i]) {
+              scrapedImages.push(planImages[i]!);
+            } else if (smFallbackIdx < sitemapImgs.length) {
+              scrapedImages.push(sitemapImgs[smFallbackIdx]);
+              if (enrichedPlan[i]) enrichedPlan[i].referenceImageUrls = [sitemapImgs[smFallbackIdx]];
+              smFallbackIdx++;
+            }
+          }
+
+          (body as Record<string, unknown>).__scrapedProductImages = scrapedImages;
+          return NextResponse.json(mockContentImages(body as ContentImagesInput));
+        }
+
         default:
           return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       }
@@ -948,6 +1093,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ imageUrl });
     }
 
+    // Special case: batch image generation via DALL-E 3 (5 images)
+    if (action === 'generate-content-images') {
+      const result = await generateContentImages(body as ContentImagesInput, apiKey);
+      return NextResponse.json(result);
+    }
+
     // Special case: link injection (no AI needed — deterministic)
     if (action === 'inject-links') {
       // Use AI to intelligently inject links
@@ -958,7 +1109,8 @@ Rules:
 - For any remaining links in the plan, find the best natural anchor text in the article and wrap it with the markdown link
 - NEVER link to homepage URLs (just "/" or root domain with no path)
 - Preserve all article formatting, headings, and structure exactly
-- Return JSON: { "content": "updated markdown content" }`;
+- Return JSON: { "content": "updated markdown content" }`
+      + getMCMGuardrails(body) + getHOMCGuardrails(body);
 
       const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -989,7 +1141,29 @@ Rules:
     }
 
     // Standard AI generation
-    const systemPrompt = buildSystemPrompt(action, body);
+    const guardrails = getMCMGuardrails(body) + getHOMCGuardrails(body);
+    const systemPrompt = buildSystemPrompt(action, body) + guardrails;
+
+    // Use structured user prompt for keyword selection
+    const userContent = action === 'select-keywords-for-content'
+      ? buildKeywordSelectionUserPrompt(body as KeywordSelectionInput)
+      : action === 'generate-content-brief'
+      ? buildContentBriefUserPrompt(body as ContentBriefInput)
+      : action === 'generate-long-form-seo-content'
+      ? buildLongFormContentUserPrompt(body as LongFormContentInput)
+      : action === 'generate-platform-content'
+      ? buildPlatformContentUserPrompt(body as PlatformContentInput)
+      : action === 'generate-internal-link-plan'
+      ? buildInternalLinkPlanUserPrompt(body as InternalLinkPlanInput)
+      : action === 'generate-external-link-plan'
+      ? buildExternalLinkPlanUserPrompt(body as ExternalLinkPlanInput)
+      : action === 'inject-approved-links'
+      ? buildInjectLinksUserPrompt(body as InjectLinksInput)
+      : action === 'discover-image-references'
+      ? buildImageReferenceUserPrompt(body as ImageReferenceInput)
+      : action === 'generate-image-plan'
+      ? buildImagePlanUserPrompt(body as ImagePlanInput)
+      : JSON.stringify(body);
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1001,10 +1175,10 @@ Rules:
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: JSON.stringify(body) },
+          { role: 'user', content: userContent },
         ],
-        temperature: action === 'article' ? 0.8 : 0.7,
-        max_tokens: action === 'article' ? 8000 : 4000,
+        temperature: action === 'article' || action === 'generate-long-form-seo-content' ? 0.8 : action === 'select-keywords-for-content' ? 0.5 : action === 'generate-content-brief' ? 0.6 : 0.7,
+        max_tokens: action === 'article' || action === 'generate-long-form-seo-content' ? 8000 : action === 'select-keywords-for-content' ? 6000 : action === 'generate-content-brief' ? 5000 : 4000,
         response_format: { type: 'json_object' },
       }),
     });
@@ -1020,8 +1194,8 @@ Rules:
     return NextResponse.json(content);
 
   } catch (err) {
-    console.error('[SEO Generate Error]', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[SEO Generate Error]', err instanceof Error ? err.message : err, err instanceof Error ? err.stack : '');
+    return NextResponse.json({ error: `Internal server error: ${err instanceof Error ? err.message : 'Unknown error'}` }, { status: 500 });
   }
 }
 
@@ -1098,6 +1272,33 @@ The outline should be publication-ready and reflect the correct information arch
 Return JSON: { "h1": "exact H1 title", "outline": [{ "level": "h2|h3", "text": "section heading" }] }
 Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The outline should cover: intro hook, definition, why it matters, core methodology/how-to (3-4 H3s), common mistakes, tools/resources, FAQ, conclusion.`;
     }
+
+    case 'select-keywords-for-content':
+      return KEYWORD_SELECTION_SYSTEM_PROMPT;
+
+    case 'generate-content-brief':
+      return CONTENT_BRIEF_SYSTEM_PROMPT;
+
+    case 'generate-long-form-seo-content':
+      return LONG_FORM_CONTENT_SYSTEM_PROMPT;
+
+    case 'generate-platform-content':
+      return PLATFORM_CONTENT_SYSTEM_PROMPT;
+
+    case 'generate-internal-link-plan':
+      return INTERNAL_LINK_PLAN_SYSTEM_PROMPT;
+
+    case 'generate-external-link-plan':
+      return EXTERNAL_LINK_PLAN_SYSTEM_PROMPT;
+
+    case 'inject-approved-links':
+      return INJECT_LINKS_SYSTEM_PROMPT;
+
+    case 'discover-image-references':
+      return IMAGE_REFERENCE_SYSTEM_PROMPT;
+
+    case 'generate-image-plan':
+      return IMAGE_PLAN_SYSTEM_PROMPT;
 
     default:
       return 'You are an SEO expert assistant. Return valid JSON.';
