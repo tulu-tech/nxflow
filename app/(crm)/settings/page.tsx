@@ -19,9 +19,11 @@ import {
 import { setTheme, getStoredTheme, type Theme } from "@/lib/theme"
 import type { ScoringRule, CreditUsage } from "@/types"
 import { format } from "date-fns"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 
 export default function SettingsPage() {
   const supabase = createClient()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   // Profile
   const [fullName, setFullName] = useState("")
@@ -78,13 +80,14 @@ export default function SettingsPage() {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
+    const wsParam = activeWorkspaceId ? `?workspaceId=${activeWorkspaceId}` : ""
     const [keysRes, gmailRes, twilioRes, creditRes, historyRes, rulesRes] = await Promise.all([
       fetch("/api/settings/api-keys"),
-      supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
-      fetch("/api/settings/twilio"),
-      supabase.from("credit_usage").select("type, amount").gte("created_at", monthStart),
-      supabase.from("credit_usage").select("*").order("created_at", { ascending: false }).limit(20),
-      supabase.from("scoring_rules").select("*").order("created_at", { ascending: false }),
+      supabase.from("gmail_tokens").select("id, email").not("email", "is", null).eq("workspace_id", activeWorkspaceId ?? "").order("updated_at", { ascending: true }),
+      fetch(`/api/settings/twilio${wsParam}`),
+      supabase.from("credit_usage").select("type, amount").eq("workspace_id", activeWorkspaceId ?? "").gte("created_at", monthStart),
+      supabase.from("credit_usage").select("*").eq("workspace_id", activeWorkspaceId ?? "").order("created_at", { ascending: false }).limit(20),
+      supabase.from("scoring_rules").select("*").eq("workspace_id", activeWorkspaceId ?? "").order("created_at", { ascending: false }),
     ])
 
     if (keysRes.ok) {
@@ -112,7 +115,7 @@ export default function SettingsPage() {
     setCreditHistory((historyRes.data as CreditUsage[]) ?? [])
     setRules((rulesRes.data as ScoringRule[]) ?? [])
     setCurrentTheme(getStoredTheme())
-  }, [supabase])
+  }, [supabase, activeWorkspaceId])
 
   useEffect(() => { loadAll() }, [loadAll])
 
@@ -159,7 +162,7 @@ export default function SettingsPage() {
     setSavingTwilio(true)
     setTwilioError(null)
     setTwilioSuccess(false)
-    const body: Record<string, string> = { phoneNumber: twilioPhone }
+    const body: Record<string, string> = { phoneNumber: twilioPhone, workspaceId: activeWorkspaceId ?? "" }
     if (twilioAccountSid) body.accountSid = twilioAccountSid
     if (twilioAuthToken) body.authToken = twilioAuthToken
     const res = await fetch("/api/settings/twilio", {
@@ -438,7 +441,7 @@ export default function SettingsPage() {
                 </div>
               )}
               <a
-                href="/api/auth/gmail"
+                href={`/api/auth/gmail${activeWorkspaceId ? `?workspaceId=${activeWorkspaceId}` : ""}`}
                 className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[0.8rem] font-medium rounded-[min(var(--radius-md),12px)] border border-border bg-background hover:bg-muted transition-colors"
               >
                 <Mail className="h-3.5 w-3.5" />

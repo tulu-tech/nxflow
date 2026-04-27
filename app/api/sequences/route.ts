@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getValidatedWorkspaceId } from "@/lib/workspace"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const workspaceId = req.nextUrl.searchParams.get("workspaceId")
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
+  if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
   const { data } = await supabase
     .from("sequences")
     .select("*, sequence_steps(*)")
     .eq("user_id", user.id)
+    .eq("workspace_id", wsId)
     .order("created_at", { ascending: false })
 
   return NextResponse.json(data ?? [])
@@ -20,12 +26,15 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { name, description, steps } = await req.json()
+  const { name, description, steps, workspaceId } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: "Name required" }, { status: 400 })
+
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
+  if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
   const { data: seq, error } = await supabase
     .from("sequences")
-    .insert({ user_id: user.id, name: name.trim(), description })
+    .insert({ user_id: user.id, workspace_id: wsId, name: name.trim(), description })
     .select()
     .single()
 
@@ -50,7 +59,10 @@ export async function DELETE(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { id } = await req.json()
-  await supabase.from("sequences").delete().eq("id", id).eq("user_id", user.id)
+  const { id, workspaceId } = await req.json()
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
+  if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
+
+  await supabase.from("sequences").delete().eq("id", id).eq("user_id", user.id).eq("workspace_id", wsId)
   return NextResponse.json({ success: true })
 }

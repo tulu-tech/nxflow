@@ -19,6 +19,18 @@ export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code")
   if (!code) return redirectWithError(req, "no_code")
 
+  // Decode workspaceId from state param
+  let workspaceId: string | null = null
+  const stateRaw = req.nextUrl.searchParams.get("state")
+  if (stateRaw) {
+    try {
+      const decoded = JSON.parse(Buffer.from(stateRaw, "base64").toString("utf-8"))
+      workspaceId = decoded.workspaceId ?? null
+    } catch {
+      // ignore malformed state
+    }
+  }
+
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/gmail/callback`
 
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -95,6 +107,8 @@ export async function GET(req: NextRequest) {
     }
     // Only overwrite refresh_token if Google issued a new one
     if (tokens.refresh_token) updatePayload.refresh_token = tokens.refresh_token
+    // Update workspace_id if provided
+    if (workspaceId) updatePayload.workspace_id = workspaceId
 
     const { error: updateErr } = await supabase
       .from("gmail_tokens")
@@ -105,6 +119,7 @@ export async function GET(req: NextRequest) {
   } else {
     const { error: insertErr } = await supabase.from("gmail_tokens").insert({
       user_id: user.id,
+      workspace_id: workspaceId ?? null,
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token ?? null,
       expires_at: expiresAt,

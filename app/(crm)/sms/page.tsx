@@ -18,6 +18,7 @@ import {
 import type { LeadboardEntry, LeadStatus } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
 import { cn } from "@/lib/utils"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 
 const MERGE_TAGS = [
   { label: "{{first_name}}", value: "{{first_name}}" },
@@ -28,6 +29,7 @@ const MERGE_TAGS = [
 
 export default function SMSPage() {
   const supabase = createClient()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   const [leads, setLeads] = useState<LeadboardEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,11 +49,13 @@ export default function SMSPage() {
   const [message, setMessage] = useState("")
 
   const loadData = useCallback(async () => {
+    if (!activeWorkspaceId) return
     setLoading(true)
+    const wsParam = `?workspaceId=${activeWorkspaceId}`
     const [{ data: l }, segsRes, twilioRes] = await Promise.all([
-      supabase.from("leadboard").select("*").order("relevance_score", { ascending: false }),
-      fetch("/api/segments"),
-      fetch("/api/settings/twilio"),
+      supabase.from("leadboard").select("*").eq("workspace_id", activeWorkspaceId).order("relevance_score", { ascending: false }),
+      fetch(`/api/segments${wsParam}`),
+      fetch(`/api/settings/twilio${wsParam}`),
     ])
     setLeads((l as LeadboardEntry[]) ?? [])
     const segs = segsRes.ok ? await segsRes.json() : []
@@ -63,7 +67,7 @@ export default function SMSPage() {
       setTwilioConnected(false)
     }
     setLoading(false)
-  }, [supabase])
+  }, [supabase, activeWorkspaceId])
 
   useEffect(() => { loadData() }, [loadData])
 

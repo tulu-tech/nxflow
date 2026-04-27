@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
@@ -139,6 +140,7 @@ export default function ProspectingPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   const [filters, setFilters] = useState<LushaSearchFilters>(EMPTY_FILTERS)
   const [filtersOpen, setFiltersOpen] = useState(true)
@@ -183,8 +185,8 @@ export default function ProspectingPage() {
   // Load saved search from ?saved=<id> query
   useEffect(() => {
     const savedId = searchParams.get("saved")
-    if (!savedId) return
-    fetch("/api/saved-searches").then((r) => r.json()).then((list) => {
+    if (!savedId || !activeWorkspaceId) return
+    fetch(`/api/saved-searches?workspaceId=${activeWorkspaceId}`).then((r) => r.json()).then((list) => {
       const found = (list as Array<{ id: string; name: string; filters: LushaSearchFilters }>)
         .find((s) => s.id === savedId)
       if (found) {
@@ -203,7 +205,7 @@ export default function ProspectingPage() {
       const res = await fetch("/api/saved-searches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), filters }),
+        body: JSON.stringify({ name: name.trim(), filters, workspaceId: activeWorkspaceId }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setLoadedSavedName(name.trim())
@@ -294,6 +296,7 @@ export default function ProspectingPage() {
 
       const { data: prospect } = await supabase.from("prospects").insert({
         user_id: user.id,
+        workspace_id: activeWorkspaceId ?? null,
         lusha_id: contact.lushaId,
         full_name: contact.fullName,
         company: contact.company ?? null,
@@ -308,6 +311,7 @@ export default function ProspectingPage() {
 
       await supabase.from("leadboard").insert({
         user_id: user.id,
+        workspace_id: activeWorkspaceId ?? null,
         prospect_id: prospect?.id ?? null,
         full_name: contact.fullName,
         company: contact.company ?? null,

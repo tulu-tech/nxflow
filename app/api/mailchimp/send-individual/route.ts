@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getValidatedWorkspaceId } from "@/lib/workspace"
 
 async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   try {
@@ -53,16 +54,20 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { to, subject, body, leadId, fromEmail, isHtml } = await req.json()
+  const { to, subject, body, leadId, fromEmail, isHtml, workspaceId } = await req.json()
   if (!to || !subject || !body) {
     return NextResponse.json({ error: "to, subject, and body are required" }, { status: 400 })
   }
+
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
+  if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
   // Look up specified Gmail account, or first connected if none specified
   let tokenQuery = supabase
     .from("gmail_tokens")
     .select("id, access_token, refresh_token, expires_at, email")
     .eq("user_id", user.id)
+    .eq("workspace_id", wsId)
 
   if (fromEmail) tokenQuery = tokenQuery.eq("email", fromEmail)
 
@@ -115,6 +120,7 @@ export async function POST(req: NextRequest) {
   // Log the sent email for the thread view in lead card
   await supabase.from("email_logs").insert({
     user_id: user.id,
+    workspace_id: wsId,
     lead_id: leadId ?? null,
     from_email: fromAddr,
     to_email: to,
@@ -125,6 +131,7 @@ export async function POST(req: NextRequest) {
 
   await supabase.from("credit_usage").insert({
     user_id: user.id,
+    workspace_id: wsId,
     type: "mailchimp_send",
     amount: 1,
     metadata: { to, lead_id: leadId, method: "gmail", from: fromAddr },

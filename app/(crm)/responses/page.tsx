@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
@@ -19,6 +20,7 @@ import { format } from "date-fns"
 
 export default function ResponsesPage() {
   const supabase = createClient()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   const [rules, setRules] = useState<ResponseRule[]>([])
   const [loading, setLoading] = useState(true)
@@ -46,16 +48,18 @@ export default function ResponsesPage() {
   const [draftSuccess, setDraftSuccess] = useState(false)
 
   const loadRules = useCallback(async () => {
+    if (!activeWorkspaceId) return
     setLoading(true)
-    const { data } = await supabase.from("response_rules").select("*").order("created_at", { ascending: false })
+    const { data } = await supabase.from("response_rules").select("*").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false })
     setRules((data as ResponseRule[]) ?? [])
     setLoading(false)
-  }, [supabase])
+  }, [supabase, activeWorkspaceId])
 
   const checkGmail = useCallback(async () => {
-    const { data } = await supabase.from("gmail_tokens").select("id").limit(1)
+    if (!activeWorkspaceId) return
+    const { data } = await supabase.from("gmail_tokens").select("id").eq("workspace_id", activeWorkspaceId).limit(1)
     setGmailConnected((data?.length ?? 0) > 0)
-  }, [supabase])
+  }, [supabase, activeWorkspaceId])
 
   useEffect(() => { loadRules(); checkGmail() }, [loadRules, checkGmail])
 
@@ -93,6 +97,7 @@ export default function ResponsesPage() {
         claude_prompt: claudePrompt.trim(),
         auto_send: autoSend,
         is_active: true,
+        workspace_id: activeWorkspaceId,
       })
     }
     setSavingRule(false)
@@ -115,7 +120,11 @@ export default function ResponsesPage() {
     setScanError(null)
     setHasScanned(false)
     try {
-      const res = await fetch("/api/responses/scan", { method: "POST" })
+      const res = await fetch("/api/responses/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setMatches(data.matches ?? [])
@@ -143,6 +152,7 @@ export default function ResponsesPage() {
           emailSubject: email.subject,
           fromEmail: email.from,
           ruleId: email.matchedRuleId,
+          workspaceId: activeWorkspaceId,
         }),
       })
       const data = await res.json()
@@ -170,6 +180,7 @@ export default function ResponsesPage() {
           to: draftEmail.from,
           subject: `Re: ${draftEmail.subject}`,
           body: draftText,
+          workspaceId: activeWorkspaceId,
         }),
       })
       const data = await res.json()

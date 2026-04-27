@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
 import { Card, CardContent } from "@/components/ui-crm/card"
 import { Badge } from "@/components/ui-crm/badge"
@@ -35,16 +36,18 @@ const FILTER_LABELS: Record<string, string> = {
 
 export default function SavedSearchesPage() {
   const router = useRouter()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
   const [list, setList] = useState<SavedSearch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function load() {
+    if (!activeWorkspaceId) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/saved-searches")
+      const res = await fetch(`/api/saved-searches?workspaceId=${activeWorkspaceId}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load")
       setList(data)
@@ -57,7 +60,7 @@ export default function SavedSearchesPage() {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [activeWorkspaceId])
 
   async function handleDelete(id: string) {
     if (!confirm("Delete this saved search?")) return
@@ -66,7 +69,7 @@ export default function SavedSearchesPage() {
       const res = await fetch("/api/saved-searches", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, workspaceId: activeWorkspaceId }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setList((l) => l.filter((s) => s.id !== id))

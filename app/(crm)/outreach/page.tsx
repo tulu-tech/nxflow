@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
@@ -239,6 +240,7 @@ function MergeTagChips({
 
 export default function OutreachPage() {
   const supabase = createClient()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   const [leads, setLeads] = useState<LeadboardEntry[]>([])
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([])
@@ -280,12 +282,13 @@ export default function OutreachPage() {
   const campBodyRef = useRef<HTMLTextAreaElement>(null)
 
   const loadData = useCallback(async () => {
+    if (!activeWorkspaceId) return
     setLoading(true)
     const [{ data: l }, { data: c }, segsRes, gmailRes] = await Promise.all([
-      supabase.from("leadboard").select("*").order("relevance_score", { ascending: false }),
-      supabase.from("email_campaigns").select("*").order("created_at", { ascending: false }),
-      fetch("/api/segments"),
-      supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
+      supabase.from("leadboard").select("*").eq("workspace_id", activeWorkspaceId).order("relevance_score", { ascending: false }),
+      supabase.from("email_campaigns").select("*").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
+      fetch(`/api/segments?workspaceId=${activeWorkspaceId}`),
+      supabase.from("gmail_tokens").select("id, email").eq("workspace_id", activeWorkspaceId).not("email", "is", null).order("updated_at", { ascending: true }),
     ])
     setLeads((l as LeadboardEntry[]) ?? [])
     setCampaigns((c as EmailCampaign[]) ?? [])
@@ -300,7 +303,7 @@ export default function OutreachPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { loadData() }, [loadData, activeWorkspaceId])
 
   // Auto-insert template when lead is selected and body is empty
   const selectedLead = leads.find((l) => l.id === selectedLeadId)
@@ -340,6 +343,7 @@ export default function OutreachPage() {
           leadId: selectedLead.id,
           fromEmail: fromEmail || undefined,
           isHtml: indEmailFormat === "html",
+          workspaceId: activeWorkspaceId,
         }),
       })
       const data = await res.json()
@@ -408,7 +412,7 @@ export default function OutreachPage() {
       const res = await fetch("/api/mailchimp/create-campaign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: campName, subject: campSubject, body: campBody }),
+        body: JSON.stringify({ name: campName, subject: campSubject, body: campBody, workspaceId: activeWorkspaceId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -440,6 +444,7 @@ export default function OutreachPage() {
           recipientIds: Array.from(selectedLeadIds),
           fromEmail: campFromEmail || undefined,
           isHtml: campEmailFormat === "html",
+          workspaceId: activeWorkspaceId,
         }),
       })
       const data = await res.json()

@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getValidatedWorkspaceId } from '@/lib/workspace';
 
 export const dynamic = 'force-dynamic';
 
 // GET — return connection status (never expose raw tokens)
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const workspaceId = req.nextUrl.searchParams.get('workspaceId');
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId);
+  if (!wsId) return NextResponse.json({ error: 'Invalid workspace' }, { status: 400 });
 
   const { data } = await supabase
     .from('twilio_config')
     .select('account_sid, auth_token, phone_number')
     .eq('user_id', user.id)
+    .eq('workspace_id', wsId)
     .single();
 
   return NextResponse.json({
@@ -29,7 +35,10 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { accountSid, authToken, phoneNumber } = await req.json();
+  const { accountSid, authToken, phoneNumber, workspaceId } = await req.json();
+
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId);
+  if (!wsId) return NextResponse.json({ error: 'Invalid workspace' }, { status: 400 });
 
   const update: Record<string, string> = { updated_at: new Date().toISOString() };
   if (accountSid !== undefined) update.account_sid = accountSid.trim();
@@ -38,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const { error } = await supabase
     .from('twilio_config')
-    .upsert({ ...update, user_id: user.id }, { onConflict: 'user_id' });
+    .upsert({ ...update, user_id: user.id, workspace_id: wsId }, { onConflict: 'user_id,workspace_id' });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
@@ -46,6 +47,7 @@ const EMPTY_STEP = (): SequenceStep => ({ step_number: 1, subject: "", body: "",
 
 export default function SequencesPage() {
   const supabase = createClient()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
   const [sequences, setSequences] = useState<Sequence[]>([])
   const [selected, setSelected] = useState<Sequence | null>(null)
   const [loading, setLoading] = useState(true)
@@ -68,8 +70,9 @@ export default function SequencesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    if (!activeWorkspaceId) return
     setLoading(true)
-    const res = await fetch("/api/sequences")
+    const res = await fetch(`/api/sequences?workspaceId=${activeWorkspaceId}`)
     const data = await res.json()
 
     // Load enrollment counts
@@ -92,7 +95,7 @@ export default function SequencesPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, activeWorkspaceId])
 
   async function handleCreate() {
     if (!newName.trim() || newSteps.some(s => !s.subject.trim() || !s.body.trim())) return
@@ -101,7 +104,7 @@ export default function SequencesPage() {
     await fetch("/api/sequences", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, description: newDesc, steps }),
+      body: JSON.stringify({ name: newName, description: newDesc, steps, workspaceId: activeWorkspaceId }),
     })
     setShowNew(false)
     setNewName("")
@@ -115,7 +118,7 @@ export default function SequencesPage() {
     await fetch("/api/sequences", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, workspaceId: activeWorkspaceId }),
     })
     setDeleteId(null)
     if (selected?.id === id) setSelected(null)
@@ -129,6 +132,7 @@ export default function SequencesPage() {
       .from("leadboard")
       .select("id, full_name, email, company, status")
       .eq("user_id", user.id)
+      .eq("workspace_id", activeWorkspaceId ?? "")
       .order("full_name")
     setLeads(data ?? [])
     setSelectedLeads(new Set())

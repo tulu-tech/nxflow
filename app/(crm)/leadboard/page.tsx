@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { DragEvent } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
 import { Label } from "@/components/ui-crm/label"
@@ -198,6 +199,7 @@ function mapCSVRow(row: Record<string, string>, headers: string[]) {
 
 export default function LeadboardPage() {
   const supabase = createClient()
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   // ── Core data ──────────────────────────────────────────────────────────────
   const [leads, setLeads] = useState<LeadWithTags[]>([])
@@ -304,6 +306,7 @@ export default function LeadboardPage() {
   // ─── Data Loading ─────────────────────────────────────────────────────────────
 
   const loadAll = useCallback(async () => {
+    if (!activeWorkspaceId) return
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
@@ -313,17 +316,19 @@ export default function LeadboardPage() {
         .from("leadboard")
         .select("*, lead_tag_assignments(tag_id)")
         .eq("user_id", user.id)
+        .eq("workspace_id", activeWorkspaceId)
         .order("relevance_score", { ascending: false }),
-      fetch("/api/tags"),
-      fetch("/api/segments"),
+      fetch(`/api/tags?workspaceId=${activeWorkspaceId}`),
+      fetch(`/api/segments?workspaceId=${activeWorkspaceId}`),
       supabase
         .from("follow_up_reminders")
         .select("*, leadboard(full_name)")
         .eq("user_id", user.id)
+        .eq("workspace_id", activeWorkspaceId)
         .eq("is_done", false)
         .lte("remind_at", new Date().toISOString()),
       supabase.from("scoring_rules").select("*").order("created_at", { ascending: false }),
-      fetch("/api/sequences"),
+      fetch(`/api/sequences?workspaceId=${activeWorkspaceId}`),
     ])
 
     const rawLeads = (leadsRes.data ?? []) as (LeadboardEntry & { lead_tag_assignments: { tag_id: string }[] })[]
@@ -350,7 +355,7 @@ export default function LeadboardPage() {
     setLoading(false)
   }, [supabase])
 
-  useEffect(() => { loadAll() }, [loadAll])
+  useEffect(() => { loadAll() }, [loadAll, activeWorkspaceId])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -526,7 +531,7 @@ export default function LeadboardPage() {
     const res = await fetch("/api/leads/add", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(addForm),
+      body: JSON.stringify({ ...addForm, workspaceId: activeWorkspaceId }),
     })
     const data = await res.json()
     if (res.status === 409) {
@@ -637,7 +642,7 @@ export default function LeadboardPage() {
     const res = await fetch("/api/tags", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newTagName.trim(), color: newTagColor }),
+      body: JSON.stringify({ name: newTagName.trim(), color: newTagColor, workspaceId: activeWorkspaceId }),
     })
     if (res.ok) {
       const tag = await res.json()
@@ -651,7 +656,7 @@ export default function LeadboardPage() {
     await fetch("/api/tags", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tagId }),
+      body: JSON.stringify({ tagId, workspaceId: activeWorkspaceId }),
     })
     setAllTags((prev) => prev.filter((t) => t.id !== tagId))
     setLeads((prev) => prev.map((l) => ({ ...l, tagIds: l.tagIds.filter((t) => t !== tagId) })))
@@ -706,7 +711,7 @@ export default function LeadboardPage() {
     const res = await fetch("/api/segments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: segmentName.trim(), color: segmentColor, filters }),
+      body: JSON.stringify({ name: segmentName.trim(), color: segmentColor, filters, workspaceId: activeWorkspaceId }),
     })
     if (res.ok) {
       const seg = await res.json()
@@ -730,7 +735,7 @@ export default function LeadboardPage() {
     await fetch("/api/segments", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, workspaceId: activeWorkspaceId }),
     })
     setSegments((prev) => prev.filter((s) => s.id !== id))
     if (activeSegmentId === id) setActiveSegmentId(null)
@@ -941,6 +946,14 @@ export default function LeadboardPage() {
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
+
+  if (!activeWorkspaceId) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-96">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full">

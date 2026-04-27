@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getValidatedWorkspaceId } from "@/lib/workspace"
 import type { MatchedEmail } from "@/types"
 
 export async function POST(req: NextRequest) {
@@ -7,11 +8,16 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const { workspaceId } = await req.json()
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
+  if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
+
   // Get Gmail token
   const { data: gmailToken } = await supabase
     .from("gmail_tokens")
     .select("access_token, expires_at")
     .eq("user_id", user.id)
+    .eq("workspace_id", wsId)
     .single()
 
   if (!gmailToken?.access_token) {
@@ -23,6 +29,7 @@ export async function POST(req: NextRequest) {
     .from("response_rules")
     .select("*")
     .eq("user_id", user.id)
+    .eq("workspace_id", wsId)
     .eq("is_active", true)
 
   if (!rules?.length) {

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useEffect } from "react"
 import {
   LayoutDashboard,
   Search,
@@ -17,6 +18,8 @@ import {
   Smartphone,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher"
+import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 
 interface NavItem {
   href: string
@@ -70,6 +73,22 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { setWorkspaces, setActiveWorkspace, activeWorkspaceId, workspaces } = useCrmWorkspaceStore()
+
+  useEffect(() => {
+    fetch("/api/workspaces")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setWorkspaces(data)
+          if (!activeWorkspaceId || !data.find((w: { id: string }) => w.id === activeWorkspaceId)) {
+            setActiveWorkspace(data[0].id)
+          }
+        }
+      })
+      .catch(() => {/* ignore */})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -143,6 +162,11 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
           </div>
         </div>
       </div>
+
+      {/* Workspace switcher */}
+      <WorkspaceSwitcher />
+
+      <div style={{ height: 1, background: "var(--border-subtle)", margin: "0" }} />
 
       {/* Back link */}
       <div style={{ padding: "6px 8px 2px" }}>

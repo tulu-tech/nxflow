@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getValidatedWorkspaceId } from "@/lib/workspace"
 
 async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   try {
@@ -53,14 +54,18 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { campaignId, recipientIds, fromEmail, isHtml } = await req.json()
+  const { campaignId, recipientIds, fromEmail, isHtml, workspaceId } = await req.json()
   if (!campaignId) return NextResponse.json({ error: "campaignId required" }, { status: 400 })
+
+  const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
+  if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
   const { data: campaign } = await supabase
     .from("email_campaigns")
     .select("*")
     .eq("id", campaignId)
     .eq("user_id", user.id)
+    .eq("workspace_id", wsId)
     .single()
 
   if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 })
@@ -72,6 +77,7 @@ export async function POST(req: NextRequest) {
     .from("gmail_tokens")
     .select("id, access_token, refresh_token, email")
     .eq("user_id", user.id)
+    .eq("workspace_id", wsId)
   if (fromEmail) tokenQuery = tokenQuery.eq("email", fromEmail)
 
   const { data: gmailTokens } = await tokenQuery.limit(1)
@@ -150,6 +156,7 @@ export async function POST(req: NextRequest) {
 
     await supabase.from("credit_usage").insert({
       user_id: user.id,
+      workspace_id: wsId,
       type: "mailchimp_send",
       amount: sent,
       metadata: { campaign_id: campaignId, method: "gmail", from: fromAddr, failures: failures.length },
@@ -198,6 +205,7 @@ export async function POST(req: NextRequest) {
 
   await supabase.from("credit_usage").insert({
     user_id: user.id,
+    workspace_id: wsId,
     type: "mailchimp_send",
     amount: campaign.recipient_count ?? 1,
     metadata: { campaign_id: campaignId, method: "mailchimp" },

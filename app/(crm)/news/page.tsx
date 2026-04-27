@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCrmWorkspaceStore } from '@/store/crmWorkspaceStore';
 import { formatDistanceToNow, format } from 'date-fns';
 import {
   Newspaper,
@@ -247,7 +248,7 @@ function ArticleCard({
 
 // ─── Sources Panel ─────────────────────────────────────────────────────────────
 
-function SourcesPanel() {
+function SourcesPanel({ workspaceId }: { workspaceId: string | null }) {
   const [sources, setSources] = useState<NewsSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -260,9 +261,10 @@ function SourcesPanel() {
   const nameRef = useRef<HTMLInputElement>(null);
 
   const loadSources = useCallback(async () => {
+    if (!workspaceId) return;
     setLoading(true);
     setError(null);
-    const res = await fetch('/api/news/sources');
+    const res = await fetch(`/api/news/sources?workspaceId=${workspaceId}`);
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
       setError(d.error ?? 'Failed to load sources');
@@ -270,7 +272,7 @@ function SourcesPanel() {
       setSources(await res.json());
     }
     setLoading(false);
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => { loadSources(); }, [loadSources]);
 
@@ -281,7 +283,7 @@ function SourcesPanel() {
     const res = await fetch('/api/news/sources', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: addName.trim(), url: addUrl.trim() }),
+      body: JSON.stringify({ name: addName.trim(), url: addUrl.trim(), workspaceId }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -300,7 +302,7 @@ function SourcesPanel() {
     const res = await fetch('/api/news/sources', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, is_active: !current }),
+      body: JSON.stringify({ id, is_active: !current, workspaceId }),
     });
     if (res.ok) {
       setSources((prev) => prev.map((s) => s.id === id ? { ...s, is_active: !current } : s));
@@ -311,7 +313,7 @@ function SourcesPanel() {
   async function handleDelete(id: string) {
     if (!confirm('Remove this source?')) return;
     setDeletingId(id);
-    const res = await fetch(`/api/news/sources?id=${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/news/sources?id=${id}&workspaceId=${workspaceId ?? ""}`, { method: 'DELETE' });
     if (res.ok) {
       setSources((prev) => prev.filter((s) => s.id !== id));
     }
@@ -485,7 +487,7 @@ function SourcesPanel() {
 
 // ─── Keywords Panel ───────────────────────────────────────────────────────────
 
-function KeywordsPanel() {
+function KeywordsPanel({ workspaceId }: { workspaceId: string | null }) {
   const [keywords, setKeywords] = useState<NewsKeyword[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -497,9 +499,10 @@ function KeywordsPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadKeywords = useCallback(async () => {
+    if (!workspaceId) return;
     setLoading(true);
     setError(null);
-    const res = await fetch('/api/news/keywords');
+    const res = await fetch(`/api/news/keywords?workspaceId=${workspaceId}`);
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
       setError(d.error ?? 'Failed to load keywords');
@@ -507,7 +510,7 @@ function KeywordsPanel() {
       setKeywords(await res.json());
     }
     setLoading(false);
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => { loadKeywords(); }, [loadKeywords]);
 
@@ -518,7 +521,7 @@ function KeywordsPanel() {
     const res = await fetch('/api/news/keywords', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyword: addKw.trim() }),
+      body: JSON.stringify({ keyword: addKw.trim(), workspaceId }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -536,7 +539,7 @@ function KeywordsPanel() {
     const res = await fetch('/api/news/keywords', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, is_active: !current }),
+      body: JSON.stringify({ id, is_active: !current, workspaceId }),
     });
     if (res.ok) {
       setKeywords((prev) => prev.map((k) => k.id === id ? { ...k, is_active: !current } : k));
@@ -547,7 +550,7 @@ function KeywordsPanel() {
   async function handleDelete(id: string) {
     if (!confirm('Remove this keyword?')) return;
     setDeletingId(id);
-    const res = await fetch(`/api/news/keywords?id=${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/news/keywords?id=${id}&workspaceId=${workspaceId ?? ""}`, { method: 'DELETE' });
     if (res.ok) {
       setKeywords((prev) => prev.filter((k) => k.id !== id));
     }
@@ -691,6 +694,7 @@ function KeywordsPanel() {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function NewsPage() {
+  const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
   const [todayArticles, setTodayArticles] = useState<NewsArticle[]>([]);
   const [archiveArticles, setArchiveArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -839,14 +843,14 @@ export default function NewsPage() {
       {/* Keywords panel */}
       {keywordsOpen && (
         <div style={{ marginBottom: 16 }}>
-          <KeywordsPanel />
+          <KeywordsPanel workspaceId={activeWorkspaceId} />
         </div>
       )}
 
       {/* Sources panel */}
       {sourcesOpen && (
         <div style={{ marginBottom: 24 }}>
-          <SourcesPanel />
+          <SourcesPanel workspaceId={activeWorkspaceId} />
         </div>
       )}
 
