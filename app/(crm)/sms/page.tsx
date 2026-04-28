@@ -47,6 +47,9 @@ export default function SMSPage() {
   // Compose
   const [campName, setCampName] = useState("")
   const [message, setMessage] = useState("")
+  const [sending, setSending] = useState(false)
+  const [sendResult, setSendResult] = useState<{ sent: number; failed: number; skipped: number; failures: { name: string; phone: string; reason: string }[] } | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   const loadData = useCallback(async () => {
     if (!activeWorkspaceId) return
@@ -90,11 +93,42 @@ export default function SMSPage() {
   }
 
   const massLeads = leads.filter((l) => {
+    if (!l.phone) return false  // SMS only works for leads with phone numbers
     if (segmentFilter !== "all" && !segmentMemberIds.has(l.id)) return false
     if (statusFilter !== "all" && l.status !== statusFilter) return false
     if (l.relevance_score < minScore) return false
     return true
   })
+
+  async function handleSend() {
+    if (!twilioConnected || selectedLeadIds.size === 0 || !message.trim()) return
+    setSending(true)
+    setSendError(null)
+    setSendResult(null)
+    try {
+      const res = await fetch("/api/sms/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipientIds: Array.from(selectedLeadIds),
+          message,
+          campName: campName.trim() || "SMS Campaign",
+          workspaceId: activeWorkspaceId,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSendResult(data)
+        setSelectedLeadIds(new Set())
+        setCampName("")
+        setMessage("")
+      } else {
+        setSendError(data.error ?? "Send failed")
+      }
+    } finally {
+      setSending(false)
+    }
+  }
 
   function toggleLead(id: string) {
     setSelectedLeadIds((prev) => {
@@ -254,7 +288,12 @@ export default function SMSPage() {
                     </div>
                   ) : massLeads.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No leads match filters</p>
-                  ) : massLeads.map((l) => (
+                  ) : massLeads.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <p className="text-sm">No leads with phone numbers</p>
+                    <p className="text-xs mt-1">Add phone numbers to leads in <a href="/leadboard" className="underline text-primary">Leadboard</a></p>
+                  </div>
+                ) : massLeads.map((l) => (
                     <div key={l.id} className="flex items-center gap-2 py-1.5">
                       <Checkbox
                         checked={selectedLeadIds.has(l.id)}
@@ -262,7 +301,7 @@ export default function SMSPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{l.full_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{l.company ?? l.email}</p>
+                        <p className="text-xs text-muted-foreground truncate font-mono">{l.phone}</p>
                       </div>
                       <span className="text-xs text-muted-foreground">{l.relevance_score}</span>
                     </div>
@@ -317,20 +356,40 @@ export default function SMSPage() {
                   </div>
                 </div>
 
+                {sendResult && (
+                  <div className="flex items-start gap-2 rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium">Sent to {sendResult.sent} recipient{sendResult.sent !== 1 ? "s" : ""}!</p>
+                      {sendResult.skipped > 0 && <p className="text-xs mt-0.5">{sendResult.skipped} skipped (no phone number)</p>}
+                      {sendResult.failed > 0 && <p className="text-xs mt-0.5 text-amber-700 dark:text-amber-400">{sendResult.failed} failed — check phone number format</p>}
+                    </div>
+                  </div>
+                )}
+
+                {sendError && (
+                  <div className="flex items-center gap-2 rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {sendError}
+                  </div>
+                )}
+
                 <Button
-                  disabled
-                  className="w-full gap-2 opacity-60 cursor-not-allowed"
-                  title="Connect Twilio in Settings first"
+                  onClick={handleSend}
+                  disabled={!twilioConnected || selectedLeadIds.size === 0 || !message.trim() || sending}
+                  className="w-full gap-2"
                 >
-                  <Users className="h-4 w-4" />
-                  Send SMS Campaign ({selectedLeadIds.size} recipients)
+                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                  {sending ? "Sending…" : `Send SMS Campaign (${selectedLeadIds.size} recipient${selectedLeadIds.size !== 1 ? "s" : ""})`}
                 </Button>
 
-                <p className="text-xs text-muted-foreground text-center">
-                  Connect Twilio in{" "}
-                  <a href="/settings" className="underline">Settings</a>{" "}
-                  to enable sending
-                </p>
+                {!twilioConnected && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Connect Twilio in{" "}
+                    <a href="/settings" className="underline">Settings</a>{" "}
+                    to enable sending
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

@@ -34,6 +34,7 @@ export interface LeadboardEntry {
   company?: string
   position?: string
   email: string
+  phone?: string | null
   relevance_score: number
   scoring_reason?: string
   status: LeadStatus

@@ -46,9 +46,11 @@ export default function SettingsPage() {
 
   // Twilio
   const [twilioAccountSid, setTwilioAccountSid] = useState("")
+  const [twilioApiKeySid, setTwilioApiKeySid] = useState("")
   const [twilioAuthToken, setTwilioAuthToken] = useState("")
   const [twilioPhone, setTwilioPhone] = useState("")
   const [twilioConnected, setTwilioConnected] = useState(false)
+  const [twilioApiKeySet, setTwilioApiKeySet] = useState(false)
   const [showTwilioSid, setShowTwilioSid] = useState(false)
   const [showTwilioToken, setShowTwilioToken] = useState(false)
   const [savingTwilio, setSavingTwilio] = useState(false)
@@ -104,6 +106,7 @@ export default function SettingsPage() {
       const tw = await twilioRes.json()
       setTwilioPhone(tw.phoneNumber ?? "")
       setTwilioConnected(tw.connected ?? false)
+      setTwilioApiKeySet(tw.apiKeySidSet ?? false)
     }
 
     const creditRows = creditRes.data ?? []
@@ -164,6 +167,7 @@ export default function SettingsPage() {
     setTwilioSuccess(false)
     const body: Record<string, string> = { phoneNumber: twilioPhone, workspaceId: activeWorkspaceId ?? "" }
     if (twilioAccountSid) body.accountSid = twilioAccountSid
+    if (twilioApiKeySid !== undefined) body.apiKeySid = twilioApiKeySid
     if (twilioAuthToken) body.authToken = twilioAuthToken
     const res = await fetch("/api/settings/twilio", {
       method: "POST",
@@ -173,6 +177,7 @@ export default function SettingsPage() {
     if (res.ok) {
       setTwilioSuccess(true)
       setTwilioAccountSid("")
+      setTwilioApiKeySid("")
       setTwilioAuthToken("")
       setTwilioConnected(!!(twilioAccountSid || twilioConnected))
       await loadAll()
@@ -457,11 +462,13 @@ export default function SettingsPage() {
                 <Smartphone className="h-4 w-4" /> Twilio Integration
                 {twilioConnected && <Badge variant="outline" className="text-xs gap-1 ml-1"><CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" /> Connected</Badge>}
               </CardTitle>
-              <CardDescription className="text-xs">Required for SMS campaigns. Enter your Twilio Account SID, Auth Token, and phone number.</CardDescription>
+              <CardDescription className="text-xs">
+                Required for SMS campaigns. Use <strong>Account SID + Auth Token</strong> (classic) or <strong>Account SID + API Key SID + API Key Secret</strong>.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs">Account SID</Label>
+                <Label className="text-xs">Account SID <span className="text-muted-foreground">(starts with AC…)</span></Label>
                 <div className="relative">
                   <Input
                     className="h-9 text-sm pr-10"
@@ -481,7 +488,23 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Auth Token</Label>
+                <Label className="text-xs">
+                  API Key SID <span className="text-muted-foreground">(starts with SK… — optional if using Auth Token)</span>
+                  {twilioApiKeySet && !twilioApiKeySid && <Badge variant="outline" className="ml-1.5 text-[10px] gap-0.5"><CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" /> Set</Badge>}
+                </Label>
+                <div className="relative">
+                  <Input
+                    className="h-9 text-sm pr-10"
+                    type={showTwilioSid ? "text" : "password"}
+                    value={twilioApiKeySid}
+                    onChange={(e) => setTwilioApiKeySid(e.target.value)}
+                    placeholder={twilioApiKeySet ? "Enter new API Key SID to replace…" : "SKxxxxxxxxxxxxxxxx"}
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Auth Token <span className="text-muted-foreground">/ API Key Secret</span></Label>
                 <div className="relative">
                   <Input
                     className="h-9 text-sm pr-10"

@@ -238,7 +238,7 @@ export default function LeadboardPage() {
   const [sequencePickerOpen, setSequencePickerOpen] = useState(false)
 
   // ── Add Lead form ────────────────────────────────────────────────────────────
-  const [addForm, setAddForm] = useState({ full_name: "", email: "", company: "", position: "", notes: "" })
+  const [addForm, setAddForm] = useState({ full_name: "", email: "", company: "", position: "", notes: "", phone: "" })
   const [addLoading, setAddLoading] = useState(false)
   const [addDuplicate, setAddDuplicate] = useState<{ id: string; name: string } | null>(null)
   const [addError, setAddError] = useState<string | null>(null)
@@ -545,7 +545,7 @@ export default function LeadboardPage() {
       return
     }
     setLeads((prev) => [{ ...data, tagIds: [] }, ...prev])
-    setAddForm({ full_name: "", email: "", company: "", position: "", notes: "" })
+    setAddForm({ full_name: "", email: "", company: "", position: "", notes: "", phone: "" })
     setAddLeadOpen(false)
     setAddLoading(false)
   }
@@ -1932,6 +1932,16 @@ export default function LeadboardPage() {
                     placeholder="CEO"
                   />
                 </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Input
+                  className="h-9 text-sm"
+                  type="tel"
+                  value={addForm.phone}
+                  onChange={(e) => setAddForm((p) => ({ ...p, phone: e.target.value }))}
+                  placeholder="+1234567890"
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Notes</Label>

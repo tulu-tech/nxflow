@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { full_name, email, company, position, notes, workspaceId } = await req.json()
+  const { full_name, email, company, position, notes, phone, workspaceId } = await req.json()
 
   if (!full_name?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 })
   if (!email?.trim())     return NextResponse.json({ error: "Email is required" }, { status: 400 })
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       company:  company?.trim()  || null,
       position: position?.trim() || null,
       notes:    notes?.trim()    || null,
+      phone:    phone?.trim()    || null,
       status: "new",
       relevance_score: 0,
     })
