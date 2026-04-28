@@ -287,13 +287,11 @@ export default function SMSPage() {
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : massLeads.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">No leads match filters</p>
-                  ) : massLeads.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <p className="text-sm">No leads with phone numbers</p>
-                    <p className="text-xs mt-1">Add phone numbers to leads in <a href="/leadboard" className="underline text-primary">Leadboard</a></p>
-                  </div>
-                ) : massLeads.map((l) => (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <p className="text-sm">No leads with phone numbers</p>
+                      <p className="text-xs mt-1">Add phone numbers to leads in <a href="/leadboard" className="underline text-primary">Leadboard</a></p>
+                    </div>
+                  ) : massLeads.map((l) => (
                     <div key={l.id} className="flex items-center gap-2 py-1.5">
                       <Checkbox
                         checked={selectedLeadIds.has(l.id)}
