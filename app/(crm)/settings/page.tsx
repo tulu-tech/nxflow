@@ -49,6 +49,7 @@ export default function SettingsPage() {
   const [twilioApiKeySid, setTwilioApiKeySid] = useState("")
   const [twilioAuthToken, setTwilioAuthToken] = useState("")
   const [twilioPhone, setTwilioPhone] = useState("")
+  const [twilioMyNumber, setTwilioMyNumber] = useState("")
   const [twilioConnected, setTwilioConnected] = useState(false)
   const [twilioApiKeySet, setTwilioApiKeySet] = useState(false)
   const [showTwilioSid, setShowTwilioSid] = useState(false)
@@ -105,6 +106,7 @@ export default function SettingsPage() {
     if (twilioRes.ok) {
       const tw = await twilioRes.json()
       setTwilioPhone(tw.phoneNumber ?? "")
+      setTwilioMyNumber(tw.myNumber ?? "")
       setTwilioConnected(tw.connected ?? false)
       setTwilioApiKeySet(tw.apiKeySidSet ?? false)
     }
@@ -165,7 +167,11 @@ export default function SettingsPage() {
     setSavingTwilio(true)
     setTwilioError(null)
     setTwilioSuccess(false)
-    const body: Record<string, string> = { phoneNumber: twilioPhone, workspaceId: activeWorkspaceId ?? "" }
+    const body: Record<string, string> = {
+      phoneNumber: twilioPhone,
+      myNumber: twilioMyNumber,
+      workspaceId: activeWorkspaceId ?? "",
+    }
     if (twilioAccountSid) body.accountSid = twilioAccountSid
     if (twilioApiKeySid !== undefined) body.apiKeySid = twilioApiKeySid
     if (twilioAuthToken) body.authToken = twilioAuthToken
@@ -524,14 +530,26 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Phone Number</Label>
+                <Label className="text-xs">Twilio Phone Number <span className="text-muted-foreground">(sender number)</span></Label>
                 <Input
                   className="h-9 text-sm"
                   value={twilioPhone}
                   onChange={(e) => setTwilioPhone(e.target.value)}
                   placeholder="+1234567890"
                 />
-                <p className="text-xs text-muted-foreground">Must be a Twilio-provisioned number in E.164 format.</p>
+                <p className="text-xs text-muted-foreground">Your Twilio-provisioned number in E.164 format. Used as the sender for SMS and calls.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  My Phone Number <span className="text-muted-foreground">(for click-to-call)</span>
+                </Label>
+                <Input
+                  className="h-9 text-sm"
+                  value={twilioMyNumber}
+                  onChange={(e) => setTwilioMyNumber(e.target.value)}
+                  placeholder="+1234567890"
+                />
+                <p className="text-xs text-muted-foreground">Your personal number. When you click "Call" on a lead, Twilio calls this number first, then bridges you to the lead.</p>
               </div>
               {twilioSuccess && (
                 <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-md px-3 py-2">

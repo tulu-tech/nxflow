@@ -42,7 +42,7 @@ import {
   FileText, Clock, Zap, ChevronRight, ChevronDown,
   LayoutList, Columns, Bell, SlidersHorizontal,
   AlertCircle, Calendar, Check, Bookmark, Users,
-  MoreHorizontal, FolderOpen,
+  MoreHorizontal, FolderOpen, Smartphone,
 } from "lucide-react"
 import type { LeadboardEntry, LeadStatus, ScoringRule } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
@@ -254,6 +254,12 @@ export default function LeadboardPage() {
   // ── Notes / Sheet ────────────────────────────────────────────────────────────
   const [notesDraft, setNotesDraft] = useState("")
   const [savingNotes, setSavingNotes] = useState(false)
+  const [phoneDraft, setPhoneDraft] = useState("")
+  const [savingPhone, setSavingPhone] = useState(false)
+
+  // ── Click-to-Call ────────────────────────────────────────────────────────────
+  const [callState, setCallState] = useState<"idle" | "calling" | "error">("idle")
+  const [callMessage, setCallMessage] = useState<string | null>(null)
 
   // ── Activities ───────────────────────────────────────────────────────────────
   const [activities, setActivities] = useState<Activity[]>([])
@@ -361,6 +367,9 @@ export default function LeadboardPage() {
   useEffect(() => {
     if (selectedLead) {
       setNotesDraft(selectedLead.notes ?? "")
+      setPhoneDraft(selectedLead.phone ?? "")
+      setCallState("idle")
+      setCallMessage(null)
       loadActivities(selectedLead.id)
       loadEmailLogs(selectedLead.id)
       loadExistingReminder(selectedLead.id)
@@ -507,6 +516,47 @@ export default function LeadboardPage() {
     setLeads((prev) => prev.map((l) => l.id === selectedLead.id ? { ...l, notes: notesDraft } : l))
     setSelectedLead((l) => l ? { ...l, notes: notesDraft } : l)
     setSavingNotes(false)
+  }
+
+  async function handleSavePhone() {
+    if (!selectedLead) return
+    setSavingPhone(true)
+    const val = phoneDraft.trim() || null
+    await supabase.from("leadboard").update({ phone: val }).eq("id", selectedLead.id)
+    setLeads((prev) => prev.map((l) => l.id === selectedLead.id ? { ...l, phone: val } : l))
+    setSelectedLead((l) => l ? { ...l, phone: val } : l)
+    setSavingPhone(false)
+  }
+
+  async function handleCall(leadId: string) {
+    if (callState === "calling") return
+    setCallState("calling")
+    setCallMessage(null)
+    try {
+      const res = await fetch("/api/calls/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, workspaceId: activeWorkspaceId }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setCallMessage(data.message)
+        // Mark lead as contacted in local state
+        setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, status: "contacted", last_contacted_at: new Date().toISOString() } : l))
+        if (selectedLead?.id === leadId) {
+          setSelectedLead((l) => l ? { ...l, status: "contacted", last_contacted_at: new Date().toISOString() } : l)
+        }
+      } else {
+        setCallMessage(data.error ?? "Call failed")
+        setCallState("error")
+        return
+      }
+    } catch {
+      setCallMessage("Network error — call not placed")
+      setCallState("error")
+      return
+    }
+    setCallState("idle")
   }
 
   // ─── Delete Lead ──────────────────────────────────────────────────────────────
@@ -1228,6 +1278,7 @@ export default function LeadboardPage() {
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Name</th>
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs hidden md:table-cell">Position</th>
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs hidden lg:table-cell">Email</th>
+                      <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs hidden xl:table-cell">Phone</th>
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Score</th>
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Status</th>
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs hidden sm:table-cell">Tags</th>
@@ -1247,7 +1298,7 @@ export default function LeadboardPage() {
                                 onClick={() => toggleCompany(group.company)}
                               >
                                 <td className="px-3 py-2" colSpan={2} />
-                                <td className="px-4 py-2" colSpan={7}>
+                                <td className="px-4 py-2" colSpan={8}>
                                   <div className="flex items-center gap-2">
                                     {collapsed
                                       ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1493,9 +1544,56 @@ export default function LeadboardPage() {
                 <div className="px-5 py-4 space-y-5">
 
                   {/* Contact info */}
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Mail className="h-3.5 w-3.5 shrink-0" />
-                    <span className="font-mono text-xs break-all">{selectedLead.email}</span>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      <span className="font-mono text-xs break-all">{selectedLead.email}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Smartphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <Input
+                        className="h-7 text-xs font-mono border-0 bg-transparent px-1 -ml-1 focus-visible:bg-muted focus-visible:border focus-visible:ring-0 w-full"
+                        value={phoneDraft}
+                        onChange={(e) => setPhoneDraft(e.target.value)}
+                        onBlur={handleSavePhone}
+                        placeholder="Add phone number…"
+                      />
+                      {savingPhone && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />}
+                      {selectedLead.phone && (
+                        <button
+                          onClick={() => handleCall(selectedLead.id)}
+                          disabled={callState === "calling"}
+                          title="Click-to-call"
+                          className={cn(
+                            "shrink-0 h-6 w-6 flex items-center justify-center rounded-full transition-colors",
+                            callState === "calling"
+                              ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 cursor-wait"
+                              : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50"
+                          )}
+                        >
+                          {callState === "calling"
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Smartphone className="h-3 w-3" />}
+                        </button>
+                      )}
+                    </div>
+                    {/* Call status banner */}
+                    {callMessage && (
+                      <div className={cn(
+                        "flex items-start gap-2 rounded-md px-3 py-2 text-xs",
+                        callState === "error"
+                          ? "bg-destructive/10 border border-destructive/20 text-destructive"
+                          : "bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+                      )}>
+                        {callState === "error"
+                          ? <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          : <Smartphone className="h-3.5 w-3.5 shrink-0 mt-0.5" />}
+                        <span>{callMessage}</span>
+                        <button onClick={() => setCallMessage(null)} className="ml-auto shrink-0 opacity-60 hover:opacity-100">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Score */}
@@ -2314,6 +2412,7 @@ function LeadRow({
       </td>
       <td className="px-4 py-3 text-muted-foreground text-sm hidden md:table-cell">{lead.position ?? "—"}</td>
       <td className="px-4 py-3 text-muted-foreground text-xs font-mono hidden lg:table-cell">{lead.email}</td>
+      <td className="px-4 py-3 text-muted-foreground text-xs font-mono hidden xl:table-cell">{lead.phone ?? "—"}</td>
       <td className="px-4 py-3">
         <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", scoreBadgeClass(lead.relevance_score))}>
           {lead.relevance_score}

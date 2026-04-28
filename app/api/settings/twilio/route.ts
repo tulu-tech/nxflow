@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabase
     .from('twilio_config')
-    .select('account_sid, auth_token, phone_number, api_key_sid')
+    .select('account_sid, auth_token, phone_number, api_key_sid, my_number')
     .eq('user_id', user.id)
     .eq('workspace_id', wsId)
     .single();
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     authTokenSet: !!data?.auth_token,
     apiKeySidSet: !!data?.api_key_sid,
     phoneNumber: data?.phone_number ?? '',
+    myNumber: data?.my_number ?? '',
     connected: !!(data?.account_sid && data?.auth_token && data?.phone_number),
   });
 }
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { accountSid, authToken, apiKeySid, phoneNumber, workspaceId } = await req.json();
+  const { accountSid, authToken, apiKeySid, phoneNumber, myNumber, workspaceId } = await req.json();
 
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId);
   if (!wsId) return NextResponse.json({ error: 'Invalid workspace' }, { status: 400 });
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
   if (authToken !== undefined) update.auth_token = authToken.trim();
   if (apiKeySid !== undefined) update.api_key_sid = apiKeySid.trim() || null;
   if (phoneNumber !== undefined) update.phone_number = phoneNumber.trim();
+  if (myNumber !== undefined) update.my_number = myNumber.trim() || null;
 
   const { error } = await supabase
     .from('twilio_config')
