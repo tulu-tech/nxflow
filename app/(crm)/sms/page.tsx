@@ -13,12 +13,35 @@ import { Checkbox } from "@/components/ui-crm/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui-crm/select"
 import {
   Smartphone, Loader2, AlertCircle, CheckCircle2, Settings, MessageSquare,
-  Tag, Users
+  Tag, Users, Inbox, RefreshCw
 } from "lucide-react"
 import type { LeadboardEntry, LeadStatus } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
 import { cn } from "@/lib/utils"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
+import { formatDistanceToNow } from "date-fns"
+
+interface SmsLog {
+  id: string
+  lead_id: string | null
+  direction: "outbound" | "inbound"
+  to_number: string
+  from_number: string
+  body: string | null
+  status: string
+  error_code: string | null
+  campaign_name: string | null
+  sent_at: string
+  leadboard?: { full_name: string } | null
+}
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  sent:        { label: "Sent",        className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
+  delivered:   { label: "Delivered",   className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  failed:      { label: "Failed",      className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+  undelivered: { label: "Undelivered", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+  received:    { label: "Received",    className: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400" },
+}
 
 const MERGE_TAGS = [
   { label: "{{first_name}}", value: "{{first_name}}" },
@@ -51,6 +74,10 @@ export default function SMSPage() {
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number; skipped: number; failures: { name: string; phone: string; reason: string }[] } | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
 
+  // History & Inbox
+  const [smsLogs, setSmsLogs] = useState<SmsLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+
   const loadData = useCallback(async () => {
     if (!activeWorkspaceId) return
     setLoading(true)
@@ -72,7 +99,21 @@ export default function SMSPage() {
     setLoading(false)
   }, [supabase, activeWorkspaceId])
 
+  const loadLogs = useCallback(async () => {
+    if (!activeWorkspaceId) return
+    setLogsLoading(true)
+    const { data } = await supabase
+      .from("sms_logs")
+      .select("*, leadboard(full_name)")
+      .eq("workspace_id", activeWorkspaceId)
+      .order("sent_at", { ascending: false })
+      .limit(100)
+    setSmsLogs((data as SmsLog[]) ?? [])
+    setLogsLoading(false)
+  }, [supabase, activeWorkspaceId])
+
   useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { loadLogs() }, [loadLogs])
 
   async function handleSegmentChange(segId: string) {
     setSegmentFilter(segId)
@@ -196,7 +237,22 @@ export default function SMSPage() {
       <Tabs defaultValue="new">
         <TabsList className="h-9">
           <TabsTrigger value="new" className="text-sm">New Campaign</TabsTrigger>
-          <TabsTrigger value="history" className="text-sm">History</TabsTrigger>
+          <TabsTrigger value="history" className="text-sm">
+            History
+            {smsLogs.filter(l => l.direction === "outbound").length > 0 && (
+              <span className="ml-1.5 text-[10px] bg-muted rounded-full px-1.5 py-0.5 tabular-nums">
+                {smsLogs.filter(l => l.direction === "outbound").length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="inbox" className="text-sm">
+            Inbox
+            {smsLogs.filter(l => l.direction === "inbound").length > 0 && (
+              <span className="ml-1.5 text-[10px] bg-primary/10 text-primary rounded-full px-1.5 py-0.5 tabular-nums">
+                {smsLogs.filter(l => l.direction === "inbound").length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* New Campaign */}
@@ -393,13 +449,113 @@ export default function SMSPage() {
           </div>
         </TabsContent>
 
-        {/* History */}
+        {/* History — outbound messages with delivery status */}
         <TabsContent value="history" className="mt-4">
-          <div className="text-center py-20 text-muted-foreground">
-            <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-20" />
-            <p className="text-sm font-medium">No SMS campaigns yet</p>
-            <p className="text-xs mt-1">Your sent campaigns will appear here once Twilio is connected.</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-muted-foreground">Last 100 outbound messages</p>
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={loadLogs} disabled={logsLoading}>
+              {logsLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Refresh
+            </Button>
           </div>
+          {logsLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : smsLogs.filter(l => l.direction === "outbound").length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium">No outbound messages yet</p>
+              <p className="text-xs mt-1">Sent SMS campaigns will appear here with delivery status.</p>
+            </div>
+          ) : (
+            <Card>
+              <div className="divide-y">
+                {smsLogs.filter(l => l.direction === "outbound").map((log) => {
+                  const cfg = STATUS_CONFIG[log.status] ?? { label: log.status, className: "bg-muted text-muted-foreground" }
+                  return (
+                    <div key={log.id} className="flex items-start gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium truncate">
+                            {log.leadboard?.full_name ?? log.to_number}
+                          </span>
+                          {log.campaign_name && (
+                            <span className="text-xs text-muted-foreground">· {log.campaign_name}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 font-mono">{log.to_number}</p>
+                        {log.body && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 italic">"{log.body}"</p>
+                        )}
+                        {log.error_code && (
+                          <p className="text-xs text-destructive mt-0.5">Error {log.error_code}</p>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex flex-col items-end gap-1">
+                        <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", cfg.className)}>
+                          {cfg.label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(log.sent_at), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Inbox — inbound messages from leads */}
+        <TabsContent value="inbox" className="mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-muted-foreground">Incoming SMS from leads</p>
+            <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={loadLogs} disabled={logsLoading}>
+              {logsLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Refresh
+            </Button>
+          </div>
+          {logsLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : smsLogs.filter(l => l.direction === "inbound").length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <Inbox className="h-10 w-10 mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium">No inbound messages yet</p>
+              <p className="text-xs mt-1 max-w-xs mx-auto">
+                Configure your Twilio number's incoming SMS webhook to{" "}
+                <code className="text-[10px] bg-muted px-1 py-0.5 rounded">/api/webhooks/twilio/sms-inbound</code>
+              </p>
+            </div>
+          ) : (
+            <Card>
+              <div className="divide-y">
+                {smsLogs.filter(l => l.direction === "inbound").map((log) => (
+                  <div key={log.id} className="flex items-start gap-3 px-4 py-3">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Smartphone className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {log.leadboard?.full_name ?? log.from_number}
+                        </span>
+                        {!log.lead_id && (
+                          <Badge variant="outline" className="text-[10px]">Unknown</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">{log.from_number}</p>
+                      {log.body && (
+                        <p className="text-sm mt-1.5 text-foreground">{log.body}</p>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {formatDistanceToNow(new Date(log.sent_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

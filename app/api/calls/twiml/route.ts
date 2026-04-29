@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceRoleClient } from "@/lib/supabase/serviceRole"
 
 // Twilio hits this endpoint when the first leg (user's phone) is answered.
 // We return TwiML that dials out to the lead's number, bridging the call.
@@ -18,8 +18,10 @@ async function handleTwiml(req: NextRequest) {
   const callId = req.nextUrl.searchParams.get("callId")
   if (!callId) return twimlError("Missing callId")
 
-  // Use service-role to bypass RLS — this endpoint is called by Twilio, not a browser session
-  const supabase = await createClient()
+  // Service-role bypasses RLS — this endpoint is called by Twilio, not a browser session
+  const result = createServiceRoleClient()
+  if ("error" in result) return twimlError("Server configuration error")
+  const { supabase } = result
 
   const { data: log } = await supabase
     .from("call_logs")

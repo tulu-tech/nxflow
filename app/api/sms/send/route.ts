@@ -15,11 +15,12 @@ function fillMergeTags(template: string, lead: { full_name: string; company?: st
 
 async function sendTwilioSMS(
   accountSid: string,
-  authUser: string,  // accountSid or apiKeySid
-  authPass: string,  // authToken or apiKeySecret
+  authUser: string,
+  authPass: string,
   from: string,
   to: string,
   body: string,
+  statusCallbackUrl: string,
 ) {
   const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
   const credentials = Buffer.from(`${authUser}:${authPass}`).toString("base64")
@@ -30,7 +31,7 @@ async function sendTwilioSMS(
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ To: to, From: from, Body: body }),
+    body: new URLSearchParams({ To: to, From: from, Body: body, StatusCallback: statusCallbackUrl }),
   })
 }
 
@@ -64,11 +65,10 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Determine auth method
-  // API Key auth: api_key_sid (SK...) as username, auth_token (API Key Secret) as password
-  // Classic auth: account_sid (AC...) as username, auth_token as password
   const authUser = twilio.api_key_sid ?? twilio.account_sid
   const authPass = twilio.auth_token
+  const origin = req.nextUrl.origin
+  const statusCallbackUrl = `${origin}/api/webhooks/twilio/sms-status?wsId=${wsId}`
 
   // Load leads with phone numbers
   const { data: leads } = await supabase
@@ -89,6 +89,7 @@ export async function POST(req: NextRequest) {
 
   let sent = 0
   const failures: { name: string; phone: string; reason: string }[] = []
+  const now = new Date().toISOString()
 
   for (const lead of targets) {
     const personalizedMsg = fillMergeTags(message, lead)
@@ -101,18 +102,35 @@ export async function POST(req: NextRequest) {
         twilio.phone_number,
         lead.phone!,
         personalizedMsg,
+        statusCallbackUrl,
       )
+
+      const twilioData = await res.json().catch(() => null)
 
       if (res.ok) {
         sent++
-        // Mark lead as contacted
+
+        // Log to sms_logs for delivery tracking
+        await supabase.from("sms_logs").insert({
+          user_id: user.id,
+          workspace_id: wsId,
+          lead_id: lead.id,
+          twilio_message_sid: twilioData?.sid ?? null,
+          direction: "outbound",
+          to_number: lead.phone!,
+          from_number: twilio.phone_number,
+          body: personalizedMsg,
+          status: "sent",
+          campaign_name: campName?.trim() || null,
+          sent_at: now,
+        })
+
         await supabase
           .from("leadboard")
-          .update({ last_contacted_at: new Date().toISOString(), status: "contacted" })
+          .update({ last_contacted_at: now, status: "contacted" })
           .eq("id", lead.id)
       } else {
-        const err = await res.json().catch(() => null)
-        const reason = err?.message ?? `HTTP ${res.status}`
+        const reason = twilioData?.message ?? `HTTP ${res.status}`
         failures.push({ name: lead.full_name, phone: lead.phone!, reason })
       }
     } catch (e) {
@@ -120,7 +138,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Log credit usage
   if (sent > 0) {
     await supabase.from("credit_usage").insert({
       user_id: user.id,
