@@ -186,28 +186,46 @@ function parseXLSX(buffer: ArrayBuffer): { headers: string[]; rows: Record<strin
   return { headers, rows }
 }
 
-function mapCSVRow(row: Record<string, string>, headers: string[]) {
-  // Case-insensitive fuzzy column finder — also accepts partial matches
-  const find = (...keys: string[]) => {
-    for (const k of keys) {
-      // exact match first
-      const exact = headers.find((h) => h.toLowerCase().trim() === k.toLowerCase().trim())
-      if (exact) return row[exact]?.trim() ?? ""
+// CRM fields with their fuzzy match keywords
+const IMPORT_FIELDS: { key: string; label: string; required: boolean; keywords: string[] }[] = [
+  { key: "full_name", label: "Full Name",  required: true,  keywords: ["full_name","fullname","name","contact name","full name","contact"] },
+  { key: "email",     label: "Email",      required: true,  keywords: ["email","e-mail","email address","work email","mail"] },
+  { key: "company",   label: "Company",    required: false, keywords: ["company","company name","organization","org","employer","account","firm"] },
+  { key: "position",  label: "Position",   required: false, keywords: ["position","job title","title","jobtitle","role","job role","designation","function"] },
+  { key: "phone",     label: "Phone",      required: false, keywords: ["phone","phone number","mobile","cell","telephone","tel","contact number","number"] },
+  { key: "notes",     label: "Notes",      required: false, keywords: ["notes","note","comment","comments","description","memo"] },
+]
+
+function autoDetectColumns(headers: string[]): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const field of IMPORT_FIELDS) {
+    // Try exact match first, then partial
+    const lower = headers.map((h) => h.toLowerCase().trim())
+    let found = ""
+    for (const kw of field.keywords) {
+      const exact = lower.findIndex((h) => h === kw)
+      if (exact !== -1) { found = headers[exact]; break }
     }
-    // partial match fallback (e.g. "email address" contains "email")
-    for (const k of keys) {
-      const partial = headers.find((h) => h.toLowerCase().includes(k.toLowerCase()))
-      if (partial) return row[partial]?.trim() ?? ""
+    if (!found) {
+      for (const kw of field.keywords) {
+        const partial = lower.findIndex((h) => h.includes(kw) || kw.includes(h))
+        if (partial !== -1) { found = headers[partial]; break }
+      }
     }
-    return ""
+    map[field.key] = found
   }
+  return map
+}
+
+function applyColumnMap(row: Record<string, string>, map: Record<string, string>) {
+  const get = (key: string) => (map[key] ? row[map[key]]?.trim() ?? "" : "")
   return {
-    full_name: find("full_name", "fullname", "name", "contact name", "full name"),
-    email:     find("email", "e-mail", "email address", "work email", "mail"),
-    company:   find("company", "company name", "organization", "org", "employer", "account"),
-    position:  find("position", "job title", "title", "jobtitle", "role", "job role", "designation"),
-    notes:     find("notes", "note", "comment", "comments", "description"),
-    phone:     find("phone", "phone number", "mobile", "cell", "telephone", "tel", "contact number"),
+    full_name: get("full_name"),
+    email:     get("email"),
+    company:   get("company"),
+    position:  get("position"),
+    phone:     get("phone"),
+    notes:     get("notes"),
   }
 }
 
@@ -262,6 +280,7 @@ export default function LeadboardPage() {
   // ── Import ──────────────────────────────────────────────────────────────────
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvParsed, setCsvParsed] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null)
+  const [columnMap, setColumnMap] = useState<Record<string, string>>({})
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null)
   const [csvDragOver, setCsvDragOver] = useState(false)
@@ -621,19 +640,19 @@ export default function LeadboardPage() {
   function handleImportFile(file: File) {
     setCsvFile(file)
     setImportResult(null)
+    setCsvParsed(null)
+    setColumnMap({})
     const isXLSX = /\.(xlsx|xls)$/i.test(file.name)
     const reader = new FileReader()
+    const onParsed = (parsed: { headers: string[]; rows: Record<string, string>[] }) => {
+      setCsvParsed(parsed)
+      setColumnMap(autoDetectColumns(parsed.headers))
+    }
     if (isXLSX) {
-      reader.onload = (e) => {
-        const buffer = e.target?.result as ArrayBuffer
-        setCsvParsed(parseXLSX(buffer))
-      }
+      reader.onload = (e) => onParsed(parseXLSX(e.target?.result as ArrayBuffer))
       reader.readAsArrayBuffer(file)
     } else {
-      reader.onload = (e) => {
-        const text = e.target?.result as string
-        setCsvParsed(parseCSV(text))
-      }
+      reader.onload = (e) => onParsed(parseCSV(e.target?.result as string))
       reader.readAsText(file)
     }
   }
@@ -648,7 +667,7 @@ export default function LeadboardPage() {
   async function handleImportSubmit() {
     if (!csvParsed) return
     setImportLoading(true)
-    const rows = csvParsed.rows.map((r) => mapCSVRow(r, csvParsed.headers)).filter((r) => r.full_name && r.email)
+    const rows = csvParsed.rows.map((r) => applyColumnMap(r, columnMap)).filter((r) => r.full_name && r.email)
     const res = await fetch("/api/leads/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2100,6 +2119,7 @@ export default function LeadboardPage() {
           </DialogHeader>
 
           {!csvParsed ? (
+            /* ── Step 1: Drop zone ── */
             <div
               className={cn(
                 "border-2 border-dashed rounded-xl flex flex-col items-center justify-center py-12 gap-3 transition-colors cursor-pointer",
@@ -2116,20 +2136,15 @@ export default function LeadboardPage() {
                 <p className="text-xs text-muted-foreground mt-0.5">or click to browse</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium px-2 py-0.5 rounded border border-muted-foreground/30 text-muted-foreground">CSV</span>
-                <span className="text-xs font-medium px-2 py-0.5 rounded border border-muted-foreground/30 text-muted-foreground">XLSX</span>
-                <span className="text-xs font-medium px-2 py-0.5 rounded border border-muted-foreground/30 text-muted-foreground">XLS</span>
+                {["CSV", "XLSX", "XLS"].map((f) => (
+                  <span key={f} className="text-xs font-medium px-2 py-0.5 rounded border border-muted-foreground/30 text-muted-foreground">{f}</span>
+                ))}
               </div>
-              <p className="text-xs text-muted-foreground">Columns: name, email, company, position, notes, phone</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f) }}
-              />
+              <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f) }} />
             </div>
           ) : importResult ? (
+            /* ── Step 3: Done ── */
             <div className="space-y-3 py-4">
               <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-3">
                 <Check className="h-5 w-5 text-emerald-600" />
@@ -2140,55 +2155,103 @@ export default function LeadboardPage() {
                   </p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setCsvParsed(null); setCsvFile(null); setImportResult(null) }}
-              >
+              <Button variant="outline" size="sm"
+                onClick={() => { setCsvParsed(null); setCsvFile(null); setImportResult(null); setColumnMap({}) }}>
                 Import another file
               </Button>
             </div>
           ) : (
-            <div className="space-y-3">
+            /* ── Step 2: Column mapping + live preview ── */
+            <div className="space-y-4">
+              {/* File info + change */}
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Preview: <span className="font-medium text-foreground">{csvFile?.name}</span> ({csvParsed.rows.length} rows)
+                  <span className="font-medium text-foreground">{csvFile?.name}</span>
+                  <span className="ml-1">· {csvParsed.rows.length} rows · {csvParsed.headers.length} columns detected</span>
                 </p>
-                <button
-                  onClick={() => { setCsvParsed(null); setCsvFile(null) }}
-                  className="text-xs text-muted-foreground hover:text-foreground underline"
-                >
+                <button onClick={() => { setCsvParsed(null); setCsvFile(null); setColumnMap({}) }}
+                  className="text-xs text-muted-foreground hover:text-foreground underline shrink-0">
                   Change file
                 </button>
               </div>
-              <div className="rounded-lg border overflow-auto max-h-60">
+
+              {/* Mapping table */}
+              <div className="rounded-lg border overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-muted/50 border-b">
-                      {["Name", "Email", "Company", "Position", "Phone", "Notes"].map((h) => (
-                        <th key={h} className="text-left px-3 py-2 font-medium text-muted-foreground">{h}</th>
-                      ))}
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-28">CRM Field</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">File Column</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Sample value</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {csvParsed.rows.slice(0, 5).map((row, i) => {
-                      const mapped = mapCSVRow(row, csvParsed.headers)
+                    {IMPORT_FIELDS.map((field) => {
+                      const selectedCol = columnMap[field.key] ?? ""
+                      const sample = selectedCol ? (csvParsed.rows[0]?.[selectedCol] ?? "") : ""
                       return (
-                        <tr key={i} className="border-b last:border-0">
-                          <td className="px-3 py-2">{mapped.full_name || <span className="text-muted-foreground italic">—</span>}</td>
-                          <td className="px-3 py-2 font-mono">{mapped.email || <span className="text-muted-foreground italic">—</span>}</td>
-                          <td className="px-3 py-2">{mapped.company || <span className="text-muted-foreground italic">—</span>}</td>
-                          <td className="px-3 py-2">{mapped.position || <span className="text-muted-foreground italic">—</span>}</td>
-                          <td className="px-3 py-2 font-mono">{mapped.phone || <span className="text-muted-foreground italic">—</span>}</td>
-                          <td className="px-3 py-2 truncate max-w-24">{mapped.notes || <span className="text-muted-foreground italic">—</span>}</td>
+                        <tr key={field.key} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">
+                            {field.label}
+                            {field.required && <span className="text-destructive ml-0.5">*</span>}
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              className="w-full h-7 rounded-md border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                              value={selectedCol}
+                              onChange={(e) => setColumnMap((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                            >
+                              <option value="">— skip —</option>
+                              {csvParsed.headers.map((h) => (
+                                <option key={h} value={h}>{h}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground truncate max-w-[160px] font-mono">
+                            {sample || <span className="italic not-italic text-muted-foreground/50">empty</span>}
+                          </td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
               </div>
-              {csvParsed.rows.length > 5 && (
-                <p className="text-xs text-muted-foreground">… and {csvParsed.rows.length - 5} more rows</p>
+
+              {/* Live preview of first 3 rows */}
+              {(() => {
+                const preview = csvParsed.rows.slice(0, 3).map((r) => applyColumnMap(r, columnMap)).filter((r) => r.full_name || r.email)
+                if (preview.length === 0) return null
+                return (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1.5">Preview (first {preview.length} valid rows)</p>
+                    <div className="rounded-lg border overflow-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-muted/50 border-b">
+                            {IMPORT_FIELDS.filter((f) => columnMap[f.key]).map((f) => (
+                              <th key={f.key} className="text-left px-3 py-1.5 font-medium text-muted-foreground">{f.label}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {preview.map((row, i) => (
+                            <tr key={i} className="border-b last:border-0">
+                              {IMPORT_FIELDS.filter((f) => columnMap[f.key]).map((f) => (
+                                <td key={f.key} className="px-3 py-1.5 truncate max-w-[140px]">
+                                  {(row as Record<string, string>)[f.key] || <span className="text-muted-foreground italic">—</span>}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {(!columnMap.full_name || !columnMap.email) && (
+                <p className="text-xs text-destructive">Name and Email columns are required.</p>
               )}
             </div>
           )}
@@ -2196,7 +2259,11 @@ export default function LeadboardPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
             {csvParsed && !importResult && (
-              <Button onClick={handleImportSubmit} disabled={importLoading} className="gap-1.5">
+              <Button
+                onClick={handleImportSubmit}
+                disabled={importLoading || !columnMap.full_name || !columnMap.email}
+                className="gap-1.5"
+              >
                 {importLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                 Import {csvParsed.rows.length} rows
               </Button>
