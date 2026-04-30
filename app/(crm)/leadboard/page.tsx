@@ -52,6 +52,15 @@ import * as XLSX from "xlsx"
 
 // ─── Local Types ──────────────────────────────────────────────────────────────
 
+interface LeadGroup {
+  id: string
+  name: string
+  color: string
+  position: number
+}
+
+const GROUP_COLORS = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#8b5cf6","#ef4444","#14b8a6","#f97316","#84cc16"]
+
 interface LeadTag {
   id: string
   name: string
@@ -238,6 +247,10 @@ export default function LeadboardPage() {
   // ── Core data ──────────────────────────────────────────────────────────────
   const [leads, setLeads] = useState<LeadWithTags[]>([])
   const [allTags, setAllTags] = useState<LeadTag[]>([])
+  const [groups, setGroups] = useState<LeadGroup[]>([])
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null)
+  const [renamingGroupName, setRenamingGroupName] = useState("")
   const [segments, setSegments] = useState<Segment[]>([])
   const [dueReminders, setDueReminders] = useState<DueReminder[]>([])
   const [sequences, setSequences] = useState<Sequence[]>([])
@@ -281,6 +294,7 @@ export default function LeadboardPage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvParsed, setCsvParsed] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null)
   const [columnMap, setColumnMap] = useState<Record<string, string>>({})
+  const [importGroupName, setImportGroupName] = useState("")
   const [importLoading, setImportLoading] = useState(false)
   const [importResult, setImportResult] = useState<{ inserted: number; skipped: number } | null>(null)
   const [csvDragOver, setCsvDragOver] = useState(false)
@@ -335,6 +349,7 @@ export default function LeadboardPage() {
   const [bulkStatusValue, setBulkStatusValue] = useState<string>("")
   const [bulkTagValue, setBulkTagValue] = useState<string>("")
   const [bulkSegmentValue, setBulkSegmentValue] = useState<string>("")
+  const [bulkGroupValue, setBulkGroupValue] = useState<string>("")
   const [bulkLoading, setBulkLoading] = useState(false)
 
   // ── Sequence picker ──────────────────────────────────────────────────────────
@@ -353,7 +368,7 @@ export default function LeadboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    const [leadsRes, tagsRes, segmentsRes, remindersRes, rulesRes, seqRes] = await Promise.all([
+    const [leadsRes, tagsRes, segmentsRes, groupsRes, remindersRes, rulesRes, seqRes] = await Promise.all([
       supabase
         .from("leadboard")
         .select("*, lead_tag_assignments(tag_id)")
@@ -362,6 +377,7 @@ export default function LeadboardPage() {
         .order("relevance_score", { ascending: false }),
       fetch(`/api/tags?workspaceId=${activeWorkspaceId}`),
       fetch(`/api/segments?workspaceId=${activeWorkspaceId}`),
+      fetch(`/api/groups?workspaceId=${activeWorkspaceId}`),
       supabase
         .from("follow_up_reminders")
         .select("*, leadboard(full_name)")
@@ -377,6 +393,7 @@ export default function LeadboardPage() {
     setLeads(rawLeads.map((l) => ({ ...l, tagIds: (l.lead_tag_assignments ?? []).map((a) => a.tag_id) })))
 
     if (tagsRes.ok) setAllTags(await tagsRes.json())
+    if (groupsRes.ok) setGroups(await groupsRes.json())
     const segs: Segment[] = segmentsRes.ok ? await segmentsRes.json() : []
     setSegments(segs)
 
@@ -643,6 +660,7 @@ export default function LeadboardPage() {
     setImportResult(null)
     setCsvParsed(null)
     setColumnMap({})
+    setImportGroupName(file.name.replace(/\.(csv|xlsx|xls)$/i, ""))
     const isXLSX = /\.(xlsx|xls)$/i.test(file.name)
     const reader = new FileReader()
     const onParsed = (parsed: { headers: string[]; rows: Record<string, string>[] }) => {
@@ -668,11 +686,28 @@ export default function LeadboardPage() {
   async function handleImportSubmit() {
     if (!csvParsed) return
     setImportLoading(true)
+
+    // Create a new group for this import batch if a name is provided
+    let groupId: string | null = null
+    if (importGroupName.trim()) {
+      const color = GROUP_COLORS[groups.length % GROUP_COLORS.length]
+      const grpRes = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: importGroupName.trim(), color, workspaceId: activeWorkspaceId }),
+      })
+      if (grpRes.ok) {
+        const grp = await grpRes.json()
+        groupId = grp.id
+        setGroups((prev) => [...prev, grp])
+      }
+    }
+
     const rows = csvParsed.rows.map((r) => applyColumnMap(r, columnMap)).filter((r) => r.full_name && r.email)
     const res = await fetch("/api/leads/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows, workspaceId: activeWorkspaceId }),
+      body: JSON.stringify({ rows, workspaceId: activeWorkspaceId, groupId }),
     })
     const result = await res.json()
     setImportResult({ inserted: result.inserted ?? 0, skipped: result.skipped ?? 0 })
@@ -860,6 +895,57 @@ export default function LeadboardPage() {
     }
   }
 
+  // ─── Groups ───────────────────────────────────────────────────────────────────
+
+  function toggleGroupCollapse(id: string) {
+    setCollapsedGroups((prev) => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+
+  async function handleCreateGroup() {
+    const name = `New Group ${groups.length + 1}`
+    const color = GROUP_COLORS[groups.length % GROUP_COLORS.length]
+    const res = await fetch("/api/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, color, workspaceId: activeWorkspaceId }),
+    })
+    if (res.ok) {
+      const grp = await res.json()
+      setGroups((prev) => [...prev, grp])
+      setRenamingGroupId(grp.id)
+      setRenamingGroupName(grp.name)
+    }
+  }
+
+  async function handleRenameGroup(id: string) {
+    const name = renamingGroupName.trim()
+    if (!name) return
+    await fetch(`/api/groups/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    })
+    setGroups((prev) => prev.map((g) => g.id === id ? { ...g, name } : g))
+    setRenamingGroupId(null)
+  }
+
+  async function handleDeleteGroup(id: string) {
+    await fetch(`/api/groups/${id}`, { method: "DELETE" })
+    setGroups((prev) => prev.filter((g) => g.id !== id))
+    // Leads become ungrouped locally
+    setLeads((prev) => prev.map((l) => l.group_id === id ? { ...l, group_id: null } : l))
+  }
+
+  async function handleMoveLeadToGroup(leadId: string, groupId: string | null) {
+    await supabase.from("leadboard").update({ group_id: groupId }).eq("id", leadId)
+    setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, group_id: groupId } : l))
+    if (selectedLead?.id === leadId) setSelectedLead((l) => l ? { ...l, group_id: groupId } : l)
+  }
+
   // ─── Bulk Actions ─────────────────────────────────────────────────────────────
 
   async function handleBulkStatus() {
@@ -924,6 +1010,17 @@ export default function LeadboardPage() {
       return { ...prev, [bulkSegmentValue]: updated }
     })
     setBulkSegmentValue("")
+    setBulkLoading(false)
+  }
+
+  async function handleBulkMoveToGroup() {
+    if (!bulkGroupValue || !someSelected) return
+    setBulkLoading(true)
+    const leadIds = Array.from(selectedIds)
+    const groupId = bulkGroupValue === "__none__" ? null : bulkGroupValue
+    await supabase.from("leadboard").update({ group_id: groupId }).in("id", leadIds)
+    setLeads((prev) => prev.map((l) => selectedIds.has(l.id) ? { ...l, group_id: groupId } : l))
+    setBulkGroupValue("")
     setBulkLoading(false)
   }
 
@@ -1039,6 +1136,29 @@ export default function LeadboardPage() {
       body: JSON.stringify({ status: newStatus }),
     })
   }
+
+  // ─── Grouped Lead Sections (Monday CRM style) ────────────────────────────────
+
+  // When there are defined groups, bucket sortedLeads by group_id
+  const groupedLeadSections: { id: string; name: string; color: string; leads: LeadWithTags[]; isUngrouped: boolean }[] | null =
+    groups.length > 0
+      ? [
+          ...groups.map((g) => ({
+            id: g.id,
+            name: g.name,
+            color: g.color,
+            leads: sortedLeads.filter((l) => l.group_id === g.id),
+            isUngrouped: false,
+          })),
+          {
+            id: "__ungrouped__",
+            name: "Ungrouped",
+            color: "#6b7280",
+            leads: sortedLeads.filter((l) => !l.group_id),
+            isUngrouped: true,
+          },
+        ].filter((s) => s.leads.length > 0)
+      : null
 
   // ─── Tag Filter Toggle ────────────────────────────────────────────────────────
 
@@ -1198,6 +1318,9 @@ export default function LeadboardPage() {
                 </button>
               </div>
 
+              <Button variant="outline" size="sm" onClick={handleCreateGroup} className="gap-1.5">
+                <FolderOpen className="h-4 w-4" /> New Group
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setAddLeadOpen(true)} className="gap-1.5">
                 <Plus className="h-4 w-4" /> Add Lead
               </Button>
@@ -1382,6 +1505,7 @@ export default function LeadboardPage() {
                                   lead={lead}
                                   index={i + 1}
                                   allTags={allTags}
+                                  groups={groups}
                                   segments={segments}
                                   segmentMembers={segmentMembers}
                                   selected={selectedIds.has(lead.id)}
@@ -1391,28 +1515,135 @@ export default function LeadboardPage() {
                                   onDelete={handleDeleteLead}
                                   onAddTag={handleAddTagToLead}
                                   onToggleSegment={handleToggleLeadSegment}
+                                  onMoveToGroup={handleMoveLeadToGroup}
                                 />
                               ))}
                             </>
                           )
                         })
-                      : sortedLeads.map((lead, i) => (
-                          <LeadRow
-                            key={lead.id}
-                            lead={lead}
-                            index={i + 1}
-                            allTags={allTags}
-                            segments={segments}
-                            segmentMembers={segmentMembers}
-                            selected={selectedIds.has(lead.id)}
-                            onSelect={() => toggleSelect(lead.id)}
-                            onClick={() => setSelectedLead(lead)}
-                            onStatusChange={handleStatusChange}
-                            onDelete={handleDeleteLead}
-                            onAddTag={handleAddTagToLead}
-                            onToggleSegment={handleToggleLeadSegment}
-                          />
-                        ))
+                      : groupedLeadSections
+                        ? groupedLeadSections.map((section) => {
+                            const collapsed = collapsedGroups.has(section.id)
+                            return (
+                              <>
+                                {/* Lead Group header row */}
+                                <tr
+                                  key={`grp-${section.id}`}
+                                  className="group border-b border-t cursor-pointer hover:brightness-95 transition-all"
+                                  style={{ backgroundColor: section.color + "18" }}
+                                  onClick={() => !section.isUngrouped && toggleGroupCollapse(section.id)}
+                                >
+                                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={section.leads.every((l) => selectedIds.has(l.id))}
+                                      onCheckedChange={(checked) => {
+                                        setSelectedIds((prev) => {
+                                          const n = new Set(prev)
+                                          section.leads.forEach((l) => checked ? n.add(l.id) : n.delete(l.id))
+                                          return n
+                                        })
+                                      }}
+                                      aria-label={`Select ${section.name}`}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2" colSpan={9}>
+                                    <div className="flex items-center gap-2">
+                                      {!section.isUngrouped && (
+                                        collapsed
+                                          ? <ChevronRight className="h-3.5 w-3.5" style={{ color: section.color }} />
+                                          : <ChevronDown className="h-3.5 w-3.5" style={{ color: section.color }} />
+                                      )}
+                                      <span
+                                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                                        style={{ backgroundColor: section.color }}
+                                      />
+                                      {/* Rename inline or display */}
+                                      {renamingGroupId === section.id ? (
+                                        <input
+                                          autoFocus
+                                          className="text-xs font-semibold bg-background border rounded px-1.5 py-0.5 w-40 focus:outline-none focus:ring-1 focus:ring-ring"
+                                          value={renamingGroupName}
+                                          onChange={(e) => setRenamingGroupName(e.target.value)}
+                                          onBlur={() => handleRenameGroup(section.id)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter") handleRenameGroup(section.id)
+                                            if (e.key === "Escape") setRenamingGroupId(null)
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      ) : (
+                                        <span className="font-semibold text-xs text-foreground">{section.name}</span>
+                                      )}
+                                      <span className="text-xs text-muted-foreground">
+                                        {section.leads.length} lead{section.leads.length !== 1 ? "s" : ""}
+                                      </span>
+                                      {!section.isUngrouped && (
+                                        <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                                          <button
+                                            className="text-muted-foreground hover:text-foreground p-1 rounded transition-colors"
+                                            title="Rename group"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setRenamingGroupId(section.id)
+                                              setRenamingGroupName(section.name)
+                                            }}
+                                          >
+                                            <FileText className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
+                                            title="Delete group"
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteGroup(section.id) }}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                                {/* Lead rows */}
+                                {!collapsed && section.leads.map((lead, i) => (
+                                  <LeadRow
+                                    key={lead.id}
+                                    lead={lead}
+                                    index={i + 1}
+                                    allTags={allTags}
+                                    groups={groups}
+                                    segments={segments}
+                                    segmentMembers={segmentMembers}
+                                    selected={selectedIds.has(lead.id)}
+                                    onSelect={() => toggleSelect(lead.id)}
+                                    onClick={() => setSelectedLead(lead)}
+                                    onStatusChange={handleStatusChange}
+                                    onDelete={handleDeleteLead}
+                                    onAddTag={handleAddTagToLead}
+                                    onToggleSegment={handleToggleLeadSegment}
+                                    onMoveToGroup={handleMoveLeadToGroup}
+                                  />
+                                ))}
+                              </>
+                            )
+                          })
+                        : sortedLeads.map((lead, i) => (
+                            <LeadRow
+                              key={lead.id}
+                              lead={lead}
+                              index={i + 1}
+                              allTags={allTags}
+                              groups={groups}
+                              segments={segments}
+                              segmentMembers={segmentMembers}
+                              selected={selectedIds.has(lead.id)}
+                              onSelect={() => toggleSelect(lead.id)}
+                              onClick={() => setSelectedLead(lead)}
+                              onStatusChange={handleStatusChange}
+                              onDelete={handleDeleteLead}
+                              onAddTag={handleAddTagToLead}
+                              onToggleSegment={handleToggleLeadSegment}
+                              onMoveToGroup={handleMoveLeadToGroup}
+                            />
+                          ))
                     }
                   </tbody>
                 </table>
@@ -1594,6 +1825,45 @@ export default function LeadboardPage() {
           >
             {bulkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderOpen className="h-3 w-3" />}
           </Button>
+
+          {/* Move to Group */}
+          {groups.length > 0 && (
+            <>
+              <Select
+                value={bulkGroupValue || undefined}
+                onValueChange={(v) => { if (v) setBulkGroupValue(v) }}
+              >
+                <SelectTrigger className="h-8 text-xs w-36">
+                  <SelectValue placeholder="Move to group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                      Ungrouped
+                    </span>
+                  </SelectItem>
+                  {groups.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                        {g.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                disabled={!bulkGroupValue || bulkLoading}
+                onClick={handleBulkMoveToGroup}
+              >
+                {bulkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderOpen className="h-3 w-3" />}
+              </Button>
+            </>
+          )}
 
           <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={handleExport}>
             <Download className="h-3 w-3" /> Export
@@ -1825,6 +2095,39 @@ export default function LeadboardPage() {
                         })}
                       </div>
                     </div>
+                  )}
+
+                  {/* Groups */}
+                  {groups.length > 0 && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <FolderOpen className="h-3 w-3" /> Group
+                        </Label>
+                        <Select
+                          value={selectedLead.group_id ?? "__none__"}
+                          onValueChange={(v) => handleMoveLeadToGroup(selectedLead.id, v === "__none__" ? null : v)}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">
+                              <span className="text-muted-foreground">Ungrouped</span>
+                            </SelectItem>
+                            {groups.map((g) => (
+                              <SelectItem key={g.id} value={g.id}>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                                  {g.name}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
                   )}
 
                   <Separator />
@@ -2207,7 +2510,7 @@ export default function LeadboardPage() {
                 </div>
               </div>
               <Button variant="outline" size="sm"
-                onClick={() => { setCsvParsed(null); setCsvFile(null); setImportResult(null); setColumnMap({}) }}>
+                onClick={() => { setCsvParsed(null); setCsvFile(null); setImportResult(null); setColumnMap({}); setImportGroupName("") }}>
                 Import another file
               </Button>
             </div>
@@ -2220,7 +2523,7 @@ export default function LeadboardPage() {
                   <span className="font-medium text-foreground">{csvFile?.name}</span>
                   <span className="ml-1">· {csvParsed.rows.length} rows · {csvParsed.headers.length} columns detected</span>
                 </p>
-                <button onClick={() => { setCsvParsed(null); setCsvFile(null); setColumnMap({}) }}
+                <button onClick={() => { setCsvParsed(null); setCsvFile(null); setColumnMap({}); setImportGroupName("") }}
                   className="text-xs text-muted-foreground hover:text-foreground underline shrink-0">
                   Change file
                 </button>
@@ -2300,6 +2603,20 @@ export default function LeadboardPage() {
                   </div>
                 )
               })()}
+
+              {/* Group name for this import batch */}
+              <div className="flex items-center gap-3 pt-1">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                  <FolderOpen className="inline h-3 w-3 mr-1" />
+                  Group name
+                </Label>
+                <Input
+                  className="h-8 text-xs flex-1"
+                  placeholder="Leave empty to skip grouping"
+                  value={importGroupName}
+                  onChange={(e) => setImportGroupName(e.target.value)}
+                />
+              </div>
 
               {(!columnMap.full_name || !columnMap.email) && (
                 <p className="text-xs text-destructive">Name and Email columns are required.</p>
@@ -2505,6 +2822,7 @@ interface LeadRowProps {
   lead: LeadWithTags
   index: number
   allTags: LeadTag[]
+  groups: LeadGroup[]
   segments: Segment[]
   segmentMembers: Record<string, Set<string>>
   selected: boolean
@@ -2514,12 +2832,13 @@ interface LeadRowProps {
   onDelete: (id: string) => void
   onAddTag: (leadId: string, tagId: string) => void
   onToggleSegment: (leadId: string, segmentId: string) => void
+  onMoveToGroup: (leadId: string, groupId: string | null) => void
 }
 
 function LeadRow({
-  lead, index, allTags, segments, segmentMembers,
+  lead, index, allTags, groups, segments, segmentMembers,
   selected, onSelect, onClick, onStatusChange, onDelete,
-  onAddTag, onToggleSegment,
+  onAddTag, onToggleSegment, onMoveToGroup,
 }: LeadRowProps) {
   return (
     <tr
@@ -2649,6 +2968,39 @@ function LeadRow({
                 })}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+
+            {/* Move to Group submenu */}
+            {groups.length > 0 && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Users className="h-3.5 w-3.5 mr-2" /> Move to Group
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem
+                    onClick={() => onMoveToGroup(lead.id, null)}
+                    className={cn(!lead.group_id && "opacity-50 cursor-default")}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/40 mr-2 shrink-0" />
+                    Ungrouped
+                    {!lead.group_id && <Check className="h-3 w-3 ml-auto" />}
+                  </DropdownMenuItem>
+                  {groups.map((g) => (
+                    <DropdownMenuItem
+                      key={g.id}
+                      onClick={() => onMoveToGroup(lead.id, g.id)}
+                      className={cn(lead.group_id === g.id && "opacity-50 cursor-default")}
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full mr-2 shrink-0"
+                        style={{ backgroundColor: g.color }}
+                      />
+                      {g.name}
+                      {lead.group_id === g.id && <Check className="h-3 w-3 ml-auto text-primary" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
 
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -40,6 +40,7 @@ export interface LeadboardEntry {
   status: LeadStatus
   notes?: string
   last_contacted_at?: string
+  group_id?: string | null
   created_at: string
 }
 

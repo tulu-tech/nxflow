@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { rows, workspaceId } = await req.json()
+  const { rows, workspaceId, groupId } = await req.json()
   // rows: Array<{ full_name, email, company?, position?, notes?, phone? }>
 
   if (!Array.isArray(rows) || rows.length === 0)
@@ -16,8 +16,21 @@ export async function POST(req: NextRequest) {
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
   if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
+  // Validate group ownership if provided
+  let resolvedGroupId: string | null = null
+  if (groupId) {
+    const { data: grp } = await supabase
+      .from("lead_groups")
+      .select("id")
+      .eq("id", groupId)
+      .eq("user_id", user.id)
+      .eq("workspace_id", wsId)
+      .single()
+    resolvedGroupId = grp?.id ?? null
+  }
+
   // Fetch existing emails to detect duplicates within this workspace
-  const emails = rows.map((r) => r.email?.toLowerCase()).filter(Boolean)
+  const emails = rows.map((r: Record<string, string>) => r.email?.toLowerCase()).filter(Boolean)
   const { data: existing } = await supabase
     .from("leadboard")
     .select("email")
@@ -25,7 +38,7 @@ export async function POST(req: NextRequest) {
     .eq("workspace_id", wsId)
     .in("email", emails)
 
-  const existingEmails = new Set((existing ?? []).map((e) => e.email?.toLowerCase()))
+  const existingEmails = new Set((existing ?? []).map((e: { email: string }) => e.email?.toLowerCase()))
 
   const toInsert: Record<string, unknown>[] = []
   const duplicates: string[] = []
@@ -40,6 +53,7 @@ export async function POST(req: NextRequest) {
     toInsert.push({
       user_id:         user.id,
       workspace_id:    wsId,
+      group_id:        resolvedGroupId,
       full_name:       row.full_name.trim(),
       email,
       company:         row.company?.trim()  || null,
@@ -63,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     if (insertedRows && insertedRows.length > 0) {
       await supabase.from("lead_activities").insert(
-        insertedRows.map((row) => ({
+        insertedRows.map((row: { id: string }) => ({
           user_id:      user.id,
           workspace_id: wsId,
           lead_id:      row.id,
