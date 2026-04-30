@@ -48,6 +48,7 @@ import type { LeadboardEntry, LeadStatus, ScoringRule } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow, format } from "date-fns"
+import * as XLSX from "xlsx"
 
 // ─── Local Types ──────────────────────────────────────────────────────────────
 
@@ -171,6 +172,20 @@ function parseCSV(text: string): { headers: string[]; rows: Record<string, strin
   return { headers, rows }
 }
 
+function parseXLSX(buffer: ArrayBuffer): { headers: string[]; rows: Record<string, string>[] } {
+  const workbook = XLSX.read(buffer, { type: "array" })
+  const sheet = workbook.Sheets[workbook.SheetNames[0]]
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" })
+  if (raw.length === 0) return { headers: [], rows: [] }
+  const headers = Object.keys(raw[0])
+  const rows = raw.map((r) => {
+    const obj: Record<string, string> = {}
+    headers.forEach((h) => { obj[h] = String(r[h] ?? "").trim() })
+    return obj
+  })
+  return { headers, rows }
+}
+
 function mapCSVRow(row: Record<string, string>, headers: string[]) {
   // Case-insensitive fuzzy column finder — also accepts partial matches
   const find = (...keys: string[]) => {
@@ -192,6 +207,7 @@ function mapCSVRow(row: Record<string, string>, headers: string[]) {
     company:   find("company", "company name", "organization", "org", "employer", "account"),
     position:  find("position", "job title", "title", "jobtitle", "role", "job role", "designation"),
     notes:     find("notes", "note", "comment", "comments", "description"),
+    phone:     find("phone", "phone number", "mobile", "cell", "telephone", "tel", "contact number"),
   }
 }
 
@@ -600,24 +616,33 @@ export default function LeadboardPage() {
     setAddLoading(false)
   }
 
-  // ─── Import CSV ───────────────────────────────────────────────────────────────
+  // ─── Import CSV / XLSX ────────────────────────────────────────────────────────
 
-  function handleCSVFile(file: File) {
+  function handleImportFile(file: File) {
     setCsvFile(file)
     setImportResult(null)
+    const isXLSX = /\.(xlsx|xls)$/i.test(file.name)
     const reader = new FileReader()
-    reader.onload = (e) => {
-      const text = e.target?.result as string
-      setCsvParsed(parseCSV(text))
+    if (isXLSX) {
+      reader.onload = (e) => {
+        const buffer = e.target?.result as ArrayBuffer
+        setCsvParsed(parseXLSX(buffer))
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      reader.onload = (e) => {
+        const text = e.target?.result as string
+        setCsvParsed(parseCSV(text))
+      }
+      reader.readAsText(file)
     }
-    reader.readAsText(file)
   }
 
   function handleCSVDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault()
     setCsvDragOver(false)
     const file = e.dataTransfer.files[0]
-    if (file && file.name.endsWith(".csv")) handleCSVFile(file)
+    if (file && /\.(csv|xlsx|xls)$/i.test(file.name)) handleImportFile(file)
   }
 
   async function handleImportSubmit() {
@@ -627,7 +652,7 @@ export default function LeadboardPage() {
     const res = await fetch("/api/leads/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows }),
+      body: JSON.stringify({ rows, workspaceId: activeWorkspaceId }),
     })
     const result = await res.json()
     setImportResult({ inserted: result.inserted ?? 0, skipped: result.skipped ?? 0 })
@@ -1143,7 +1168,7 @@ export default function LeadboardPage() {
                 onClick={() => { setCsvFile(null); setCsvParsed(null); setImportResult(null); setImportOpen(true) }}
                 className="gap-1.5"
               >
-                <Upload className="h-4 w-4" /> Import CSV
+                <Upload className="h-4 w-4" /> Import
               </Button>
               <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
                 <Download className="h-4 w-4" />
@@ -2070,7 +2095,7 @@ export default function LeadboardPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-4 w-4" /> Import CSV
+              <Upload className="h-4 w-4" /> Import Leads
             </DialogTitle>
           </DialogHeader>
 
@@ -2087,16 +2112,21 @@ export default function LeadboardPage() {
             >
               <Upload className="h-8 w-8 text-muted-foreground/50" />
               <div className="text-center">
-                <p className="text-sm font-medium text-foreground">Drop your CSV file here</p>
+                <p className="text-sm font-medium text-foreground">Drop your file here</p>
                 <p className="text-xs text-muted-foreground mt-0.5">or click to browse</p>
               </div>
-              <p className="text-xs text-muted-foreground">Supports: name, email, company, position, notes</p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium px-2 py-0.5 rounded border border-muted-foreground/30 text-muted-foreground">CSV</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded border border-muted-foreground/30 text-muted-foreground">XLSX</span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded border border-muted-foreground/30 text-muted-foreground">XLS</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Columns: name, email, company, position, notes, phone</p>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv"
+                accept=".csv,.xlsx,.xls"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCSVFile(f) }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportFile(f) }}
               />
             </div>
           ) : importResult ? (
@@ -2135,7 +2165,7 @@ export default function LeadboardPage() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-muted/50 border-b">
-                      {["Name", "Email", "Company", "Position", "Notes"].map((h) => (
+                      {["Name", "Email", "Company", "Position", "Phone", "Notes"].map((h) => (
                         <th key={h} className="text-left px-3 py-2 font-medium text-muted-foreground">{h}</th>
                       ))}
                     </tr>
@@ -2149,6 +2179,7 @@ export default function LeadboardPage() {
                           <td className="px-3 py-2 font-mono">{mapped.email || <span className="text-muted-foreground italic">—</span>}</td>
                           <td className="px-3 py-2">{mapped.company || <span className="text-muted-foreground italic">—</span>}</td>
                           <td className="px-3 py-2">{mapped.position || <span className="text-muted-foreground italic">—</span>}</td>
+                          <td className="px-3 py-2 font-mono">{mapped.phone || <span className="text-muted-foreground italic">—</span>}</td>
                           <td className="px-3 py-2 truncate max-w-24">{mapped.notes || <span className="text-muted-foreground italic">—</span>}</td>
                         </tr>
                       )
