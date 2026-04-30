@@ -334,6 +334,7 @@ export default function LeadboardPage() {
   // ── Bulk ─────────────────────────────────────────────────────────────────────
   const [bulkStatusValue, setBulkStatusValue] = useState<string>("")
   const [bulkTagValue, setBulkTagValue] = useState<string>("")
+  const [bulkSegmentValue, setBulkSegmentValue] = useState<string>("")
   const [bulkLoading, setBulkLoading] = useState(false)
 
   // ── Sequence picker ──────────────────────────────────────────────────────────
@@ -904,6 +905,25 @@ export default function LeadboardPage() {
         : l
     ))
     setBulkTagValue("")
+    setBulkLoading(false)
+  }
+
+  async function handleBulkSegment() {
+    if (!bulkSegmentValue || !someSelected) return
+    setBulkLoading(true)
+    const leadIds = Array.from(selectedIds)
+    await fetch("/api/leads/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "add_to_segment", leadIds, payload: { segmentId: bulkSegmentValue } }),
+    })
+    // Update local segmentMembers so the detail panel reflects the change instantly
+    setSegmentMembers((prev) => {
+      const updated = new Set(prev[bulkSegmentValue] ?? [])
+      leadIds.forEach((id) => updated.add(id))
+      return { ...prev, [bulkSegmentValue]: updated }
+    })
+    setBulkSegmentValue("")
     setBulkLoading(false)
   }
 
@@ -1542,6 +1562,37 @@ export default function LeadboardPage() {
             onClick={handleBulkTag}
           >
             <Tag className="h-3 w-3" />
+          </Button>
+
+          {/* Add to Segment */}
+          <Select
+            value={bulkSegmentValue || undefined}
+            onValueChange={(v) => { if (v) setBulkSegmentValue(v) }}
+          >
+            <SelectTrigger className="h-8 text-xs w-36">
+              <SelectValue placeholder="Add to segment" />
+            </SelectTrigger>
+            <SelectContent>
+              {segments.length === 0
+                ? <SelectItem value="__none__" disabled>No segments yet</SelectItem>
+                : segments.map((seg) => (
+                  <SelectItem key={seg.id} value={seg.id}>
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
+                      {seg.name}
+                    </span>
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            disabled={!bulkSegmentValue || bulkLoading}
+            onClick={handleBulkSegment}
+          >
+            {bulkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <FolderOpen className="h-3 w-3" />}
           </Button>
 
           <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={handleExport}>

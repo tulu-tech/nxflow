@@ -49,6 +49,22 @@ export async function POST(req: NextRequest) {
         .eq("tag_id", payload.tagId)
       break
     }
+    case "add_to_segment": {
+      // Verify segment belongs to user
+      const { data: seg } = await supabase
+        .from("smart_segments")
+        .select("id")
+        .eq("id", payload.segmentId)
+        .eq("user_id", user.id)
+        .single()
+      if (!seg) return NextResponse.json({ error: "Segment not found" }, { status: 404 })
+
+      const rows = validIds.map((id) => ({ lead_id: id, segment_id: payload.segmentId }))
+      await supabase
+        .from("lead_segment_assignments")
+        .upsert(rows, { onConflict: "lead_id,segment_id" })
+      break
+    }
     case "delete": {
       await supabase.from("leadboard").delete().in("id", validIds).eq("user_id", user.id)
       break
