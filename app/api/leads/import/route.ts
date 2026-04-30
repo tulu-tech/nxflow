@@ -16,17 +16,21 @@ export async function POST(req: NextRequest) {
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
   if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
-  // Validate group ownership if provided
+  // Validate group ownership if provided (silently ignore if table doesn't exist yet)
   let resolvedGroupId: string | null = null
   if (groupId) {
-    const { data: grp } = await supabase
-      .from("lead_groups")
-      .select("id")
-      .eq("id", groupId)
-      .eq("user_id", user.id)
-      .eq("workspace_id", wsId)
-      .single()
-    resolvedGroupId = grp?.id ?? null
+    try {
+      const { data: grp } = await supabase
+        .from("lead_groups")
+        .select("id")
+        .eq("id", groupId)
+        .eq("user_id", user.id)
+        .eq("workspace_id", wsId)
+        .single()
+      resolvedGroupId = grp?.id ?? null
+    } catch {
+      resolvedGroupId = null
+    }
   }
 
   // Fetch existing emails to detect duplicates within this workspace
@@ -50,10 +54,9 @@ export async function POST(req: NextRequest) {
       duplicates.push(email)
       continue
     }
-    toInsert.push({
+    const insertRow: Record<string, unknown> = {
       user_id:         user.id,
       workspace_id:    wsId,
-      group_id:        resolvedGroupId,
       full_name:       row.full_name.trim(),
       email,
       company:         row.company?.trim()  || null,
@@ -62,7 +65,10 @@ export async function POST(req: NextRequest) {
       phone:           row.phone?.trim()    || null,
       status:          "new",
       relevance_score: 0,
-    })
+    }
+    // Only include group_id when resolved — avoids errors if column doesn't exist yet
+    if (resolvedGroupId) insertRow.group_id = resolvedGroupId
+    toInsert.push(insertRow)
   }
 
   let inserted = 0
