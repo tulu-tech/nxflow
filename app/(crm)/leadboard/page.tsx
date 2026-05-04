@@ -345,6 +345,10 @@ export default function LeadboardPage() {
   const [scoring, setScoring] = useState(false)
   const [scoreError, setScoreError] = useState<string | null>(null)
 
+  // ── Groups ───────────────────────────────────────────────────────────────────
+  const [groupError, setGroupError] = useState<string | null>(null)
+  const [groupCreating, setGroupCreating] = useState(false)
+
   // ── Bulk ─────────────────────────────────────────────────────────────────────
   const [bulkStatusValue, setBulkStatusValue] = useState<string>("")
   const [bulkTagValue, setBulkTagValue] = useState<string>("")
@@ -906,18 +910,26 @@ export default function LeadboardPage() {
   }
 
   async function handleCreateGroup() {
-    const name = `New Group ${groups.length + 1}`
-    const color = GROUP_COLORS[groups.length % GROUP_COLORS.length]
-    const res = await fetch("/api/groups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, color, workspaceId: activeWorkspaceId }),
-    })
-    if (res.ok) {
-      const grp = await res.json()
-      setGroups((prev) => [...prev, grp])
-      setRenamingGroupId(grp.id)
-      setRenamingGroupName(grp.name)
+    setGroupError(null)
+    setGroupCreating(true)
+    try {
+      const name = `New Group ${groups.length + 1}`
+      const color = GROUP_COLORS[groups.length % GROUP_COLORS.length]
+      const res = await fetch("/api/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color, workspaceId: activeWorkspaceId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setGroupError(data?.error ?? `Error ${res.status}`)
+        return
+      }
+      setGroups((prev) => [...prev, data])
+      setRenamingGroupId(data.id)
+      setRenamingGroupName(data.name)
+    } finally {
+      setGroupCreating(false)
     }
   }
 
@@ -1321,8 +1333,8 @@ export default function LeadboardPage() {
                 </button>
               </div>
 
-              <Button variant="outline" size="sm" onClick={handleCreateGroup} className="gap-1.5">
-                <FolderOpen className="h-4 w-4" /> New Group
+              <Button variant="outline" size="sm" onClick={handleCreateGroup} disabled={groupCreating} className="gap-1.5">
+                {groupCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />} New Group
               </Button>
               <Button variant="outline" size="sm" onClick={() => setAddLeadOpen(true)} className="gap-1.5">
                 <Plus className="h-4 w-4" /> Add Lead
@@ -1350,6 +1362,13 @@ export default function LeadboardPage() {
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span className="flex-1">{scoreError}</span>
               <button onClick={() => setScoreError(null)}><X className="h-3.5 w-3.5" /></button>
+            </div>
+          )}
+          {groupError && (
+            <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="flex-1">Group error: {groupError}</span>
+              <button onClick={() => setGroupError(null)}><X className="h-3.5 w-3.5" /></button>
             </div>
           )}
 

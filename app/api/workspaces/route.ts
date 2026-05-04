@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createServiceRoleClient } from "@/lib/supabase/serviceRole"
 
 export async function GET() {
   const supabase = await createClient()
@@ -13,7 +14,29 @@ export async function GET() {
     .order("created_at", { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+
+  // If we got workspaces, return them immediately
+  if (data && data.length > 0) return NextResponse.json(data)
+
+  // No workspaces visible — could be a stale user_id from SQL seeding.
+  // Use service role (bypasses RLS) to find and repair orphaned workspaces.
+  const srResult = createServiceRoleClient()
+  if ("error" in srResult) return NextResponse.json([])
+  const sr = srResult.supabase
+
+  const { data: orphans } = await sr
+    .from("crm_workspaces")
+    .select("id, name, icon, user_id")
+    .neq("user_id", user.id)
+    .order("created_at", { ascending: true })
+
+  if (!orphans || orphans.length === 0) return NextResponse.json([])
+
+  // Repair: re-assign all orphaned workspaces to this user
+  const ids = orphans.map((w: { id: string }) => w.id)
+  await sr.from("crm_workspaces").update({ user_id: user.id }).in("id", ids)
+
+  return NextResponse.json(orphans.map(({ id, name, icon }: { id: string; name: string; icon: string }) => ({ id, name, icon })))
 }
 
 export async function POST(req: NextRequest) {
