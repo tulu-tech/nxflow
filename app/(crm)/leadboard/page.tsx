@@ -1150,14 +1150,17 @@ export default function LeadboardPage() {
             leads: sortedLeads.filter((l) => l.group_id === g.id),
             isUngrouped: false,
           })),
-          {
-            id: "__ungrouped__",
-            name: "Ungrouped",
-            color: "#6b7280",
-            leads: sortedLeads.filter((l) => !l.group_id),
-            isUngrouped: true,
-          },
-        ].filter((s) => s.leads.length > 0)
+          // Only show Ungrouped section when leads without a group exist
+          ...(sortedLeads.some((l) => !l.group_id)
+            ? [{
+                id: "__ungrouped__",
+                name: "Ungrouped",
+                color: "#6b7280",
+                leads: sortedLeads.filter((l) => !l.group_id),
+                isUngrouped: true,
+              }]
+            : []),
+        ]
       : null
 
   // ─── Tag Filter Toggle ────────────────────────────────────────────────────────
@@ -1443,7 +1446,7 @@ export default function LeadboardPage() {
             </div>
           ) : view === "table" ? (
             /* ════════════════ TABLE VIEW ════════════════ */
-            filteredLeads.length === 0 ? (
+            filteredLeads.length === 0 && !groupedLeadSections ? (
               <div className="text-center py-16 text-muted-foreground">
                 <Target className="h-10 w-10 mx-auto mb-3 opacity-20" />
                 <p className="text-sm font-medium">No leads found</p>
@@ -1603,6 +1606,13 @@ export default function LeadboardPage() {
                                   </td>
                                 </tr>
                                 {/* Lead rows */}
+                                {!collapsed && section.leads.length === 0 && (
+                                  <tr>
+                                    <td colSpan={10} className="px-6 py-3 text-xs text-muted-foreground/50 italic">
+                                      No leads in this group yet — import or move leads here
+                                    </td>
+                                  </tr>
+                                )}
                                 {!collapsed && section.leads.map((lead, i) => (
                                   <LeadRow
                                     key={lead.id}

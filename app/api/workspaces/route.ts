@@ -34,6 +34,31 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data)
 }
 
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const id = req.nextUrl.searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
+
+  const { name, icon } = await req.json()
+  const update: Record<string, string> = {}
+  if (name !== undefined) update.name = name.trim()
+  if (icon !== undefined) update.icon = icon
+
+  const { data, error } = await supabase
+    .from("crm_workspaces")
+    .update(update)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id, name, icon")
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
+}
+
 export async function DELETE(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

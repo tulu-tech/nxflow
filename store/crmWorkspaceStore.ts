@@ -12,19 +12,32 @@ interface CrmWorkspaceState {
   activeWorkspaceId: string | null
   setWorkspaces: (ws: CrmWorkspace[]) => void
   setActiveWorkspace: (id: string) => void
+  updateWorkspace: (id: string, patch: Partial<CrmWorkspace>) => void
+  removeWorkspace: (id: string) => void
 }
 
 export const useCrmWorkspaceStore = create<CrmWorkspaceState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       workspaces: [],
       activeWorkspaceId: null,
       setWorkspaces: (workspaces) => set({ workspaces }),
       setActiveWorkspace: (id) => {
         set({ activeWorkspaceId: id })
-        // Write to cookie so server components can read it
         if (typeof document !== "undefined") {
           document.cookie = `crm_workspace_id=${id}; path=/; max-age=31536000; SameSite=Lax`
+        }
+      },
+      updateWorkspace: (id, patch) =>
+        set((s) => ({ workspaces: s.workspaces.map((w) => (w.id === id ? { ...w, ...patch } : w)) })),
+      removeWorkspace: (id) => {
+        const { workspaces, activeWorkspaceId } = get()
+        const remaining = workspaces.filter((w) => w.id !== id)
+        const nextActive =
+          activeWorkspaceId === id ? (remaining[0]?.id ?? null) : activeWorkspaceId
+        set({ workspaces: remaining, activeWorkspaceId: nextActive })
+        if (nextActive && typeof document !== "undefined") {
+          document.cookie = `crm_workspace_id=${nextActive}; path=/; max-age=31536000; SameSite=Lax`
         }
       },
     }),
