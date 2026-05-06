@@ -77,7 +77,6 @@ export async function POST(req: NextRequest) {
     .from("gmail_tokens")
     .select("id, access_token, refresh_token, email")
     .eq("user_id", user.id)
-    .eq("workspace_id", wsId)
   if (fromEmail) tokenQuery = tokenQuery.eq("email", fromEmail)
 
   const { data: gmailTokens } = await tokenQuery.limit(1)

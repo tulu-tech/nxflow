@@ -86,7 +86,7 @@ export default function SettingsPage() {
     const wsParam = activeWorkspaceId ? `?workspaceId=${activeWorkspaceId}` : ""
     const [keysRes, gmailRes, twilioRes, creditRes, historyRes, rulesRes] = await Promise.all([
       fetch("/api/settings/api-keys"),
-      supabase.from("gmail_tokens").select("id, email").not("email", "is", null).eq("workspace_id", activeWorkspaceId ?? "").order("updated_at", { ascending: true }),
+      supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
       fetch(`/api/settings/twilio${wsParam}`),
       supabase.from("credit_usage").select("type, amount").eq("workspace_id", activeWorkspaceId ?? "").gte("created_at", monthStart),
       supabase.from("credit_usage").select("*").eq("workspace_id", activeWorkspaceId ?? "").order("created_at", { ascending: false }).limit(20),

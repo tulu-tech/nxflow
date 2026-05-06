@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
     .from("gmail_tokens")
     .select("access_token, expires_at")
     .eq("user_id", user.id)
-    .eq("workspace_id", wsId)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   if (!gmailToken?.access_token) {
     return NextResponse.json({ error: "Gmail not connected. Connect Gmail in Settings." }, { status: 400 })

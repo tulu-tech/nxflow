@@ -57,7 +57,7 @@ export default function ResponsesPage() {
 
   const checkGmail = useCallback(async () => {
     if (!activeWorkspaceId) return
-    const { data } = await supabase.from("gmail_tokens").select("id").eq("workspace_id", activeWorkspaceId).limit(1)
+    const { data } = await supabase.from("gmail_tokens").select("id").limit(1)
     setGmailConnected((data?.length ?? 0) > 0)
   }, [supabase, activeWorkspaceId])
 

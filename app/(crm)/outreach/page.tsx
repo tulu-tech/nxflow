@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
@@ -288,7 +289,7 @@ export default function OutreachPage() {
       supabase.from("leadboard").select("*").eq("workspace_id", activeWorkspaceId).order("relevance_score", { ascending: false }),
       supabase.from("email_campaigns").select("*").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
       fetch(`/api/segments?workspaceId=${activeWorkspaceId}`),
-      supabase.from("gmail_tokens").select("id, email").eq("workspace_id", activeWorkspaceId).not("email", "is", null).order("updated_at", { ascending: true }),
+      supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
     ])
     setLeads((l as LeadboardEntry[]) ?? [])
     setCampaigns((c as EmailCampaign[]) ?? [])
@@ -544,7 +545,7 @@ export default function OutreachPage() {
                   <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
                     <Mail className="h-3.5 w-3.5 shrink-0" />
                     No Gmail connected —{" "}
-                    <a href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</a>
+                    <Link href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</Link>
                   </div>
                 )}
               </div>
@@ -798,7 +799,7 @@ export default function OutreachPage() {
                     <div className="flex items-center gap-2 h-8 px-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
                       <Mail className="h-3.5 w-3.5 shrink-0" />
                       No Gmail connected —{" "}
-                      <a href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</a>
+                      <Link href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</Link>
                     </div>
                   )}
                 </div>

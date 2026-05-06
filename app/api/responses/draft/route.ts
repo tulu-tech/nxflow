@@ -70,8 +70,8 @@ Sign off with best regards from "Alba Collective Team".`
       .from("gmail_tokens")
       .select("access_token, email")
       .eq("user_id", user.id)
-      .eq("workspace_id", wsId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (gmailToken?.access_token && fromEmail) {
       const reSubject = emailSubject?.startsWith("Re:") ? emailSubject : `Re: ${emailSubject ?? ""}`

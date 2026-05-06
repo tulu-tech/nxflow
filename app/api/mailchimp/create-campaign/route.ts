@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
     .from("gmail_tokens")
     .select("id")
     .eq("user_id", user.id)
-    .eq("workspace_id", wsId)
     .limit(1)
 
   if (gmailTokens && gmailTokens.length > 0) {

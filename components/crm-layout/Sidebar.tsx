@@ -76,13 +76,26 @@ export function Sidebar({ userEmail, userName }: SidebarProps) {
   const { setWorkspaces, setActiveWorkspace, activeWorkspaceId, workspaces } = useCrmWorkspaceStore()
 
   useEffect(() => {
+    // Read the active workspace from the cookie (set synchronously by setActiveWorkspace).
+    // The Zustand store's activeWorkspaceId may not yet be hydrated from localStorage
+    // at this point — reading the cookie avoids a race that would reset the active workspace
+    // to data[0] on every hard navigation.
+    const cookieWsId = document.cookie
+      .split("; ")
+      .find((c) => c.startsWith("crm_workspace_id="))
+      ?.split("=")[1] ?? null
+
     fetch("/api/workspaces")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
           setWorkspaces(data)
-          if (!activeWorkspaceId || !data.find((w: { id: string }) => w.id === activeWorkspaceId)) {
+          const currentId = cookieWsId ?? activeWorkspaceId
+          if (!currentId || !data.find((w: { id: string }) => w.id === currentId)) {
             setActiveWorkspace(data[0].id)
+          } else if (currentId !== activeWorkspaceId) {
+            // Store wasn't hydrated yet — sync it now
+            setActiveWorkspace(currentId)
           }
         }
       })
