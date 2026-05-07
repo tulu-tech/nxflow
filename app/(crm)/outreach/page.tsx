@@ -31,6 +31,21 @@ interface GmailAccount {
   email: string
 }
 
+interface SentEmailLog {
+  id: string
+  to_email: string
+  from_email: string
+  subject: string | null
+  is_html: boolean
+  sent_at: string
+  opened_at: string | null
+  open_count: number
+  first_clicked_at: string | null
+  click_count: number
+  lead_id: string | null
+  leadboard: { full_name: string | null }[] | null
+}
+
 const MERGE_TAGS = [
   { label: "{{first_name}}", value: "{{first_name}}", hint: "İsim (full name'in ilk kelimesi)" },
   { label: "{{last_name}}", value: "{{last_name}}", hint: "Soyisim (kalan kelimeler)" },
@@ -248,6 +263,11 @@ export default function OutreachPage() {
   const [loading, setLoading] = useState(true)
   const [gmailAccounts, setGmailAccounts] = useState<GmailAccount[]>([])
 
+  // Sent emails / tracking tab
+  const [sentLogs, setSentLogs] = useState<SentEmailLog[]>([])
+  const [sentLogsLoading, setSentLogsLoading] = useState(false)
+  const [sentLogsLoaded, setSentLogsLoaded] = useState(false)
+
   // Individual tab
   const [selectedLeadId, setSelectedLeadId] = useState("")
   const [leadSearch, setLeadSearch] = useState("")
@@ -311,6 +331,21 @@ export default function OutreachPage() {
   }, [supabase])
 
   useEffect(() => { loadData() }, [loadData, activeWorkspaceId])
+
+  const loadSentLogs = useCallback(async () => {
+    if (!activeWorkspaceId || sentLogsLoaded) return
+    setSentLogsLoading(true)
+    const { data } = await supabase
+      .from("email_logs")
+      .select("id, to_email, from_email, subject, is_html, sent_at, opened_at, open_count, first_clicked_at, click_count, lead_id, leadboard(full_name)")
+      .eq("workspace_id", activeWorkspaceId)
+      .order("sent_at", { ascending: false })
+      .limit(200)
+    setSentLogs((data ?? []) as SentEmailLog[])
+    setSentLogsLoaded(true)
+    setSentLogsLoading(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, activeWorkspaceId, sentLogsLoaded])
 
   // Auto-insert template when lead is selected and body is empty
   const selectedLead = leads.find((l) => l.id === selectedLeadId)
@@ -483,6 +518,7 @@ export default function OutreachPage() {
           <TabsTrigger value="individual" className="text-sm">Individual</TabsTrigger>
           <TabsTrigger value="campaign" className="text-sm">Mass Campaign</TabsTrigger>
           <TabsTrigger value="history" className="text-sm">Campaign History</TabsTrigger>
+          <TabsTrigger value="sent" className="text-sm" onClick={loadSentLogs}>Sent Emails</TabsTrigger>
         </TabsList>
 
         {/* ── Individual ────────────────────────────────────────────────────── */}
@@ -936,6 +972,77 @@ export default function OutreachPage() {
                           <Clock className="h-3 w-3" />
                           {c.sent_at ? format(new Date(c.sent_at), "MMM d, yyyy") : format(new Date(c.created_at), "MMM d, yyyy")}
                         </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Sent Emails / Tracking ─────────────────────────────────────── */}
+        <TabsContent value="sent" className="mt-4">
+          {sentLogsLoading ? (
+            <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : sentLogs.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <Mail className="h-10 w-10 mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium">No sent emails yet</p>
+              <p className="text-xs mt-1">Emails you send will appear here with open & click tracking</p>
+            </div>
+          ) : (
+            <div className="rounded-lg border overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b">
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">To</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Subject</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Opened</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Clicked</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs hidden md:table-cell">Sent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sentLogs.map((log) => (
+                    <tr key={log.id} className="border-b last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 max-w-[180px]">
+                        <p className="font-medium text-foreground truncate">{log.leadboard?.[0]?.full_name ?? log.to_email}</p>
+                        {log.leadboard?.[0]?.full_name && (
+                          <p className="text-xs text-muted-foreground truncate">{log.to_email}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 max-w-[220px]">
+                        <p className="truncate text-muted-foreground">{log.subject ?? "(no subject)"}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        {log.opened_at ? (
+                          <span
+                            title={`First opened ${format(new Date(log.opened_at), "MMM d 'at' HH:mm")}${log.open_count > 1 ? ` · ${log.open_count}× total` : ""}`}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-emerald-500"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            {log.open_count > 1 ? `${log.open_count}× opened` : "Opened"}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {log.click_count > 0 ? (
+                          <span
+                            title={`First clicked ${format(new Date(log.first_clicked_at!), "MMM d 'at' HH:mm")}${log.click_count > 1 ? ` · ${log.click_count}× total` : ""}`}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-500"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                            {log.click_count > 1 ? `${log.click_count}× clicked` : "Clicked"}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
+                        {format(new Date(log.sent_at), "MMM d, yyyy HH:mm")}
                       </td>
                     </tr>
                   ))}

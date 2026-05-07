@@ -1472,8 +1472,8 @@ export default function LeadboardPage() {
                 <p className="text-xs mt-1">Try adjusting your filters or add new leads</p>
               </div>
             ) : (
-              <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="rounded-lg border overflow-x-auto">
+                <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="bg-muted/50 border-b">
                       <th className="px-3 py-2.5 w-8">
