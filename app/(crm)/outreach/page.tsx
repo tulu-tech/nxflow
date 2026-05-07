@@ -285,16 +285,22 @@ export default function OutreachPage() {
   const loadData = useCallback(async () => {
     if (!activeWorkspaceId) return
     setLoading(true)
-    const [{ data: l }, { data: c }, segsRes, gmailRes] = await Promise.all([
-      supabase.from("leadboard").select("*").eq("workspace_id", activeWorkspaceId).order("relevance_score", { ascending: false }),
+    const [{ data: l }, { data: c }, initRes, gmailRes] = await Promise.all([
+      supabase
+        .from("leadboard")
+        .select("id, full_name, email, position, company, relevance_score, status, workspace_id")
+        .eq("workspace_id", activeWorkspaceId)
+        .order("relevance_score", { ascending: false }),
       supabase.from("email_campaigns").select("*").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
-      fetch(`/api/segments?workspaceId=${activeWorkspaceId}`),
+      fetch(`/api/init?workspaceId=${activeWorkspaceId}`),
       supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
     ])
-    setLeads((l as LeadboardEntry[]) ?? [])
+    setLeads((l as unknown as LeadboardEntry[]) ?? [])
     setCampaigns((c as EmailCampaign[]) ?? [])
-    const segs = segsRes.ok ? await segsRes.json() : []
-    setSegments(segs ?? [])
+    if (initRes.ok) {
+      const init = await initRes.json()
+      setSegments(init.segments ?? [])
+    }
     const accounts = (gmailRes.data ?? []) as GmailAccount[]
     setGmailAccounts(accounts)
     if (accounts.length > 0) {

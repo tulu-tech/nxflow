@@ -372,16 +372,14 @@ export default function LeadboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    const [leadsRes, tagsRes, segmentsRes, groupsRes, remindersRes, rulesRes, seqRes] = await Promise.all([
+    const [leadsRes, initRes, remindersRes, rulesRes] = await Promise.all([
       supabase
         .from("leadboard")
         .select("*, lead_tag_assignments(tag_id)")
         .eq("user_id", user.id)
         .eq("workspace_id", activeWorkspaceId)
         .order("relevance_score", { ascending: false }),
-      fetch(`/api/tags?workspaceId=${activeWorkspaceId}`),
-      fetch(`/api/segments?workspaceId=${activeWorkspaceId}`),
-      fetch(`/api/groups?workspaceId=${activeWorkspaceId}`),
+      fetch(`/api/init?workspaceId=${activeWorkspaceId}`),
       supabase
         .from("follow_up_reminders")
         .select("*, leadboard(full_name)")
@@ -390,30 +388,28 @@ export default function LeadboardPage() {
         .eq("is_done", false)
         .lte("remind_at", new Date().toISOString()),
       supabase.from("scoring_rules").select("*").order("created_at", { ascending: false }),
-      fetch(`/api/sequences?workspaceId=${activeWorkspaceId}`),
     ])
 
     const rawLeads = (leadsRes.data ?? []) as (LeadboardEntry & { lead_tag_assignments: { tag_id: string }[] })[]
     setLeads(rawLeads.map((l) => ({ ...l, tagIds: (l.lead_tag_assignments ?? []).map((a) => a.tag_id) })))
 
-    if (tagsRes.ok) setAllTags(await tagsRes.json())
-    if (groupsRes.ok) setGroups(await groupsRes.json())
-    const segs: Segment[] = segmentsRes.ok ? await segmentsRes.json() : []
-    setSegments(segs)
-
-    // Load members for all segments
-    if (segs.length > 0) {
-      const memberResults = await Promise.all(
-        segs.map((s) => fetch(`/api/segments/${s.id}/members`).then((r) => r.ok ? r.json() : []))
-      )
+    if (initRes.ok) {
+      const init = await initRes.json()
+      setAllTags(init.tags ?? [])
+      setGroups(init.groups ?? [])
+      const segs: Segment[] = init.segments ?? []
+      setSegments(segs)
+      // Segment members arrive pre-grouped — no N+1 requests needed
       const membersMap: Record<string, Set<string>> = {}
-      segs.forEach((s, i) => { membersMap[s.id] = new Set(memberResults[i] ?? []) })
+      for (const [segId, ids] of Object.entries(init.segmentMembers ?? {})) {
+        membersMap[segId] = new Set(ids as string[])
+      }
       setSegmentMembers(membersMap)
+      setSequences(init.sequences ?? [])
     }
 
     setDueReminders((remindersRes.data ?? []) as DueReminder[])
     setRules((rulesRes.data ?? []) as ScoringRule[])
-    if (seqRes.ok) setSequences(await seqRes.json())
 
     setLoading(false)
   }, [supabase])
