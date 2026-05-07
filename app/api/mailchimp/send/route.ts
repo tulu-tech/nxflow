@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     const { data: leads } = await supabase
       .from("leadboard")
-      .select("id, email, full_name")
+      .select("id, email, full_name, position, company")
       .in("id", recipientIds)
       .eq("user_id", user.id)
 
@@ -99,15 +99,33 @@ export async function POST(req: NextRequest) {
     }
 
     const fromAddr = gmailToken.email ?? user.email ?? "me"
-    const subject = campaign.subject ?? campaign.name
-    const body = campaign.body ?? ""
+    const subjectTemplate = campaign.subject ?? campaign.name
+    const bodyTemplate = campaign.body ?? ""
 
     let accessToken = gmailToken.access_token
     let sent = 0
     const failures: { email: string; reason: string }[] = []
 
     for (const lead of targets) {
-      let res = await sendViaGmail(accessToken, fromAddr, lead.email, subject, body, !!isHtml)
+      const parts = (lead.full_name ?? "").trim().split(/\s+/)
+      const firstName = parts[0] ?? ""
+      const lastName = parts.slice(1).join(" ")
+      const personalizedSubject = subjectTemplate
+        .replace(/\{\{first_name\}\}/gi, firstName)
+        .replace(/\{\{last_name\}\}/gi, lastName)
+        .replace(/\{\{full_name\}\}/gi, lead.full_name ?? "")
+        .replace(/\{\{position\}\}/gi, lead.position ?? "")
+        .replace(/\{\{company\}\}/gi, lead.company ?? "")
+        .replace(/\{\{email\}\}/gi, lead.email ?? "")
+      const personalizedBody = bodyTemplate
+        .replace(/\{\{first_name\}\}/gi, firstName)
+        .replace(/\{\{last_name\}\}/gi, lastName)
+        .replace(/\{\{full_name\}\}/gi, lead.full_name ?? "")
+        .replace(/\{\{position\}\}/gi, lead.position ?? "")
+        .replace(/\{\{company\}\}/gi, lead.company ?? "")
+        .replace(/\{\{email\}\}/gi, lead.email ?? "")
+
+      let res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, personalizedBody, !!isHtml)
 
       if (res.status === 401 && gmailToken.refresh_token) {
         const fresh = await refreshGmailToken(gmailToken.refresh_token)
@@ -117,7 +135,7 @@ export async function POST(req: NextRequest) {
             .from("gmail_tokens")
             .update({ access_token: fresh, updated_at: new Date().toISOString() })
             .eq("id", gmailToken.id)
-          res = await sendViaGmail(accessToken, fromAddr, lead.email, subject, body, !!isHtml)
+          res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, personalizedBody, !!isHtml)
         }
       }
 

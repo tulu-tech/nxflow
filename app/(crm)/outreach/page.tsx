@@ -339,8 +339,8 @@ export default function OutreachPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: selectedLead.email,
-          subject: indSubject,
-          body: indBody,
+          subject: fillMergeTags(indSubject, selectedLead),
+          body: fillMergeTags(indBody, selectedLead),
           leadId: selectedLead.id,
           fromEmail: fromEmail || undefined,
           isHtml: indEmailFormat === "html",
