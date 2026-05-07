@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getValidatedWorkspaceId } from "@/lib/workspace"
+import { injectTracking } from "@/lib/email-tracking"
 
 async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   try {
@@ -75,13 +76,36 @@ export async function POST(req: NextRequest) {
   if (!gmailToken?.access_token) {
     return NextResponse.json(
       { error: "Gmail not connected. Go to Settings → API & Credits to connect Gmail." },
-      { status: 400 }
+      { status: 400 },
     )
   }
 
   const fromAddr = gmailToken.email ?? user.email ?? "me"
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
 
-  let gmailRes = await sendViaGmail(gmailToken.access_token, fromAddr, to, subject, body, !!isHtml)
+  // Insert the log row BEFORE sending so we have an ID to embed in tracking URLs
+  const { data: logRow } = await supabase
+    .from("email_logs")
+    .insert({
+      user_id: user.id,
+      workspace_id: wsId,
+      lead_id: leadId ?? null,
+      from_email: fromAddr,
+      to_email: to,
+      subject: subject ?? null,
+      body: body ?? null,
+      is_html: !!isHtml,
+    })
+    .select("id")
+    .single()
+
+  // Inject tracking pixel + rewrite links for HTML emails
+  const finalBody =
+    isHtml && logRow?.id && appUrl
+      ? injectTracking(body, logRow.id, appUrl)
+      : body
+
+  let gmailRes = await sendViaGmail(gmailToken.access_token, fromAddr, to, subject, finalBody, !!isHtml)
 
   // 401 → try token refresh
   if (gmailRes.status === 401 && gmailToken.refresh_token) {
@@ -91,7 +115,7 @@ export async function POST(req: NextRequest) {
         .from("gmail_tokens")
         .update({ access_token: newAccessToken, updated_at: new Date().toISOString() })
         .eq("id", gmailToken.id)
-      gmailRes = await sendViaGmail(newAccessToken, fromAddr, to, subject, body, !!isHtml)
+      gmailRes = await sendViaGmail(newAccessToken, fromAddr, to, subject, finalBody, !!isHtml)
     }
   }
 
@@ -102,7 +126,7 @@ export async function POST(req: NextRequest) {
       await supabase.from("gmail_tokens").delete().eq("id", gmailToken.id)
       return NextResponse.json(
         { error: "Gmail session expired. Please reconnect Gmail in Settings → API & Credits." },
-        { status: 400 }
+        { status: 400 },
       )
     }
     return NextResponse.json({ error: message }, { status: 400 })
@@ -115,18 +139,6 @@ export async function POST(req: NextRequest) {
       .eq("id", leadId)
       .eq("user_id", user.id)
   }
-
-  // Log the sent email for the thread view in lead card
-  await supabase.from("email_logs").insert({
-    user_id: user.id,
-    workspace_id: wsId,
-    lead_id: leadId ?? null,
-    from_email: fromAddr,
-    to_email: to,
-    subject: subject ?? null,
-    body: body ?? null,
-    is_html: !!isHtml,
-  })
 
   await supabase.from("credit_usage").insert({
     user_id: user.id,

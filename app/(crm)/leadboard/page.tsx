@@ -109,6 +109,10 @@ interface EmailLog {
   body: string | null
   is_html: boolean
   sent_at: string
+  opened_at: string | null
+  open_count: number
+  first_clicked_at: string | null
+  click_count: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -442,7 +446,7 @@ export default function LeadboardPage() {
     setEmailLogsLoading(true)
     const { data } = await supabase
       .from("email_logs")
-      .select("id, from_email, to_email, subject, body, is_html, sent_at")
+      .select("id, from_email, to_email, subject, body, is_html, sent_at, opened_at, open_count, first_clicked_at, click_count")
       .eq("lead_id", leadId)
       .order("sent_at", { ascending: false })
     setEmailLogs((data as EmailLog[]) ?? [])
@@ -2260,6 +2264,22 @@ export default function LeadboardPage() {
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {log.is_html && (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">HTML</span>
+                                  )}
+                                  {log.opened_at && (
+                                    <span
+                                      title={`Opened ${log.open_count > 1 ? `${log.open_count}× · first ` : ""}${format(new Date(log.opened_at), "MMM d 'at' HH:mm")}`}
+                                      className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 font-medium"
+                                    >
+                                      👁 {log.open_count > 1 ? `${log.open_count}×` : "Opened"}
+                                    </span>
+                                  )}
+                                  {log.click_count > 0 && (
+                                    <span
+                                      title={`${log.click_count} link click${log.click_count !== 1 ? "s" : ""} · first ${format(new Date(log.first_clicked_at!), "MMM d 'at' HH:mm")}`}
+                                      className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 font-medium"
+                                    >
+                                      🔗 {log.click_count}
+                                    </span>
                                   )}
                                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                                     {formatDistanceToNow(new Date(log.sent_at), { addSuffix: true })}

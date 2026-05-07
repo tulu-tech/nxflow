@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getValidatedWorkspaceId } from "@/lib/workspace"
+import { injectTracking } from "@/lib/email-tracking"
 
 async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   try {
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
     const fromAddr = gmailToken.email ?? user.email ?? "me"
     const subjectTemplate = campaign.subject ?? campaign.name
     const bodyTemplate = campaign.body ?? ""
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
 
     let accessToken = gmailToken.access_token
     let sent = 0
@@ -125,7 +127,28 @@ export async function POST(req: NextRequest) {
         .replace(/\{\{company\}\}/gi, lead.company ?? "")
         .replace(/\{\{email\}\}/gi, lead.email ?? "")
 
-      let res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, personalizedBody, !!isHtml)
+      // Insert log row before sending to get an ID for tracking URLs
+      const { data: logRow } = await supabase
+        .from("email_logs")
+        .insert({
+          user_id: user.id,
+          workspace_id: wsId,
+          lead_id: lead.id,
+          from_email: fromAddr,
+          to_email: lead.email,
+          subject: personalizedSubject,
+          body: personalizedBody,
+          is_html: !!isHtml,
+        })
+        .select("id")
+        .single()
+
+      const finalBody =
+        isHtml && logRow?.id && appUrl
+          ? injectTracking(personalizedBody, logRow.id, appUrl)
+          : personalizedBody
+
+      let res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml)
 
       if (res.status === 401 && gmailToken.refresh_token) {
         const fresh = await refreshGmailToken(gmailToken.refresh_token)
@@ -135,7 +158,7 @@ export async function POST(req: NextRequest) {
             .from("gmail_tokens")
             .update({ access_token: fresh, updated_at: new Date().toISOString() })
             .eq("id", gmailToken.id)
-          res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, personalizedBody, !!isHtml)
+          res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml)
         }
       }
 
