@@ -296,7 +296,7 @@ function TemplatePicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-72 rounded-lg border border-border bg-background shadow-lg">
+        <div className="absolute right-0 top-full mt-1 z-50 w-72 rounded-lg border border-border bg-background shadow-lg">
           {mode === "list" ? (
             <>
               <div className="flex items-center justify-between px-3 py-2 border-b">
