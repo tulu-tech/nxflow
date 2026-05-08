@@ -26,11 +26,18 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { name, subject, body, workspaceId } = await req.json()
+  const { name, subject, body, workspaceId, subjectB, scheduledFor, fromEmail, recipientIds, isHtml } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: "Campaign name required" }, { status: 400 })
 
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
   if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
+
+  // If scheduledFor is set, validate it's in the future
+  if (scheduledFor && new Date(scheduledFor) <= new Date()) {
+    return NextResponse.json({ error: "Scheduled time must be in the future" }, { status: 400 })
+  }
+
+  const campaignStatus = scheduledFor ? "scheduled" : "draft"
 
   // Prefer Gmail when connected — skip Mailchimp sync entirely. Actual
   // delivery happens at /api/mailchimp/send via the Gmail API.
@@ -43,7 +50,20 @@ export async function POST(req: NextRequest) {
   if (gmailTokens && gmailTokens.length > 0) {
     const { data: campaign } = await supabase
       .from("email_campaigns")
-      .insert({ user_id: user.id, workspace_id: wsId, name, subject, body, status: "draft", recipient_count: 0 })
+      .insert({
+        user_id: user.id,
+        workspace_id: wsId,
+        name,
+        subject,
+        body,
+        subject_b: subjectB ?? null,
+        scheduled_for: scheduledFor ?? null,
+        from_email: fromEmail ?? null,
+        recipient_ids: Array.isArray(recipientIds) ? recipientIds : null,
+        is_html: !!isHtml,
+        status: campaignStatus,
+        recipient_count: 0,
+      })
       .select()
       .single()
     return NextResponse.json({ campaign, provider: "gmail" })
@@ -59,7 +79,7 @@ export async function POST(req: NextRequest) {
   if (!profile?.mailchimp_api_key || !profile?.mailchimp_server_prefix) {
     const { data: campaign } = await supabase
       .from("email_campaigns")
-      .insert({ user_id: user.id, workspace_id: wsId, name, subject, body, status: "draft", recipient_count: 0 })
+      .insert({ user_id: user.id, workspace_id: wsId, name, subject, body, subject_b: subjectB ?? null, status: "draft", recipient_count: 0 })
       .select()
       .single()
     return NextResponse.json({ campaign, warning: "No email provider configured — saved as local draft. Connect Gmail in Settings to send." })

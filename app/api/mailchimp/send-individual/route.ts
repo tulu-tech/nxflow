@@ -1,54 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getValidatedWorkspaceId } from "@/lib/workspace"
-import { injectTracking, appendSignature } from "@/lib/email-tracking"
-
-async function refreshGmailToken(refreshToken: string): Promise<string | null> {
-  try {
-    const res = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: process.env.GOOGLE_CLIENT_ID ?? "",
-        client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.access_token ?? null
-  } catch {
-    return null
-  }
-}
-
-async function sendViaGmail(
-  accessToken: string,
-  from: string,
-  to: string,
-  subject: string,
-  body: string,
-  isHtml = false,
-) {
-  const contentType = isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8"
-  const emailLines = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: ${contentType}`,
-    ``,
-    body,
-  ]
-  const encoded = Buffer.from(emailLines.join("\r\n")).toString("base64url")
-
-  return fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ raw: encoded }),
-  })
-}
+import { injectTracking, injectUnsubscribe, appendSignature } from "@/lib/email-tracking"
+import { sendViaGmail, refreshGmailToken } from "@/lib/gmail-send"
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -63,24 +17,23 @@ export async function POST(req: NextRequest) {
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
   if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
-  // Fetch workspace signature (fire alongside token lookup below)
-  const { data: wsData } = await supabase
-    .from("crm_workspaces")
-    .select("email_signature")
-    .eq("id", wsId)
-    .single()
-  const signature: string | null = wsData?.email_signature ?? null
+  // Fetch workspace signature + unsubscribe blocklist in parallel
+  const [wsRes, unsubRes, tokenRes] = await Promise.all([
+    supabase.from("crm_workspaces").select("email_signature").eq("id", wsId).single(),
+    supabase.from("email_unsubscribes").select("email").eq("workspace_id", wsId).eq("email", to.toLowerCase()).maybeSingle(),
+    (() => {
+      let q = supabase.from("gmail_tokens").select("id, access_token, refresh_token, expires_at, email").eq("user_id", user.id)
+      if (fromEmail) q = q.eq("email", fromEmail)
+      return q.limit(1).single()
+    })(),
+  ])
 
-  // Look up specified Gmail account, or first connected if none specified
-  let tokenQuery = supabase
-    .from("gmail_tokens")
-    .select("id, access_token, refresh_token, expires_at, email")
-    .eq("user_id", user.id)
+  // Block if unsubscribed
+  if (unsubRes.data) {
+    return NextResponse.json({ error: "This recipient has unsubscribed." }, { status: 400 })
+  }
 
-  if (fromEmail) tokenQuery = tokenQuery.eq("email", fromEmail)
-
-  const { data: gmailToken } = await tokenQuery.limit(1).single()
-
+  const gmailToken = tokenRes.data
   if (!gmailToken?.access_token) {
     return NextResponse.json(
       { error: "Gmail not connected. Go to Settings → API & Credits to connect Gmail." },
@@ -88,13 +41,14 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  const signature: string | null = wsRes.data?.email_signature ?? null
   const fromAddr = gmailToken.email ?? user.email ?? "me"
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
 
   // Append workspace signature
   const bodyWithSig = appendSignature(body, signature, !!isHtml)
 
-  // Insert the log row BEFORE sending so we have an ID to embed in tracking URLs
+  // Insert the log row BEFORE sending so we have an ID for tracking URLs
   const { data: logRow } = await supabase
     .from("email_logs")
     .insert({
@@ -110,11 +64,12 @@ export async function POST(req: NextRequest) {
     .select("id")
     .single()
 
-  // Inject tracking pixel + rewrite links for HTML emails
-  const finalBody =
-    isHtml && logRow?.id && appUrl
-      ? injectTracking(bodyWithSig, logRow.id, appUrl)
-      : bodyWithSig
+  // Inject tracking pixel + click proxying + unsubscribe link for HTML emails
+  let finalBody = bodyWithSig
+  if (isHtml && logRow?.id && appUrl) {
+    finalBody = injectTracking(bodyWithSig, logRow.id, appUrl)
+    finalBody = injectUnsubscribe(finalBody, logRow.id, appUrl)
+  }
 
   let gmailRes = await sendViaGmail(gmailToken.access_token, fromAddr, to, subject, finalBody, !!isHtml)
 

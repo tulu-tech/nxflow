@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Send, Loader2, Search, CheckCircle2, AlertCircle,
   Clock, Users, Mail, Tag, Monitor, Smartphone, FileText, Code2,
-  ChevronLeft,
+  ChevronLeft, LayoutTemplate, Calendar, FlaskConical, Save, X,
 } from "lucide-react"
 import type { LeadboardEntry, EmailCampaign, LeadStatus } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
@@ -44,6 +44,24 @@ interface SentEmailLog {
   click_count: number
   lead_id: string | null
   leadboard: { full_name: string | null }[] | null
+}
+
+interface EmailTemplate {
+  id: string
+  name: string
+  subject: string
+  body: string
+  is_html: boolean
+}
+
+interface CampaignStat {
+  delivered: number
+  opened: number
+  clicked: number
+  openedA: number
+  totalA: number
+  openedB: number
+  totalB: number
 }
 
 const MERGE_TAGS = [
@@ -136,7 +154,6 @@ function HtmlEditor({
     >
       {/* ── Left: Live preview ─────────────────────────────── */}
       <div style={{ flex: "1 1 0", display: "flex", flexDirection: "column", borderRight: "1px solid var(--border)", minWidth: 0 }}>
-        {/* Preview toolbar */}
         <div style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "8px 14px", borderBottom: "1px solid var(--border)",
@@ -170,7 +187,6 @@ function HtmlEditor({
             <Smartphone style={{ width: 12, height: 12 }} /> Mobile
           </button>
         </div>
-        {/* Preview area */}
         <div style={{
           flex: 1, background: "#f5f5f5",
           display: "flex", justifyContent: "center", alignItems: "flex-start",
@@ -195,7 +211,6 @@ function HtmlEditor({
 
       {/* ── Right: Code editor ─────────────────────────────── */}
       <div style={{ width: 360, flexShrink: 0, display: "flex", flexDirection: "column" }}>
-        {/* Code tab header */}
         <div style={{
           padding: "8px 14px", borderBottom: "1px solid var(--border)",
           background: "var(--muted)", flexShrink: 0,
@@ -204,7 +219,6 @@ function HtmlEditor({
           <Code2 style={{ width: 13, height: 13, color: "var(--primary)" }} />
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)" }}>HTML Code</span>
         </div>
-        {/* Textarea fills remaining height */}
         <textarea
           ref={textareaRef}
           value={value}
@@ -252,6 +266,106 @@ function MergeTagChips({
   )
 }
 
+// ─── Template picker dropdown ─────────────────────────────────────────────────
+
+function TemplatePicker({
+  templates,
+  onLoad,
+  onSave,
+  savingName,
+  setSavingName,
+  isSaving,
+}: {
+  templates: EmailTemplate[]
+  onLoad: (t: EmailTemplate) => void
+  onSave: (name: string) => void
+  savingName: string
+  setSavingName: (v: string) => void
+  isSaving: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<"list" | "save">("list")
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => { setOpen((v) => !v); setMode("list") }}
+        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors text-muted-foreground"
+      >
+        <LayoutTemplate className="h-3.5 w-3.5" /> Templates
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-72 rounded-lg border border-border bg-background shadow-lg">
+          {mode === "list" ? (
+            <>
+              <div className="flex items-center justify-between px-3 py-2 border-b">
+                <span className="text-xs font-semibold text-foreground">Email Templates</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setMode("save")}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Save className="h-3 w-3" /> Save current
+                  </button>
+                  <button onClick={() => setOpen(false)} className="ml-2 text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {templates.length === 0 ? (
+                <p className="text-xs text-muted-foreground px-3 py-4 text-center">
+                  No templates yet — compose an email and save it as a template.
+                </p>
+              ) : (
+                <div className="max-h-52 overflow-y-auto py-1">
+                  {templates.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => { onLoad(t); setOpen(false) }}
+                      className="w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors"
+                    >
+                      <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
+                      {t.subject && <p className="text-xs text-muted-foreground truncate">{t.subject}</p>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between px-3 py-2 border-b">
+                <span className="text-xs font-semibold text-foreground">Save as Template</span>
+                <button onClick={() => setMode("list")} className="text-muted-foreground hover:text-foreground">
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="p-3 space-y-2">
+                <Input
+                  className="h-8 text-sm"
+                  placeholder="Template name..."
+                  value={savingName}
+                  onChange={(e) => setSavingName(e.target.value)}
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  className="w-full gap-1.5"
+                  disabled={!savingName.trim() || isSaving}
+                  onClick={() => { onSave(savingName); setOpen(false); setMode("list") }}
+                >
+                  {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  Save Template
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OutreachPage() {
@@ -262,6 +376,16 @@ export default function OutreachPage() {
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [gmailAccounts, setGmailAccounts] = useState<GmailAccount[]>([])
+
+  // Templates
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [indTemplateName, setIndTemplateName] = useState("")
+  const [campTemplateName, setCampTemplateName] = useState("")
+
+  // Campaign analytics
+  const [campaignStats, setCampaignStats] = useState<Map<string, CampaignStat>>(new Map())
+  const [statsLoading, setStatsLoading] = useState(false)
 
   // Sent emails / tracking tab
   const [sentLogs, setSentLogs] = useState<SentEmailLog[]>([])
@@ -291,10 +415,14 @@ export default function OutreachPage() {
   const [loadingSegment, setLoadingSegment] = useState(false)
   const [campName, setCampName] = useState("")
   const [campSubject, setCampSubject] = useState("")
+  const [campSubjectB, setCampSubjectB] = useState("")
+  const [showSubjectB, setShowSubjectB] = useState(false)
   const [campBody, setCampBody] = useState("")
   const [campEmailFormat, setCampEmailFormat] = useState<EmailFormat>("none")
   const [campPreviewDevice, setCampPreviewDevice] = useState<PreviewDevice>("desktop")
   const [campFromEmail, setCampFromEmail] = useState("")
+  const [useSchedule, setUseSchedule] = useState(false)
+  const [scheduledFor, setScheduledFor] = useState("")
   const [creatingCampaign, setCreatingCampaign] = useState(false)
   const [campaignDraft, setCampaignDraft] = useState<EmailCampaign | null>(null)
   const [sendingCampaign, setSendingCampaign] = useState(false)
@@ -302,10 +430,36 @@ export default function OutreachPage() {
   const [campSuccess, setCampSuccess] = useState(false)
   const campBodyRef = useRef<HTMLTextAreaElement>(null)
 
+  const loadCampaignStats = useCallback(async (campaignIds: string[]) => {
+    if (campaignIds.length === 0) return
+    setStatsLoading(true)
+    const { data } = await supabase
+      .from("email_logs")
+      .select("campaign_id, opened_at, click_count, subject_variant")
+      .in("campaign_id", campaignIds)
+    setStatsLoading(false)
+    if (!data) return
+
+    const stats = new Map<string, CampaignStat>()
+    for (const row of data) {
+      if (!row.campaign_id) continue
+      if (!stats.has(row.campaign_id)) {
+        stats.set(row.campaign_id, { delivered: 0, opened: 0, clicked: 0, openedA: 0, totalA: 0, openedB: 0, totalB: 0 })
+      }
+      const s = stats.get(row.campaign_id)!
+      s.delivered++
+      if (row.opened_at) s.opened++
+      if ((row.click_count ?? 0) > 0) s.clicked++
+      if (row.subject_variant === "a") { s.totalA++; if (row.opened_at) s.openedA++ }
+      if (row.subject_variant === "b") { s.totalB++; if (row.opened_at) s.openedB++ }
+    }
+    setCampaignStats(stats)
+  }, [supabase])
+
   const loadData = useCallback(async () => {
     if (!activeWorkspaceId) return
     setLoading(true)
-    const [{ data: l }, { data: c }, initRes, gmailRes] = await Promise.all([
+    const [{ data: l }, { data: c }, initRes, gmailRes, { data: tmpl }] = await Promise.all([
       supabase
         .from("leadboard")
         .select("id, full_name, email, position, company, relevance_score, status, workspace_id")
@@ -314,9 +468,11 @@ export default function OutreachPage() {
       supabase.from("email_campaigns").select("*").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
       fetch(`/api/init?workspaceId=${activeWorkspaceId}`),
       supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
+      supabase.from("email_templates").select("id, name, subject, body, is_html").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
     ])
     setLeads((l as unknown as LeadboardEntry[]) ?? [])
-    setCampaigns((c as EmailCampaign[]) ?? [])
+    const campaignList = (c as EmailCampaign[]) ?? []
+    setCampaigns(campaignList)
     if (initRes.ok) {
       const init = await initRes.json()
       setSegments(init.segments ?? [])
@@ -327,15 +483,19 @@ export default function OutreachPage() {
       setFromEmail((prev: string) => prev || accounts[0].email)
       setCampFromEmail((prev: string) => prev || accounts[0].email)
     }
+    setTemplates((tmpl as EmailTemplate[]) ?? [])
     setLoading(false)
-  }, [supabase, activeWorkspaceId])
+
+    if (campaignList.length > 0) {
+      loadCampaignStats(campaignList.map((cp) => cp.id))
+    }
+  }, [supabase, activeWorkspaceId, loadCampaignStats])
 
   useEffect(() => { loadData() }, [loadData])
 
   const loadSentLogs = useCallback(async () => {
     if (!activeWorkspaceId || sentLogsLoaded) return
     setSentLogsLoading(true)
-    // Try full query with tracking columns first; fall back to base columns if migration not run
     let { data, error } = await supabase
       .from("email_logs")
       .select("id, to_email, from_email, subject, is_html, sent_at, opened_at, open_count, first_clicked_at, click_count, lead_id, leadboard(full_name)")
@@ -343,7 +503,6 @@ export default function OutreachPage() {
       .order("sent_at", { ascending: false })
       .limit(200)
     if (error) {
-      // Tracking columns missing — fall back to base columns
       const fallback = await supabase
         .from("email_logs")
         .select("id, to_email, from_email, subject, is_html, sent_at, lead_id, leadboard(full_name)")
@@ -370,7 +529,6 @@ export default function OutreachPage() {
         `Dear ${firstName}${position},\n\nI wanted to reach out to you${company}.\n\nBest regards`,
       )
     }
-    // Only fire when selectedLeadId changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
 
@@ -379,6 +537,43 @@ export default function OutreachPage() {
     l.full_name.toLowerCase().includes(leadSearch.toLowerCase()) ||
     l.email.toLowerCase().includes(leadSearch.toLowerCase()),
   )
+
+  async function handleSaveTemplate(forTab: "ind" | "camp") {
+    const name = forTab === "ind" ? indTemplateName : campTemplateName
+    const subject = forTab === "ind" ? indSubject : campSubject
+    const body = forTab === "ind" ? indBody : campBody
+    const isHtml = forTab === "ind" ? indEmailFormat === "html" : campEmailFormat === "html"
+    if (!name.trim() || !body.trim()) return
+    setSavingTemplate(true)
+    try {
+      await fetch("/api/email-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, subject, body, is_html: isHtml, workspaceId: activeWorkspaceId }),
+      })
+      const { data } = await supabase
+        .from("email_templates")
+        .select("id, name, subject, body, is_html")
+        .eq("workspace_id", activeWorkspaceId)
+        .order("created_at", { ascending: false })
+      setTemplates((data as EmailTemplate[]) ?? [])
+      if (forTab === "ind") { setIndTemplateName("") } else { setCampTemplateName("") }
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  function loadTemplate(t: EmailTemplate, forTab: "ind" | "camp") {
+    if (forTab === "ind") {
+      setIndSubject(t.subject)
+      setIndBody(t.body)
+      setIndEmailFormat(t.is_html ? "html" : "plain")
+    } else {
+      setCampSubject(t.subject)
+      setCampBody(t.body)
+      setCampEmailFormat(t.is_html ? "html" : "plain")
+    }
+  }
 
   async function handleSendIndividual() {
     if (!selectedLead) return
@@ -465,17 +660,23 @@ export default function OutreachPage() {
       const res = await fetch("/api/mailchimp/create-campaign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: campName, subject: campSubject, body: campBody, workspaceId: activeWorkspaceId }),
+        body: JSON.stringify({
+          name: campName,
+          subject: campSubject,
+          body: campBody,
+          workspaceId: activeWorkspaceId,
+          subjectB: showSubjectB && campSubjectB.trim() ? campSubjectB : undefined,
+          scheduledFor: useSchedule && scheduledFor ? scheduledFor : undefined,
+          fromEmail: campFromEmail || undefined,
+          recipientIds: Array.from(selectedLeadIds),
+          isHtml: campEmailFormat === "html",
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      await supabase
-        .from("email_campaigns")
-        .update({ recipient_count: selectedLeadIds.size })
-        .eq("id", data.campaign.id)
-
-      setCampaignDraft({ ...data.campaign, recipient_count: selectedLeadIds.size })
+      const campaign: EmailCampaign = { ...data.campaign, recipient_count: selectedLeadIds.size }
+      setCampaignDraft(campaign)
       await loadData()
     } catch (e) {
       setCampError((e as Error).message)
@@ -506,9 +707,13 @@ export default function OutreachPage() {
       setCampaignDraft(null)
       setCampName("")
       setCampSubject("")
+      setCampSubjectB("")
+      setShowSubjectB(false)
       setCampBody("")
       setCampEmailFormat("none")
       setSelectedLeadIds(new Set())
+      setUseSchedule(false)
+      setScheduledFor("")
       await loadData()
     } catch (e) {
       setCampError((e as Error).message)
@@ -612,18 +817,45 @@ export default function OutreachPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Message</Label>
-                  {indEmailFormat !== "none" && (
-                    <button
-                      onClick={() => { setIndEmailFormat("none"); setIndBody("") }}
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <ChevronLeft className="h-3 w-3" /> Change format
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {indEmailFormat !== "none" && (
+                      <TemplatePicker
+                        templates={templates}
+                        onLoad={(t) => loadTemplate(t, "ind")}
+                        onSave={(name) => { setIndTemplateName(name); handleSaveTemplate("ind") }}
+                        savingName={indTemplateName}
+                        setSavingName={setIndTemplateName}
+                        isSaving={savingTemplate}
+                      />
+                    )}
+                    {indEmailFormat !== "none" && (
+                      <button
+                        onClick={() => { setIndEmailFormat("none"); setIndBody("") }}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <ChevronLeft className="h-3 w-3" /> Change format
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {indEmailFormat === "none" && (
-                  <FormatChooser onChoose={setIndEmailFormat} />
+                  <>
+                    {templates.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <TemplatePicker
+                          templates={templates}
+                          onLoad={(t) => loadTemplate(t, "ind")}
+                          onSave={(name) => { setIndTemplateName(name); handleSaveTemplate("ind") }}
+                          savingName={indTemplateName}
+                          setSavingName={setIndTemplateName}
+                          isSaving={savingTemplate}
+                        />
+                        <span className="text-xs text-muted-foreground">or choose a format below</span>
+                      </div>
+                    )}
+                    <FormatChooser onChoose={setIndEmailFormat} />
+                  </>
                 )}
 
                 {indEmailFormat === "plain" && (
@@ -719,13 +951,12 @@ export default function OutreachPage() {
           )}
 
           <div className={cn("grid gap-5", campEmailFormat === "html" ? "grid-cols-1" : "lg:grid-cols-2")}>
-            {/* Left: Lead selection — hidden in HTML mode (compact bar above replaces it) */}
+            {/* Left: Lead selection */}
             <Card className={campEmailFormat === "html" ? "hidden" : ""}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Select Recipients</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Segment filter */}
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center gap-1.5">
                     <Tag className="h-3 w-3" /> Segment
@@ -764,7 +995,6 @@ export default function OutreachPage() {
                   )}
                 </div>
 
-                {/* Status + Score filters */}
                 <div className="flex items-center gap-2">
                   <div className="space-y-1 flex-1">
                     <Label className="text-xs">Status Filter</Label>
@@ -857,26 +1087,86 @@ export default function OutreachPage() {
                   )}
                 </div>
 
+                {/* Subject A */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Subject Line</Label>
-                  <Input className="h-8 text-sm" value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder="Email subject" />
-                </div>
-
-                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs">Email Body</Label>
-                    {campEmailFormat !== "none" && (
+                    <Label className="text-xs">{showSubjectB ? "Subject A" : "Subject Line"}</Label>
+                    {!showSubjectB && (
                       <button
-                        onClick={() => { setCampEmailFormat("none"); setCampBody("") }}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={() => setShowSubjectB(true)}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
                       >
-                        <ChevronLeft className="h-3 w-3" /> Change format
+                        <FlaskConical className="h-3 w-3" /> A/B Test
                       </button>
                     )}
                   </div>
+                  <Input className="h-8 text-sm" value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder="Email subject" />
+                </div>
+
+                {/* Subject B (A/B test) */}
+                {showSubjectB && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs flex items-center gap-1.5">
+                        <FlaskConical className="h-3 w-3 text-violet-500" />
+                        Subject B
+                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">A/B</Badge>
+                      </Label>
+                      <button
+                        onClick={() => { setShowSubjectB(false); setCampSubjectB("") }}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    <Input className="h-8 text-sm" value={campSubjectB} onChange={(e) => setCampSubjectB(e.target.value)} placeholder="Alternate subject for half the recipients" />
+                    <p className="text-xs text-muted-foreground">Recipients are split 50/50 between Subject A and Subject B.</p>
+                  </div>
+                )}
+
+                {/* Email Body */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Email Body</Label>
+                    <div className="flex items-center gap-2">
+                      {campEmailFormat !== "none" && (
+                        <TemplatePicker
+                          templates={templates}
+                          onLoad={(t) => loadTemplate(t, "camp")}
+                          onSave={(name) => { setCampTemplateName(name); handleSaveTemplate("camp") }}
+                          savingName={campTemplateName}
+                          setSavingName={setCampTemplateName}
+                          isSaving={savingTemplate}
+                        />
+                      )}
+                      {campEmailFormat !== "none" && (
+                        <button
+                          onClick={() => { setCampEmailFormat("none"); setCampBody("") }}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <ChevronLeft className="h-3 w-3" /> Change format
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
                   {campEmailFormat === "none" && (
-                    <FormatChooser onChoose={setCampEmailFormat} />
+                    <>
+                      {templates.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <TemplatePicker
+                            templates={templates}
+                            onLoad={(t) => loadTemplate(t, "camp")}
+                            onSave={(name) => { setCampTemplateName(name); handleSaveTemplate("camp") }}
+                            savingName={campTemplateName}
+                            setSavingName={setCampTemplateName}
+                            isSaving={savingTemplate}
+                          />
+                          <span className="text-xs text-muted-foreground">or choose a format below</span>
+                        </div>
+                      )}
+                      <FormatChooser onChoose={setCampEmailFormat} />
+                    </>
                   )}
 
                   {campEmailFormat === "plain" && (
@@ -907,6 +1197,43 @@ export default function OutreachPage() {
                   )}
                 </div>
 
+                {/* Schedule toggle */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setUseSchedule(!useSchedule)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border transition-colors",
+                        useSchedule
+                          ? "border-primary text-primary bg-primary/5"
+                          : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                      )}
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                      {useSchedule ? "Scheduled send" : "Schedule send"}
+                    </button>
+                    {useSchedule && (
+                      <button onClick={() => { setUseSchedule(false); setScheduledFor("") }} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {useSchedule && (
+                    <div className="space-y-1">
+                      <input
+                        type="datetime-local"
+                        className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        value={scheduledFor}
+                        onChange={(e) => setScheduledFor(e.target.value)}
+                        min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Campaign will be sent automatically at the scheduled time.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {campError && (
                   <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{campError}</div>
                 )}
@@ -921,21 +1248,39 @@ export default function OutreachPage() {
                     <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
                       <CheckCircle2 className="h-4 w-4 text-primary" />
                       Campaign created: <span className="font-medium">{campaignDraft.name}</span>
+                      {campaignDraft.status === "scheduled" && campaignDraft.scheduled_for && (
+                        <Badge variant="secondary" className="text-xs ml-auto">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {format(new Date(campaignDraft.scheduled_for), "MMM d, HH:mm")}
+                        </Badge>
+                      )}
                     </div>
-                    <Button onClick={handleSendCampaign} disabled={sendingCampaign} className="w-full gap-2">
-                      {sendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      {sendingCampaign ? "Sending..." : `Send to ${campaignDraft.recipient_count} recipients`}
-                    </Button>
+                    {campaignDraft.status !== "scheduled" && (
+                      <Button onClick={handleSendCampaign} disabled={sendingCampaign} className="w-full gap-2">
+                        {sendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        {sendingCampaign ? "Sending..." : `Send to ${campaignDraft.recipient_count} recipients`}
+                      </Button>
+                    )}
+                    {campaignDraft.status === "scheduled" && (
+                      <p className="text-xs text-center text-muted-foreground">
+                        This campaign will be sent automatically at the scheduled time.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <Button
                     onClick={handleCreateCampaign}
-                    disabled={!campName.trim() || !selectedLeadIds.size || creatingCampaign || campEmailFormat === "none"}
+                    disabled={!campName.trim() || !selectedLeadIds.size || creatingCampaign || campEmailFormat === "none" || (useSchedule && !scheduledFor)}
                     className="w-full gap-2"
                     variant="outline"
                   >
-                    {creatingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                    {creatingCampaign ? "Creating..." : `Create Campaign (${selectedLeadIds.size} recipients)`}
+                    {creatingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : useSchedule ? <Calendar className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                    {creatingCampaign
+                      ? "Creating..."
+                      : useSchedule
+                        ? `Schedule Campaign (${selectedLeadIds.size} recipients)`
+                        : `Create Campaign (${selectedLeadIds.size} recipients)`
+                    }
                   </Button>
                 )}
               </CardContent>
@@ -953,39 +1298,91 @@ export default function OutreachPage() {
               <p className="text-sm font-medium">No campaigns yet</p>
             </div>
           ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="rounded-lg border overflow-hidden overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="bg-muted/50 border-b">
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Campaign</th>
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Status</th>
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs hidden sm:table-cell">Recipients</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Opened</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs">Clicked</th>
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs hidden md:table-cell">Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map((c) => (
-                    <tr key={c.id} className="border-b last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-foreground">{c.name}</p>
-                        {c.subject && <p className="text-xs text-muted-foreground truncate max-w-xs">{c.subject}</p>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={c.status === "sent" ? "default" : "secondary"} className="text-xs">
-                          {c.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                        {c.recipient_count > 0 ? `${c.recipient_count} recipients` : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {c.sent_at ? format(new Date(c.sent_at), "MMM d, yyyy") : format(new Date(c.created_at), "MMM d, yyyy")}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {campaigns.map((c) => {
+                    const stat = campaignStats.get(c.id)
+                    const hasAB = stat && stat.totalA > 0 && stat.totalB > 0
+                    const openPct = stat && stat.delivered > 0 ? Math.round((stat.opened / stat.delivered) * 100) : null
+                    const clickPct = stat && stat.delivered > 0 ? Math.round((stat.clicked / stat.delivered) * 100) : null
+                    const openPctA = stat && stat.totalA > 0 ? Math.round((stat.openedA / stat.totalA) * 100) : null
+                    const openPctB = stat && stat.totalB > 0 ? Math.round((stat.openedB / stat.totalB) * 100) : null
+                    return (
+                      <tr key={c.id} className="border-b last:border-0 hover:bg-muted/20">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-foreground">{c.name}</p>
+                          {c.subject && <p className="text-xs text-muted-foreground truncate max-w-xs">{c.subject}</p>}
+                          {c.subject_b && (
+                            <p className="text-xs text-violet-500 truncate max-w-xs flex items-center gap-1">
+                              <FlaskConical className="h-3 w-3 shrink-0" /> B: {c.subject_b}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            variant={c.status === "sent" ? "default" : c.status === "scheduled" ? "secondary" : "outline"}
+                            className="text-xs"
+                          >
+                            {c.status === "scheduled" && <Clock className="h-3 w-3 mr-1" />}
+                            {c.status}
+                          </Badge>
+                          {c.status === "scheduled" && c.scheduled_for && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {format(new Date(c.scheduled_for), "MMM d, HH:mm")}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                          {stat ? stat.delivered : c.recipient_count > 0 ? `${c.recipient_count}` : "—"}
+                          {stat && ` sent`}
+                        </td>
+                        <td className="px-4 py-3">
+                          {statsLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                          ) : hasAB ? (
+                            <span className="text-xs text-foreground">
+                              A: <span className="font-medium text-emerald-600">{openPctA}%</span>
+                              {" · "}B: <span className="font-medium text-violet-600">{openPctB}%</span>
+                            </span>
+                          ) : openPct !== null ? (
+                            <span className={cn("text-xs font-medium", openPct > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+                              {openPct}%
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {statsLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                          ) : clickPct !== null ? (
+                            <span className={cn("text-xs font-medium", clickPct > 0 ? "text-blue-600" : "text-muted-foreground")}>
+                              {clickPct}%
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                          <span className="flex items-center gap-1 text-xs">
+                            <Clock className="h-3 w-3" />
+                            {c.sent_at ? format(new Date(c.sent_at), "MMM d, yyyy") : format(new Date(c.created_at), "MMM d, yyyy")}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

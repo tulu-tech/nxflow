@@ -1,54 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getValidatedWorkspaceId } from "@/lib/workspace"
-import { injectTracking, appendSignature } from "@/lib/email-tracking"
-
-async function refreshGmailToken(refreshToken: string): Promise<string | null> {
-  try {
-    const res = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: process.env.GOOGLE_CLIENT_ID ?? "",
-        client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.access_token ?? null
-  } catch {
-    return null
-  }
-}
-
-async function sendViaGmail(
-  accessToken: string,
-  from: string,
-  to: string,
-  subject: string,
-  body: string,
-  isHtml = false,
-) {
-  const contentType = isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8"
-  const emailLines = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: ${contentType}`,
-    ``,
-    body,
-  ]
-  const encoded = Buffer.from(emailLines.join("\r\n")).toString("base64url")
-
-  return fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ raw: encoded }),
-  })
-}
+import { injectTracking, injectUnsubscribe, appendSignature } from "@/lib/email-tracking"
+import { sendViaGmail, refreshGmailToken, fillMergeTags } from "@/lib/gmail-send"
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -61,33 +15,19 @@ export async function POST(req: NextRequest) {
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
   if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
-  const { data: campaign } = await supabase
-    .from("email_campaigns")
-    .select("*")
-    .eq("id", campaignId)
-    .eq("user_id", user.id)
-    .eq("workspace_id", wsId)
-    .single()
+  const [campaignRes, wsRes] = await Promise.all([
+    supabase.from("email_campaigns").select("*").eq("id", campaignId).eq("user_id", user.id).eq("workspace_id", wsId).single(),
+    supabase.from("crm_workspaces").select("email_signature").eq("id", wsId).single(),
+  ])
 
+  const campaign = campaignRes.data
   if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 })
 
-  // Fetch workspace signature
-  const { data: wsData } = await supabase
-    .from("crm_workspaces")
-    .select("email_signature")
-    .eq("id", wsId)
-    .single()
-  const signature: string | null = wsData?.email_signature ?? null
+  const signature: string | null = wsRes.data?.email_signature ?? null
 
-  // Prefer Gmail when connected. The user's auth email (e.g. berat@alba.com)
-  // won't be a verified Mailchimp sender, so Mailchimp's send API would reject
-  // with "Your Campaign is not ready to send. address(es) - ..."
-  let tokenQuery = supabase
-    .from("gmail_tokens")
-    .select("id, access_token, refresh_token, email")
-    .eq("user_id", user.id)
+  // Prefer Gmail when connected
+  let tokenQuery = supabase.from("gmail_tokens").select("id, access_token, refresh_token, email").eq("user_id", user.id)
   if (fromEmail) tokenQuery = tokenQuery.eq("email", fromEmail)
-
   const { data: gmailTokens } = await tokenQuery.limit(1)
   const gmailToken = gmailTokens?.[0]
 
@@ -96,45 +36,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No recipients selected" }, { status: 400 })
     }
 
-    const { data: leads } = await supabase
-      .from("leadboard")
-      .select("id, email, full_name, position, company")
-      .in("id", recipientIds)
-      .eq("user_id", user.id)
+    const [leadsRes, unsubRes] = await Promise.all([
+      supabase.from("leadboard").select("id, email, full_name, position, company").in("id", recipientIds).eq("user_id", user.id),
+      supabase.from("email_unsubscribes").select("email").eq("workspace_id", wsId),
+    ])
 
-    const targets = (leads ?? []).filter((l) => l.email)
+    const unsubEmails = new Set((unsubRes.data ?? []).map((r: { email: string }) => r.email.toLowerCase()))
+    const targets = (leadsRes.data ?? []).filter((l) => l.email && !unsubEmails.has(l.email.toLowerCase()))
+
     if (targets.length === 0) {
-      return NextResponse.json({ error: "No valid recipient emails found" }, { status: 400 })
+      return NextResponse.json({ error: "No valid recipient emails found (all may have unsubscribed)" }, { status: 400 })
     }
 
     const fromAddr = gmailToken.email ?? user.email ?? "me"
     const subjectTemplate = campaign.subject ?? campaign.name
+    const subjectBTemplate: string | null = campaign.subject_b ?? null
     const bodyTemplate = campaign.body ?? ""
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
+
+    // A/B split: shuffle targets, first half gets subject A, second half gets subject B
+    const shuffled = [...targets].sort(() => Math.random() - 0.5)
+    const splitIndex = subjectBTemplate ? Math.ceil(shuffled.length / 2) : shuffled.length
 
     let accessToken = gmailToken.access_token
     let sent = 0
     const failures: { email: string; reason: string }[] = []
 
-    for (const lead of targets) {
-      const parts = (lead.full_name ?? "").trim().split(/\s+/)
-      const firstName = parts[0] ?? ""
-      const lastName = parts.slice(1).join(" ")
-      const personalizedSubject = subjectTemplate
-        .replace(/\{\{first_name\}\}/gi, firstName)
-        .replace(/\{\{last_name\}\}/gi, lastName)
-        .replace(/\{\{full_name\}\}/gi, lead.full_name ?? "")
-        .replace(/\{\{position\}\}/gi, lead.position ?? "")
-        .replace(/\{\{company\}\}/gi, lead.company ?? "")
-        .replace(/\{\{email\}\}/gi, lead.email ?? "")
+    for (let i = 0; i < shuffled.length; i++) {
+      const lead = shuffled[i]
+      const variant: "a" | "b" = subjectBTemplate && i >= splitIndex ? "b" : "a"
+      const chosenSubjectTemplate = variant === "b" ? (subjectBTemplate ?? subjectTemplate) : subjectTemplate
+
+      const personalizedSubject = fillMergeTags(chosenSubjectTemplate, lead)
       const personalizedBody = appendSignature(
-        bodyTemplate
-          .replace(/\{\{first_name\}\}/gi, firstName)
-          .replace(/\{\{last_name\}\}/gi, lastName)
-          .replace(/\{\{full_name\}\}/gi, lead.full_name ?? "")
-          .replace(/\{\{position\}\}/gi, lead.position ?? "")
-          .replace(/\{\{company\}\}/gi, lead.company ?? "")
-          .replace(/\{\{email\}\}/gi, lead.email ?? ""),
+        fillMergeTags(bodyTemplate, lead),
         signature,
         !!isHtml,
       )
@@ -146,6 +81,8 @@ export async function POST(req: NextRequest) {
           user_id: user.id,
           workspace_id: wsId,
           lead_id: lead.id,
+          campaign_id: campaignId,
+          subject_variant: subjectBTemplate ? variant : null,
           from_email: fromAddr,
           to_email: lead.email,
           subject: personalizedSubject,
@@ -155,10 +92,11 @@ export async function POST(req: NextRequest) {
         .select("id")
         .single()
 
-      const finalBody =
-        isHtml && logRow?.id && appUrl
-          ? injectTracking(personalizedBody, logRow.id, appUrl)
-          : personalizedBody
+      let finalBody = personalizedBody
+      if (isHtml && logRow?.id && appUrl) {
+        finalBody = injectTracking(personalizedBody, logRow.id, appUrl)
+        finalBody = injectUnsubscribe(finalBody, logRow.id, appUrl)
+      }
 
       let res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml)
 
@@ -166,27 +104,17 @@ export async function POST(req: NextRequest) {
         const fresh = await refreshGmailToken(gmailToken.refresh_token)
         if (fresh) {
           accessToken = fresh
-          await supabase
-            .from("gmail_tokens")
-            .update({ access_token: fresh, updated_at: new Date().toISOString() })
-            .eq("id", gmailToken.id)
+          await supabase.from("gmail_tokens").update({ access_token: fresh, updated_at: new Date().toISOString() }).eq("id", gmailToken.id)
           res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml)
         }
       }
 
       if (res.ok) {
         sent++
-        await supabase
-          .from("leadboard")
-          .update({ last_contacted_at: new Date().toISOString(), status: "contacted" })
-          .eq("id", lead.id)
-          .eq("user_id", user.id)
+        await supabase.from("leadboard").update({ last_contacted_at: new Date().toISOString(), status: "contacted" }).eq("id", lead.id).eq("user_id", user.id)
       } else {
         const err = await res.json().catch(() => null)
-        failures.push({
-          email: lead.email,
-          reason: err?.error?.message ?? `HTTP ${res.status}`,
-        })
+        failures.push({ email: lead.email, reason: err?.error?.message ?? `HTTP ${res.status}` })
       }
     }
 
@@ -197,15 +125,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    await supabase
-      .from("email_campaigns")
-      .update({
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        recipient_count: sent,
-      })
-      .eq("id", campaignId)
-
+    await supabase.from("email_campaigns").update({ status: "sent", sent_at: new Date().toISOString(), recipient_count: sent }).eq("id", campaignId)
     await supabase.from("credit_usage").insert({
       user_id: user.id,
       workspace_id: wsId,
@@ -225,24 +145,14 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("mailchimp_api_key, mailchimp_server_prefix")
-    .eq("id", user.id)
-    .single()
-
+  const { data: profile } = await supabase.from("profiles").select("mailchimp_api_key, mailchimp_server_prefix").eq("id", user.id).single()
   if (!profile?.mailchimp_api_key || !profile?.mailchimp_server_prefix) {
     return NextResponse.json({ error: "Mailchimp not configured" }, { status: 400 })
   }
 
   const sendRes = await fetch(
     `https://${profile.mailchimp_server_prefix}.api.mailchimp.com/3.0/campaigns/${campaign.mailchimp_campaign_id}/actions/send`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${Buffer.from(`anystring:${profile.mailchimp_api_key}`).toString("base64")}`,
-      },
-    },
+    { method: "POST", headers: { Authorization: `Basic ${Buffer.from(`anystring:${profile.mailchimp_api_key}`).toString("base64")}` } },
   )
 
   if (!sendRes.ok) {
@@ -250,11 +160,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.detail ?? "Send failed" }, { status: 400 })
   }
 
-  await supabase
-    .from("email_campaigns")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
-    .eq("id", campaignId)
-
+  await supabase.from("email_campaigns").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", campaignId)
   await supabase.from("credit_usage").insert({
     user_id: user.id,
     workspace_id: wsId,

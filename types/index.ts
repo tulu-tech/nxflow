@@ -76,9 +76,15 @@ export interface CreditUsage {
 export interface EmailCampaign {
   id: string
   user_id: string
+  workspace_id?: string
   name: string
   subject?: string
   body?: string
+  subject_b?: string | null
+  from_email?: string | null
+  scheduled_for?: string | null
+  recipient_ids?: string[] | null
+  is_html?: boolean
   mailchimp_campaign_id?: string
   status: "draft" | "sent" | "scheduled"
   recipient_count: number

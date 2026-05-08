@@ -47,3 +47,16 @@ export function injectTracking(
     ? tracked.replace("</body>", `${pixel}</body>`)
     : tracked + pixel
 }
+
+/**
+ * Injects an unsubscribe link footer into an HTML email body.
+ * Call after injectTracking() so the unsubscribe href is NOT rewritten by the click proxy.
+ */
+export function injectUnsubscribe(html: string, logId: string, appUrl: string): string {
+  const link = `<p style="text-align:center;margin-top:32px;font-size:11px;color:#aaa;font-family:sans-serif;">` +
+    `<a href="${appUrl}/api/track/unsubscribe?id=${logId}" style="color:#aaa;text-decoration:underline;">Unsubscribe</a>` +
+    `</p>`
+  return html.includes("</body>")
+    ? html.replace("</body>", `${link}</body>`)
+    : html + link
+}
