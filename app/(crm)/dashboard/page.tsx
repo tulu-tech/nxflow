@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui-crm/card"
@@ -54,7 +54,7 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)

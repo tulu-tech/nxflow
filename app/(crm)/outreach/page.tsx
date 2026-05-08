@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
@@ -255,7 +255,7 @@ function MergeTagChips({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OutreachPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   const [leads, setLeads] = useState<LeadboardEntry[]>([])
@@ -328,20 +328,31 @@ export default function OutreachPage() {
       setCampFromEmail((prev: string) => prev || accounts[0].email)
     }
     setLoading(false)
-  }, [supabase])
+  }, [supabase, activeWorkspaceId])
 
-  useEffect(() => { loadData() }, [loadData, activeWorkspaceId])
+  useEffect(() => { loadData() }, [loadData])
 
   const loadSentLogs = useCallback(async () => {
     if (!activeWorkspaceId || sentLogsLoaded) return
     setSentLogsLoading(true)
-    const { data } = await supabase
+    // Try full query with tracking columns first; fall back to base columns if migration not run
+    let { data, error } = await supabase
       .from("email_logs")
       .select("id, to_email, from_email, subject, is_html, sent_at, opened_at, open_count, first_clicked_at, click_count, lead_id, leadboard(full_name)")
       .eq("workspace_id", activeWorkspaceId)
       .order("sent_at", { ascending: false })
       .limit(200)
-    setSentLogs((data ?? []) as SentEmailLog[])
+    if (error) {
+      // Tracking columns missing — fall back to base columns
+      const fallback = await supabase
+        .from("email_logs")
+        .select("id, to_email, from_email, subject, is_html, sent_at, lead_id, leadboard(full_name)")
+        .eq("workspace_id", activeWorkspaceId)
+        .order("sent_at", { ascending: false })
+        .limit(200)
+      data = fallback.data as typeof data
+    }
+    setSentLogs((data ?? []) as unknown as SentEmailLog[])
     setSentLogsLoaded(true)
     setSentLogsLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps

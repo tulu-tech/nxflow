@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
@@ -19,7 +19,7 @@ import type { ResponseRule, MatchedEmail } from "@/types"
 import { format } from "date-fns"
 
 export default function ResponsesPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   const [rules, setRules] = useState<ResponseRule[]>([])

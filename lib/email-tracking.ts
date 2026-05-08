@@ -1,4 +1,26 @@
 /**
+ * Appends an email signature to the body.
+ * For HTML emails the signature is separated by a horizontal rule.
+ * For plain-text emails a blank line separator is used.
+ * Returns body unchanged when signature is null/empty.
+ */
+export function appendSignature(
+  body: string,
+  signature: string | null | undefined,
+  isHtml: boolean,
+): string {
+  if (!signature?.trim()) return body
+  if (isHtml) {
+    const divider = `<hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />`
+    const sigBlock = `<div class="email-signature" style="color:#555;font-size:13px;line-height:1.5;">${signature}</div>`
+    return body.includes("</body>")
+      ? body.replace("</body>", `${divider}${sigBlock}</body>`)
+      : `${body}${divider}${sigBlock}`
+  }
+  return `${body}\n\n--\n${signature}`
+}
+
+/**
  * Injects open-pixel and click-tracking into an HTML email body.
  * Call this AFTER inserting the email_logs row (so the ID exists)
  * and BEFORE base64-encoding the MIME payload for Gmail.

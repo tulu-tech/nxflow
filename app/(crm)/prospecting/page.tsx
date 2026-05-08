@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
@@ -137,7 +137,7 @@ const SENIORITY_LABELS = SENIORITY_LEVELS.map((s) => s.label)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ProspectingPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const searchParams = useSearchParams()
   const router = useRouter()
   const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)

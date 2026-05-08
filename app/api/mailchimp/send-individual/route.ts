@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getValidatedWorkspaceId } from "@/lib/workspace"
-import { injectTracking } from "@/lib/email-tracking"
+import { injectTracking, appendSignature } from "@/lib/email-tracking"
 
 async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   try {
@@ -63,6 +63,14 @@ export async function POST(req: NextRequest) {
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
   if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
+  // Fetch workspace signature (fire alongside token lookup below)
+  const { data: wsData } = await supabase
+    .from("crm_workspaces")
+    .select("email_signature")
+    .eq("id", wsId)
+    .single()
+  const signature: string | null = wsData?.email_signature ?? null
+
   // Look up specified Gmail account, or first connected if none specified
   let tokenQuery = supabase
     .from("gmail_tokens")
@@ -83,6 +91,9 @@ export async function POST(req: NextRequest) {
   const fromAddr = gmailToken.email ?? user.email ?? "me"
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
 
+  // Append workspace signature
+  const bodyWithSig = appendSignature(body, signature, !!isHtml)
+
   // Insert the log row BEFORE sending so we have an ID to embed in tracking URLs
   const { data: logRow } = await supabase
     .from("email_logs")
@@ -93,7 +104,7 @@ export async function POST(req: NextRequest) {
       from_email: fromAddr,
       to_email: to,
       subject: subject ?? null,
-      body: body ?? null,
+      body: bodyWithSig,
       is_html: !!isHtml,
     })
     .select("id")
@@ -102,8 +113,8 @@ export async function POST(req: NextRequest) {
   // Inject tracking pixel + rewrite links for HTML emails
   const finalBody =
     isHtml && logRow?.id && appUrl
-      ? injectTracking(body, logRow.id, appUrl)
-      : body
+      ? injectTracking(bodyWithSig, logRow.id, appUrl)
+      : bodyWithSig
 
   let gmailRes = await sendViaGmail(gmailToken.access_token, fromAddr, to, subject, finalBody, !!isHtml)
 

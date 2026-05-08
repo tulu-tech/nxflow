@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getValidatedWorkspaceId } from "@/lib/workspace"
-import { injectTracking } from "@/lib/email-tracking"
+import { injectTracking, appendSignature } from "@/lib/email-tracking"
 
 async function refreshGmailToken(refreshToken: string): Promise<string | null> {
   try {
@@ -71,6 +71,14 @@ export async function POST(req: NextRequest) {
 
   if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 })
 
+  // Fetch workspace signature
+  const { data: wsData } = await supabase
+    .from("crm_workspaces")
+    .select("email_signature")
+    .eq("id", wsId)
+    .single()
+  const signature: string | null = wsData?.email_signature ?? null
+
   // Prefer Gmail when connected. The user's auth email (e.g. berat@alba.com)
   // won't be a verified Mailchimp sender, so Mailchimp's send API would reject
   // with "Your Campaign is not ready to send. address(es) - ..."
@@ -119,13 +127,17 @@ export async function POST(req: NextRequest) {
         .replace(/\{\{position\}\}/gi, lead.position ?? "")
         .replace(/\{\{company\}\}/gi, lead.company ?? "")
         .replace(/\{\{email\}\}/gi, lead.email ?? "")
-      const personalizedBody = bodyTemplate
-        .replace(/\{\{first_name\}\}/gi, firstName)
-        .replace(/\{\{last_name\}\}/gi, lastName)
-        .replace(/\{\{full_name\}\}/gi, lead.full_name ?? "")
-        .replace(/\{\{position\}\}/gi, lead.position ?? "")
-        .replace(/\{\{company\}\}/gi, lead.company ?? "")
-        .replace(/\{\{email\}\}/gi, lead.email ?? "")
+      const personalizedBody = appendSignature(
+        bodyTemplate
+          .replace(/\{\{first_name\}\}/gi, firstName)
+          .replace(/\{\{last_name\}\}/gi, lastName)
+          .replace(/\{\{full_name\}\}/gi, lead.full_name ?? "")
+          .replace(/\{\{position\}\}/gi, lead.position ?? "")
+          .replace(/\{\{company\}\}/gi, lead.company ?? "")
+          .replace(/\{\{email\}\}/gi, lead.email ?? ""),
+        signature,
+        !!isHtml,
+      )
 
       // Insert log row before sending to get an ID for tracking URLs
       const { data: logRow } = await supabase

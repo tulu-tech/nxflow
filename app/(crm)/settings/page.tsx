@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui-crm/button"
 import { Input } from "@/components/ui-crm/input"
@@ -22,7 +22,7 @@ import { format } from "date-fns"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 
 export default function SettingsPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   // Profile
@@ -72,6 +72,11 @@ export default function SettingsPage() {
   const [currentTheme, setCurrentTheme] = useState<Theme>("light")
   const [savingTheme, setSavingTheme] = useState(false)
 
+  // Email Signature
+  const [emailSignature, setEmailSignature] = useState("")
+  const [savingSignature, setSavingSignature] = useState(false)
+  const [signatureSuccess, setSignatureSuccess] = useState(false)
+
   // Password
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -84,13 +89,16 @@ export default function SettingsPage() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
     const wsParam = activeWorkspaceId ? `?workspaceId=${activeWorkspaceId}` : ""
-    const [keysRes, gmailRes, twilioRes, creditRes, historyRes, rulesRes] = await Promise.all([
+    const [keysRes, gmailRes, twilioRes, creditRes, historyRes, rulesRes, wsRes] = await Promise.all([
       fetch("/api/settings/api-keys"),
       supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
       fetch(`/api/settings/twilio${wsParam}`),
       supabase.from("credit_usage").select("type, amount").eq("workspace_id", activeWorkspaceId ?? "").gte("created_at", monthStart),
       supabase.from("credit_usage").select("*").eq("workspace_id", activeWorkspaceId ?? "").order("created_at", { ascending: false }).limit(20),
       supabase.from("scoring_rules").select("*").eq("workspace_id", activeWorkspaceId ?? "").order("created_at", { ascending: false }),
+      activeWorkspaceId
+        ? supabase.from("crm_workspaces").select("email_signature").eq("id", activeWorkspaceId).single()
+        : Promise.resolve({ data: null }),
     ])
 
     if (keysRes.ok) {
@@ -100,6 +108,8 @@ export default function SettingsPage() {
       setMailchimpKeySet(keys.mailchimpKeySet)
       setServerPrefix(keys.mailchimpServerPrefix ?? "")
     }
+
+    if (wsRes.data) setEmailSignature((wsRes.data as { email_signature: string | null }).email_signature ?? "")
 
     setGmailAccounts((gmailRes.data ?? []) as { id: string; email: string }[])
 
@@ -135,6 +145,23 @@ export default function SettingsPage() {
     setProfileSuccess(true)
     setSavingProfile(false)
     setTimeout(() => setProfileSuccess(false), 3000)
+  }
+
+  async function handleSaveSignature() {
+    if (!activeWorkspaceId) return
+    setSavingSignature(true)
+    setSignatureSuccess(false)
+    await fetch(`/api/workspaces?id=${activeWorkspaceId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email_signature: emailSignature || null }),
+    })
+    // Update local store so outreach page picks it up immediately
+    const { updateWorkspace } = useCrmWorkspaceStore.getState()
+    updateWorkspace(activeWorkspaceId, { email_signature: emailSignature || null })
+    setSignatureSuccess(true)
+    setSavingSignature(false)
+    setTimeout(() => setSignatureSuccess(false), 3000)
   }
 
   async function handleSaveKeys() {
@@ -458,6 +485,41 @@ export default function SettingsPage() {
                 <Mail className="h-3.5 w-3.5" />
                 {gmailAccounts.length > 0 ? "Connect another account" : "Connect Gmail"}
               </a>
+            </CardContent>
+          </Card>
+
+          {/* Email Signature */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <Mail className="h-4 w-4" /> Email Signature
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Automatically appended to every email sent from this workspace (individual and mass campaigns). Supports plain text or HTML.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                className="text-sm font-mono min-h-[140px] resize-y"
+                placeholder={"Best regards,\nYour Name\n\n<a href=\"https://yoursite.com\">yoursite.com</a>"}
+                value={emailSignature}
+                onChange={(e) => setEmailSignature(e.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleSaveSignature}
+                  disabled={savingSignature}
+                >
+                  {savingSignature ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                  Save Signature
+                </Button>
+                {signatureSuccess && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-500">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+                  </span>
+                )}
+              </div>
             </CardContent>
           </Card>
 

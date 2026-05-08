@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("crm_workspaces")
-    .select("id, name, icon")
+    .select("id, name, icon, email_signature")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true })
 
@@ -26,7 +26,7 @@ export async function GET() {
 
   const { data: orphans } = await sr
     .from("crm_workspaces")
-    .select("id, name, icon, user_id")
+    .select("id, name, icon, email_signature, user_id")
     .neq("user_id", user.id)
     .order("created_at", { ascending: true })
 
@@ -36,7 +36,7 @@ export async function GET() {
   const ids = orphans.map((w: { id: string }) => w.id)
   await sr.from("crm_workspaces").update({ user_id: user.id }).in("id", ids)
 
-  return NextResponse.json(orphans.map(({ id, name, icon }: { id: string; name: string; icon: string }) => ({ id, name, icon })))
+  return NextResponse.json(orphans.map(({ id, name, icon, email_signature }: { id: string; name: string; icon: string; email_signature: string | null }) => ({ id, name, icon, email_signature })))
 }
 
 export async function POST(req: NextRequest) {
@@ -65,17 +65,18 @@ export async function PATCH(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id")
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
 
-  const { name, icon } = await req.json()
-  const update: Record<string, string> = {}
+  const { name, icon, email_signature } = await req.json()
+  const update: Record<string, string | null> = {}
   if (name !== undefined) update.name = name.trim()
   if (icon !== undefined) update.icon = icon
+  if (email_signature !== undefined) update.email_signature = email_signature ?? null
 
   const { data, error } = await supabase
     .from("crm_workspaces")
     .update(update)
     .eq("id", id)
     .eq("user_id", user.id)
-    .select("id, name, icon")
+    .select("id, name, icon, email_signature")
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

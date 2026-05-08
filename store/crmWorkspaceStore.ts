@@ -5,6 +5,7 @@ export interface CrmWorkspace {
   id: string
   name: string
   icon: string
+  email_signature?: string | null
 }
 
 interface CrmWorkspaceState {
@@ -14,6 +15,7 @@ interface CrmWorkspaceState {
   setActiveWorkspace: (id: string) => void
   updateWorkspace: (id: string, patch: Partial<CrmWorkspace>) => void
   removeWorkspace: (id: string) => void
+  activeSignature: () => string | null
 }
 
 export const useCrmWorkspaceStore = create<CrmWorkspaceState>()(
@@ -30,6 +32,10 @@ export const useCrmWorkspaceStore = create<CrmWorkspaceState>()(
       },
       updateWorkspace: (id, patch) =>
         set((s) => ({ workspaces: s.workspaces.map((w) => (w.id === id ? { ...w, ...patch } : w)) })),
+      activeSignature: () => {
+        const { workspaces, activeWorkspaceId } = get()
+        return workspaces.find((w) => w.id === activeWorkspaceId)?.email_signature ?? null
+      },
       removeWorkspace: (id) => {
         const { workspaces, activeWorkspaceId } = get()
         const remaining = workspaces.filter((w) => w.id !== id)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import type { DragEvent } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
@@ -245,7 +245,7 @@ function applyColumnMap(row: Record<string, string>, map: Record<string, string>
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LeadboardPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
 
   // ── Core data ──────────────────────────────────────────────────────────────
@@ -416,9 +416,9 @@ export default function LeadboardPage() {
     setRules((rulesRes.data ?? []) as ScoringRule[])
 
     setLoading(false)
-  }, [supabase])
+  }, [supabase, activeWorkspaceId])
 
-  useEffect(() => { loadAll() }, [loadAll, activeWorkspaceId])
+  useEffect(() => { loadAll() }, [loadAll])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {

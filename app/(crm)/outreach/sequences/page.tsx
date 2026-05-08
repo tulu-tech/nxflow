@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useCrmWorkspaceStore } from "@/store/crmWorkspaceStore"
 import { Button } from "@/components/ui-crm/button"
@@ -46,7 +46,7 @@ interface Lead {
 const EMPTY_STEP = (): SequenceStep => ({ step_number: 1, subject: "", body: "", delay_days: 0 })
 
 export default function SequencesPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const activeWorkspaceId = useCrmWorkspaceStore((s) => s.activeWorkspaceId)
   const [sequences, setSequences] = useState<Sequence[]>([])
   const [selected, setSelected] = useState<Sequence | null>(null)
