@@ -132,7 +132,7 @@ function FormatChooser({ onChoose }: { onChoose: (f: "plain" | "html") => void }
   )
 }
 
-// ─── HTML Editor with device preview ───────────────────────────────────────────
+// ─── HTML Editor — tabbed full-width layout ────────────────────────────────────
 
 function HtmlEditor({
   value,
@@ -147,92 +147,103 @@ function HtmlEditor({
   onDeviceChange: (d: PreviewDevice) => void
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
 }) {
+  const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
+
   return (
-    <div
-      className="rounded-xl border border-border overflow-hidden"
-      style={{ display: "flex", height: 560 }}
-    >
-      {/* ── Left: Live preview ─────────────────────────────── */}
-      <div style={{ flex: "1 1 0", display: "flex", flexDirection: "column", borderRight: "1px solid var(--border)", minWidth: 0 }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "8px 14px", borderBottom: "1px solid var(--border)",
-          background: "var(--muted)", flexShrink: 0,
-        }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)", marginRight: 6 }}>Preview</span>
-          <button
-            onClick={() => onDeviceChange("desktop")}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid",
-              cursor: "pointer", transition: "all 0.15s",
-              background: device === "desktop" ? "var(--primary)" : "transparent",
-              color: device === "desktop" ? "#fff" : "var(--muted-foreground)",
-              borderColor: device === "desktop" ? "var(--primary)" : "var(--border)",
-            }}
-          >
-            <Monitor style={{ width: 12, height: 12 }} /> Desktop
-          </button>
-          <button
-            onClick={() => onDeviceChange("mobile")}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid",
-              cursor: "pointer", transition: "all 0.15s",
-              background: device === "mobile" ? "var(--primary)" : "transparent",
-              color: device === "mobile" ? "#fff" : "var(--muted-foreground)",
-              borderColor: device === "mobile" ? "var(--primary)" : "var(--border)",
-            }}
-          >
-            <Smartphone style={{ width: 12, height: 12 }} /> Mobile
-          </button>
-        </div>
-        <div style={{
-          flex: 1, background: "#f5f5f5",
-          display: "flex", justifyContent: "center", alignItems: "flex-start",
-          overflow: "auto", padding: device === "mobile" ? "16px 0" : 0,
-        }}>
-          <iframe
-            srcDoc={value || "<p style='color:#aaa;font-family:sans-serif;padding:20px;font-size:14px'>Preview appears here…</p>"}
-            sandbox="allow-same-origin"
-            title="Email Preview"
-            style={{
-              border: device === "mobile" ? "1px solid #ddd" : "none",
-              borderRadius: device === "mobile" ? 8 : 0,
-              background: "#fff",
-              height: device === "mobile" ? 480 : "100%",
-              width: device === "mobile" ? 390 : "100%",
-              flexShrink: 0,
-              display: "block",
-            }}
-          />
-        </div>
+    <div className="rounded-xl border border-border overflow-hidden flex flex-col" style={{ height: 620 }}>
+      {/* ── Toolbar ── */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-muted/60 shrink-0">
+        {/* Tab buttons */}
+        <button
+          onClick={() => setActiveTab("code")}
+          className={cn(
+            "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium transition-colors",
+            activeTab === "code"
+              ? "bg-background text-foreground shadow-sm border border-border"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Code2 className="h-3.5 w-3.5" /> Code
+        </button>
+        <button
+          onClick={() => setActiveTab("preview")}
+          className={cn(
+            "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium transition-colors",
+            activeTab === "preview"
+              ? "bg-background text-foreground shadow-sm border border-border"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Monitor className="h-3.5 w-3.5" /> Preview
+        </button>
+
+        {/* Device toggle — only shown in preview tab */}
+        {activeTab === "preview" && (
+          <div className="ml-3 flex items-center gap-1 border-l border-border pl-3">
+            <button
+              onClick={() => onDeviceChange("desktop")}
+              className={cn(
+                "inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors",
+                device === "desktop"
+                  ? "bg-primary text-white border-primary"
+                  : "text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              <Monitor className="h-3 w-3" /> Desktop
+            </button>
+            <button
+              onClick={() => onDeviceChange("mobile")}
+              className={cn(
+                "inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md border transition-colors",
+                device === "mobile"
+                  ? "bg-primary text-white border-primary"
+                  : "text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              <Smartphone className="h-3 w-3" /> Mobile
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ── Right: Code editor ─────────────────────────────── */}
-      <div style={{ width: 360, flexShrink: 0, display: "flex", flexDirection: "column" }}>
-        <div style={{
-          padding: "8px 14px", borderBottom: "1px solid var(--border)",
-          background: "var(--muted)", flexShrink: 0,
-          display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <Code2 style={{ width: 13, height: 13, color: "var(--primary)" }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--foreground)" }}>HTML Code</span>
-        </div>
+      {/* ── Code pane ── */}
+      {activeTab === "code" && (
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={"<p>Dear {{first_name}},</p>\n<p>Your message here...</p>"}
+          spellCheck={false}
+          className="flex-1 w-full resize-none border-none outline-none bg-background text-foreground"
           style={{
-            flex: 1, resize: "none", border: "none", outline: "none",
-            padding: "12px 14px", fontSize: 12, lineHeight: 1.6,
+            padding: "16px 20px",
+            fontSize: 13,
+            lineHeight: 1.7,
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            background: "var(--background)", color: "var(--foreground)",
-            width: "100%", boxSizing: "border-box",
           }}
         />
-      </div>
+      )}
+
+      {/* ── Preview pane ── */}
+      {activeTab === "preview" && (
+        <div className="flex-1 bg-[#f0f0f0] flex justify-center items-start overflow-auto"
+          style={{ padding: device === "mobile" ? "24px 0" : 0 }}
+        >
+          <iframe
+            srcDoc={value || "<p style='color:#aaa;font-family:sans-serif;padding:32px;font-size:14px'>Preview appears here…</p>"}
+            sandbox="allow-same-origin"
+            title="Email Preview"
+            style={{
+              border: device === "mobile" ? "1px solid #ddd" : "none",
+              borderRadius: device === "mobile" ? 12 : 0,
+              background: "#fff",
+              height: device === "mobile" ? 568 : "100%",
+              width: device === "mobile" ? 390 : "100%",
+              display: "block",
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }
