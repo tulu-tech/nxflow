@@ -234,7 +234,7 @@ export default function SMSPage() {
         </div>
       )}
 
-      <Tabs defaultValue="new">
+      <Tabs defaultValue="new" className="flex-col">
         <TabsList className="h-9">
           <TabsTrigger value="new" className="text-sm">New Campaign</TabsTrigger>
           <TabsTrigger value="history" className="text-sm">

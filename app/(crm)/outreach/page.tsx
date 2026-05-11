@@ -608,8 +608,8 @@ export default function OutreachPage() {
         <p className="text-sm text-muted-foreground mt-0.5">Send personalized emails to your leads</p>
       </div>
 
-      <Tabs defaultValue="individual">
-        <TabsList className="h-9">
+      <Tabs defaultValue="individual" className="flex-col">
+        <TabsList className="h-9 w-fit">
           <TabsTrigger value="individual" className="text-sm">Individual</TabsTrigger>
           <TabsTrigger value="campaign" className="text-sm">Mass Campaign</TabsTrigger>
           <TabsTrigger value="history" className="text-sm">Campaign History</TabsTrigger>
