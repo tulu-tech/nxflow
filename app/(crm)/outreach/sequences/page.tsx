@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Plus, Trash2, Play, Users, Mail,
   Clock, Loader2, CheckCircle2, ArrowRight, GitBranch,
-  Zap, UserMinus, AlertCircle,
+  Zap, UserMinus, AlertCircle, Search,
 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -105,6 +105,11 @@ export default function SequencesPage() {
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
   const [enrolling, setEnrolling] = useState(false)
   const [enrollSuccess, setEnrollSuccess] = useState(false)
+  const [enrollSearch, setEnrollSearch] = useState("")
+  const [enrollSegment, setEnrollSegment] = useState("all")
+  const [enrollSegments, setEnrollSegments] = useState<{ id: string; name: string; color: string }[]>([])
+  const [enrollSegmentIds, setEnrollSegmentIds] = useState<Set<string>>(new Set())
+  const [loadingEnrollSegment, setLoadingEnrollSegment] = useState(false)
 
   // Delete confirm
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -217,16 +222,42 @@ export default function SequencesPage() {
   async function openEnroll() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data } = await supabase
-      .from("leadboard")
-      .select("id, full_name, email, company, status")
-      .eq("user_id", user.id)
-      .eq("workspace_id", activeWorkspaceId ?? "")
-      .order("full_name")
-    setLeads(data ?? [])
+    const [leadsRes, segRes] = await Promise.all([
+      supabase
+        .from("leadboard")
+        .select("id, full_name, email, company, status")
+        .eq("user_id", user.id)
+        .eq("workspace_id", activeWorkspaceId ?? "")
+        .order("full_name"),
+      fetch(`/api/init?workspaceId=${activeWorkspaceId}`),
+    ])
+    setLeads(leadsRes.data ?? [])
+    if (segRes.ok) {
+      const init = await segRes.json()
+      setEnrollSegments(init.segments ?? [])
+    }
     setSelectedLeads(new Set())
+    setEnrollSearch("")
+    setEnrollSegment("all")
+    setEnrollSegmentIds(new Set())
     setEnrollSuccess(false)
     setShowEnroll(true)
+  }
+
+  async function handleEnrollSegmentChange(segId: string) {
+    setEnrollSegment(segId)
+    if (segId === "all") {
+      setEnrollSegmentIds(new Set())
+      return
+    }
+    setLoadingEnrollSegment(true)
+    try {
+      const res = await fetch(`/api/segments/${segId}/members`)
+      const ids: string[] = res.ok ? await res.json() : []
+      setEnrollSegmentIds(new Set(ids))
+    } finally {
+      setLoadingEnrollSegment(false)
+    }
   }
 
   async function handleEnroll() {
@@ -695,43 +726,108 @@ export default function SequencesPage() {
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between px-1 py-1">
-                <span className="text-xs text-muted-foreground">{selectedLeads.size} selected</span>
-                <button
-                  className="text-xs text-primary hover:underline"
-                  onClick={() => {
-                    if (selectedLeads.size === leads.length) setSelectedLeads(new Set())
-                    else setSelectedLeads(new Set(leads.map((l) => l.id)))
-                  }}
-                >
-                  {selectedLeads.size === leads.length ? "Deselect all" : "Select all"}
-                </button>
+              {/* Search + Segment filters */}
+              <div className="space-y-2 px-1 pb-1">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    className="pl-8 h-9 text-sm"
+                    placeholder="Search by name, email or company..."
+                    value={enrollSearch}
+                    onChange={(e) => setEnrollSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={enrollSegment} onValueChange={(v) => handleEnrollSegmentChange(v ?? "all")}>
+                    <SelectTrigger className="h-8 text-xs flex-1">
+                      {loadingEnrollSegment
+                        ? <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Loading…</span>
+                        : enrollSegment === "all"
+                          ? "All Leads"
+                          : (enrollSegments.find(s => s.id === enrollSegment)?.name ?? "Segment")
+                      }
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Leads</SelectItem>
+                      {enrollSegments.map((seg) => (
+                        <SelectItem key={seg.id} value={seg.id}>
+                          <span className="flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
+                            {seg.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {(() => {
+                    const filtered = leads.filter(l => {
+                      if (enrollSegment !== "all" && !enrollSegmentIds.has(l.id)) return false
+                      if (!enrollSearch) return true
+                      const q = enrollSearch.toLowerCase()
+                      return l.full_name.toLowerCase().includes(q) ||
+                        l.email.toLowerCase().includes(q) ||
+                        (l.company ?? "").toLowerCase().includes(q)
+                    })
+                    return (
+                      <button
+                        className="text-xs text-primary hover:underline whitespace-nowrap shrink-0"
+                        onClick={() => {
+                          const ids = filtered.map(l => l.id)
+                          const allSelected = ids.every(id => selectedLeads.has(id))
+                          setSelectedLeads(prev => {
+                            const next = new Set(prev)
+                            if (allSelected) ids.forEach(id => next.delete(id))
+                            else ids.forEach(id => next.add(id))
+                            return next
+                          })
+                        }}
+                      >
+                        {filtered.every(l => selectedLeads.has(l.id)) && filtered.length > 0 ? "Deselect all" : "Select all"}
+                      </button>
+                    )
+                  })()}
+                </div>
+                <p className="text-xs text-muted-foreground">{selectedLeads.size} selected</p>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
-                {leads.map((lead) => (
-                  <div
-                    key={lead.id}
-                    className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 cursor-pointer"
-                    onClick={() => setSelectedLeads((prev) => {
-                      const next = new Set(prev)
-                      next.has(lead.id) ? next.delete(lead.id) : next.add(lead.id)
-                      return next
-                    })}
-                  >
-                    <Checkbox checked={selectedLeads.has(lead.id)} readOnly />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{lead.full_name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{lead.email}{lead.company ? ` · ${lead.company}` : ""}</p>
+
+              {/* Lead list */}
+              <div className="flex-1 overflow-y-auto space-y-0.5 min-h-0 border rounded-lg">
+                {(() => {
+                  const filtered = leads.filter(l => {
+                    if (enrollSegment !== "all" && !enrollSegmentIds.has(l.id)) return false
+                    if (!enrollSearch) return true
+                    const q = enrollSearch.toLowerCase()
+                    return l.full_name.toLowerCase().includes(q) ||
+                      l.email.toLowerCase().includes(q) ||
+                      (l.company ?? "").toLowerCase().includes(q)
+                  })
+                  if (filtered.length === 0) return (
+                    <p className="text-center text-sm text-muted-foreground py-8">No leads match</p>
+                  )
+                  return filtered.map((lead) => (
+                    <div
+                      key={lead.id}
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => setSelectedLeads((prev) => {
+                        const next = new Set(prev)
+                        next.has(lead.id) ? next.delete(lead.id) : next.add(lead.id)
+                        return next
+                      })}
+                    >
+                      <Checkbox checked={selectedLeads.has(lead.id)} readOnly />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{lead.full_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{lead.email}{lead.company ? ` · ${lead.company}` : ""}</p>
+                      </div>
+                      <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium shrink-0", STATUS_COLORS[lead.status] ?? "")}>
+                        {lead.status}
+                      </span>
                     </div>
-                    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", STATUS_COLORS[lead.status] ?? "")}>
-                      {lead.status}
-                    </span>
-                  </div>
-                ))}
-                {leads.length === 0 && (
-                  <p className="text-center text-sm text-muted-foreground py-8">No leads in Leadboard yet</p>
-                )}
+                  ))
+                })()}
               </div>
+
               <DialogFooter className="border-t pt-3">
                 <Button variant="outline" onClick={() => setShowEnroll(false)}>Cancel</Button>
                 <Button onClick={handleEnroll} disabled={enrolling || selectedLeads.size === 0} className="gap-2">
