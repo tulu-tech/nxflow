@@ -8,7 +8,6 @@ import {
   Search,
   Target,
   Send,
-  MessageSquare,
   Settings,
   LogOut,
   GitBranch,
@@ -51,7 +50,6 @@ const NAV_SECTIONS: NavSection[] = [
       { href: "/outreach", label: "Outreach", icon: Send },
       { href: "/sms", label: "SMS Campaigns", icon: Smartphone },
       { href: "/outreach/sequences", label: "Sequences", icon: GitBranch },
-      { href: "/responses", label: "Responses", icon: MessageSquare },
     ],
   },
   {

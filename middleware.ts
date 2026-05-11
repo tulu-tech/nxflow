@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 // CRM routes that require Supabase Auth session
-const CRM_PROTECTED = ['/dashboard', '/prospecting', '/leadboard', '/outreach', '/responses', '/settings'];
+const CRM_PROTECTED = ['/dashboard', '/prospecting', '/leadboard', '/outreach', '/settings'];
 const CRM_AUTH_ROUTES = ['/login'];
 
 export async function middleware(request: NextRequest) {

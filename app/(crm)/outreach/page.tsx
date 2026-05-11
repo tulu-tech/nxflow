@@ -444,15 +444,34 @@ export default function OutreachPage() {
   const loadCampaignStats = useCallback(async (campaignIds: string[]) => {
     if (campaignIds.length === 0) return
     setStatsLoading(true)
-    const { data } = await supabase
+
+    // Try full query with tracking columns; fall back to base columns if migration not run
+    let rows: Array<{ campaign_id: string | null; opened_at?: string | null; click_count?: number | null; subject_variant?: string | null }> = []
+
+    const { data, error } = await supabase
       .from("email_logs")
       .select("campaign_id, opened_at, click_count, subject_variant")
       .in("campaign_id", campaignIds)
+
+    if (error) {
+      // Tracking columns may not exist yet — fall back to counting deliveries only
+      const { data: fallback, error: fbErr } = await supabase
+        .from("email_logs")
+        .select("campaign_id")
+        .in("campaign_id", campaignIds)
+      if (fbErr) {
+        console.error("loadCampaignStats fallback error:", fbErr)
+      } else {
+        rows = (fallback ?? []) as typeof rows
+      }
+    } else {
+      rows = data ?? []
+    }
+
     setStatsLoading(false)
-    if (!data) return
 
     const stats = new Map<string, CampaignStat>()
-    for (const row of data) {
+    for (const row of rows) {
       if (!row.campaign_id) continue
       if (!stats.has(row.campaign_id)) {
         stats.set(row.campaign_id, { delivered: 0, opened: 0, clicked: 0, openedA: 0, totalA: 0, openedB: 0, totalB: 0 })
