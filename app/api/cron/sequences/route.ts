@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   // Fetch due enrollments with sequence and workspace info
   const { data: enrollments } = await supabase
     .from("sequence_enrollments")
-    .select("*, sequences(workspace_id, user_id, name)")
+    .select("*, sequences(workspace_id, user_id, name, from_email)")
     .eq("status", "active")
     .lte("next_send_at", now)
     .limit(100)
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   for (const enrollment of enrollments) {
     try {
-      const sequence = enrollment.sequences as { workspace_id: string; user_id: string; name: string } | null
+      const sequence = enrollment.sequences as { workspace_id: string; user_id: string; name: string; from_email?: string | null } | null
       if (!sequence) continue
 
       // Fetch all steps for this sequence
@@ -55,19 +55,40 @@ export async function GET(req: NextRequest) {
       if (!currentStep) continue
       const nextStep = steps[enrollment.current_step + 1] ?? null
 
-      // Fetch lead and gmail token in parallel
-      const [leadRes, tokenRes, wsRes] = await Promise.all([
+      // Fetch lead and gmail token in parallel.
+      // For the gmail token: prefer the token matching sequence.from_email (if set),
+      // then the workspace-scoped token, then any token for the user as fallback.
+      const [leadRes, wsRes] = await Promise.all([
         supabase.from("leadboard").select("id, email, full_name, position, company").eq("id", enrollment.lead_id).single(),
-        supabase.from("gmail_tokens").select("id, access_token, refresh_token, email").eq("user_id", enrollment.user_id).limit(1).single(),
         supabase.from("crm_workspaces").select("email_signature").eq("id", sequence.workspace_id).single(),
       ])
 
+      // Workspace-scoped token, filtered by from_email if the sequence specifies one
+      const seqFromEmail = sequence.from_email ?? null
+      let tokenQuery = supabase
+        .from("gmail_tokens")
+        .select("id, access_token, refresh_token, email")
+        .eq("user_id", enrollment.user_id)
+        .eq("workspace_id", sequence.workspace_id)
+      if (seqFromEmail) tokenQuery = tokenQuery.eq("email", seqFromEmail)
+      let tokenRes = await tokenQuery.limit(1).single()
+
+      // Fallback: any token for this user (ignores workspace — handles legacy data)
+      if (!tokenRes.data) {
+        let fallbackQuery = supabase
+          .from("gmail_tokens")
+          .select("id, access_token, refresh_token, email")
+          .eq("user_id", enrollment.user_id)
+        if (seqFromEmail) fallbackQuery = fallbackQuery.eq("email", seqFromEmail)
+        tokenRes = await fallbackQuery.limit(1).single()
+      }
+
       const lead = leadRes.data
       const gmailToken = tokenRes.data
+      const signature: string | null = wsRes.data?.email_signature ?? null
       if (!lead?.email || !gmailToken?.access_token) continue
 
-      const fromAddr = gmailToken.email ?? "me"
-      const signature: string | null = wsRes.data?.email_signature ?? null
+      const fromAddr = seqFromEmail ?? gmailToken.email ?? "me"
 
       const personalizedSubject = fillMergeTags(currentStep.subject, lead)
       const personalizedBody = appendSignature(fillMergeTags(currentStep.body, lead), signature, false)

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { name, description, steps, workspaceId } = await req.json()
+  const { name, description, steps, workspaceId, fromEmail } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: "Name required" }, { status: 400 })
 
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const { data: seq, error } = await supabase
     .from("sequences")
-    .insert({ user_id: user.id, workspace_id: wsId, name: name.trim(), description })
+    .insert({ user_id: user.id, workspace_id: wsId, name: name.trim(), description, from_email: fromEmail ?? null })
     .select()
     .single()
 

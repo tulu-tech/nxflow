@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Send, Loader2, Search, CheckCircle2, AlertCircle,
   Clock, Users, Mail, Tag, Monitor, Smartphone, FileText, Code2,
-  ChevronLeft, LayoutTemplate, Calendar, FlaskConical, Save, X,
+  ChevronLeft, Calendar, FlaskConical, X, ChevronRight,
 } from "lucide-react"
 import type { LeadboardEntry, EmailCampaign, LeadStatus } from "@/types"
 import { LEAD_STATUS_CONFIG } from "@/types"
@@ -44,14 +44,6 @@ interface SentEmailLog {
   click_count: number
   lead_id: string | null
   leadboard: { full_name: string | null }[] | null
-}
-
-interface EmailTemplate {
-  id: string
-  name: string
-  subject: string
-  body: string
-  is_html: boolean
 }
 
 interface CampaignStat {
@@ -277,106 +269,6 @@ function MergeTagChips({
   )
 }
 
-// ─── Template picker dropdown ─────────────────────────────────────────────────
-
-function TemplatePicker({
-  templates,
-  onLoad,
-  onSave,
-  savingName,
-  setSavingName,
-  isSaving,
-}: {
-  templates: EmailTemplate[]
-  onLoad: (t: EmailTemplate) => void
-  onSave: (name: string) => void
-  savingName: string
-  setSavingName: (v: string) => void
-  isSaving: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<"list" | "save">("list")
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => { setOpen((v) => !v); setMode("list") }}
-        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-border hover:border-primary hover:text-primary transition-colors text-muted-foreground"
-      >
-        <LayoutTemplate className="h-3.5 w-3.5" /> Templates
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-72 rounded-lg border border-border bg-background shadow-lg">
-          {mode === "list" ? (
-            <>
-              <div className="flex items-center justify-between px-3 py-2 border-b">
-                <span className="text-xs font-semibold text-foreground">Email Templates</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setMode("save")}
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    <Save className="h-3 w-3" /> Save current
-                  </button>
-                  <button onClick={() => setOpen(false)} className="ml-2 text-muted-foreground hover:text-foreground">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-              {templates.length === 0 ? (
-                <p className="text-xs text-muted-foreground px-3 py-4 text-center">
-                  No templates yet — compose an email and save it as a template.
-                </p>
-              ) : (
-                <div className="max-h-52 overflow-y-auto py-1">
-                  {templates.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => { onLoad(t); setOpen(false) }}
-                      className="w-full text-left px-3 py-2 hover:bg-muted/50 transition-colors"
-                    >
-                      <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
-                      {t.subject && <p className="text-xs text-muted-foreground truncate">{t.subject}</p>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between px-3 py-2 border-b">
-                <span className="text-xs font-semibold text-foreground">Save as Template</span>
-                <button onClick={() => setMode("list")} className="text-muted-foreground hover:text-foreground">
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="p-3 space-y-2">
-                <Input
-                  className="h-8 text-sm"
-                  placeholder="Template name..."
-                  value={savingName}
-                  onChange={(e) => setSavingName(e.target.value)}
-                  autoFocus
-                />
-                <Button
-                  size="sm"
-                  className="w-full gap-1.5"
-                  disabled={!savingName.trim() || isSaving}
-                  onClick={() => { onSave(savingName); setOpen(false); setMode("list") }}
-                >
-                  {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                  Save Template
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OutreachPage() {
@@ -387,12 +279,6 @@ export default function OutreachPage() {
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [gmailAccounts, setGmailAccounts] = useState<GmailAccount[]>([])
-
-  // Templates
-  const [templates, setTemplates] = useState<EmailTemplate[]>([])
-  const [savingTemplate, setSavingTemplate] = useState(false)
-  const [indTemplateName, setIndTemplateName] = useState("")
-  const [campTemplateName, setCampTemplateName] = useState("")
 
   // Campaign analytics
   const [campaignStats, setCampaignStats] = useState<Map<string, CampaignStat>>(new Map())
@@ -439,6 +325,7 @@ export default function OutreachPage() {
   const [sendingCampaign, setSendingCampaign] = useState(false)
   const [campError, setCampError] = useState<string | null>(null)
   const [campSuccess, setCampSuccess] = useState(false)
+  const [campStep, setCampStep] = useState<1 | 2 | 3>(1)
   const campBodyRef = useRef<HTMLTextAreaElement>(null)
 
   const loadCampaignStats = useCallback(async (campaignIds: string[]) => {
@@ -489,7 +376,7 @@ export default function OutreachPage() {
   const loadData = useCallback(async () => {
     if (!activeWorkspaceId) return
     setLoading(true)
-    const [{ data: l }, { data: c }, initRes, gmailRes, { data: tmpl }] = await Promise.all([
+    const [{ data: l }, { data: c }, initRes, gmailRes] = await Promise.all([
       supabase
         .from("leadboard")
         .select("id, full_name, email, position, company, relevance_score, status, workspace_id")
@@ -498,7 +385,6 @@ export default function OutreachPage() {
       supabase.from("email_campaigns").select("*").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
       fetch(`/api/init?workspaceId=${activeWorkspaceId}`),
       supabase.from("gmail_tokens").select("id, email").not("email", "is", null).order("updated_at", { ascending: true }),
-      supabase.from("email_templates").select("id, name, subject, body, is_html").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
     ])
     setLeads((l as unknown as LeadboardEntry[]) ?? [])
     const campaignList = (c as EmailCampaign[]) ?? []
@@ -513,7 +399,6 @@ export default function OutreachPage() {
       setFromEmail((prev: string) => prev || accounts[0].email)
       setCampFromEmail((prev: string) => prev || accounts[0].email)
     }
-    setTemplates((tmpl as EmailTemplate[]) ?? [])
     setLoading(false)
 
     if (campaignList.length > 0) {
@@ -567,43 +452,6 @@ export default function OutreachPage() {
     l.full_name.toLowerCase().includes(leadSearch.toLowerCase()) ||
     l.email.toLowerCase().includes(leadSearch.toLowerCase()),
   )
-
-  async function handleSaveTemplate(forTab: "ind" | "camp") {
-    const name = forTab === "ind" ? indTemplateName : campTemplateName
-    const subject = forTab === "ind" ? indSubject : campSubject
-    const body = forTab === "ind" ? indBody : campBody
-    const isHtml = forTab === "ind" ? indEmailFormat === "html" : campEmailFormat === "html"
-    if (!name.trim() || !body.trim()) return
-    setSavingTemplate(true)
-    try {
-      await fetch("/api/email-templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, subject, body, is_html: isHtml, workspaceId: activeWorkspaceId }),
-      })
-      const { data } = await supabase
-        .from("email_templates")
-        .select("id, name, subject, body, is_html")
-        .eq("workspace_id", activeWorkspaceId)
-        .order("created_at", { ascending: false })
-      setTemplates((data as EmailTemplate[]) ?? [])
-      if (forTab === "ind") { setIndTemplateName("") } else { setCampTemplateName("") }
-    } finally {
-      setSavingTemplate(false)
-    }
-  }
-
-  function loadTemplate(t: EmailTemplate, forTab: "ind" | "camp") {
-    if (forTab === "ind") {
-      setIndSubject(t.subject)
-      setIndBody(t.body)
-      setIndEmailFormat(t.is_html ? "html" : "plain")
-    } else {
-      setCampSubject(t.subject)
-      setCampBody(t.body)
-      setCampEmailFormat(t.is_html ? "html" : "plain")
-    }
-  }
 
   async function handleSendIndividual() {
     if (!selectedLead) return
@@ -744,6 +592,7 @@ export default function OutreachPage() {
       setSelectedLeadIds(new Set())
       setUseSchedule(false)
       setScheduledFor("")
+      setCampStep(1)
       await loadData()
     } catch (e) {
       setCampError((e as Error).message)
@@ -847,45 +696,18 @@ export default function OutreachPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Message</Label>
-                  <div className="flex items-center gap-2">
-                    {indEmailFormat !== "none" && (
-                      <TemplatePicker
-                        templates={templates}
-                        onLoad={(t) => loadTemplate(t, "ind")}
-                        onSave={(name) => { setIndTemplateName(name); handleSaveTemplate("ind") }}
-                        savingName={indTemplateName}
-                        setSavingName={setIndTemplateName}
-                        isSaving={savingTemplate}
-                      />
-                    )}
-                    {indEmailFormat !== "none" && (
-                      <button
-                        onClick={() => { setIndEmailFormat("none"); setIndBody("") }}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <ChevronLeft className="h-3 w-3" /> Change format
-                      </button>
-                    )}
-                  </div>
+                  {indEmailFormat !== "none" && (
+                    <button
+                      onClick={() => { setIndEmailFormat("none"); setIndBody("") }}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ChevronLeft className="h-3 w-3" /> Change format
+                    </button>
+                  )}
                 </div>
 
                 {indEmailFormat === "none" && (
-                  <>
-                    {templates.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <TemplatePicker
-                          templates={templates}
-                          onLoad={(t) => loadTemplate(t, "ind")}
-                          onSave={(name) => { setIndTemplateName(name); handleSaveTemplate("ind") }}
-                          savingName={indTemplateName}
-                          setSavingName={setIndTemplateName}
-                          isSaving={savingTemplate}
-                        />
-                        <span className="text-xs text-muted-foreground">or choose a format below</span>
-                      </div>
-                    )}
-                    <FormatChooser onChoose={setIndEmailFormat} />
-                  </>
+                  <FormatChooser onChoose={setIndEmailFormat} />
                 )}
 
                 {indEmailFormat === "plain" && (
@@ -939,236 +761,293 @@ export default function OutreachPage() {
           </Card>
         </TabsContent>
 
-        {/* ── Mass Campaign ─────────────────────────────────────────────────── */}
-        <TabsContent value="campaign" className="space-y-4 mt-4">
-          {/* Compact recipients bar shown only in HTML mode */}
-          {campEmailFormat === "html" && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-muted/40 flex-wrap">
-              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium text-foreground">
-                {selectedLeadIds.size} recipient{selectedLeadIds.size !== 1 ? "s" : ""} selected
-              </span>
-              <span className="text-muted-foreground text-xs">·</span>
-              <Select value={segmentFilter} onValueChange={(v) => handleSegmentChange(v ?? "all")}>
-                <SelectTrigger className="h-7 text-xs w-36">
-                  {segmentFilter === "all" ? "All Leads" : (segments.find((s) => s.id === segmentFilter)?.name ?? "Segment")}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Leads</SelectItem>
-                  {segments.map((seg) => (
-                    <SelectItem key={seg.id} value={seg.id}>{seg.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | "all")}>
-                <SelectTrigger className="h-7 text-xs w-28">
-                  {statusFilter === "all" ? "All Status" : (LEAD_STATUS_CONFIG[statusFilter as LeadStatus]?.label ?? statusFilter)}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {(Object.keys(LEAD_STATUS_CONFIG) as LeadStatus[]).map((s) => (
-                    <SelectItem key={s} value={s}>{LEAD_STATUS_CONFIG[s].label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <button
-                onClick={toggleAll}
-                className="text-xs text-primary hover:underline ml-auto"
-              >
-                {selectedLeadIds.size === massLeads.length && massLeads.length > 0 ? "Deselect all" : `Select all (${massLeads.length})`}
-              </button>
-            </div>
-          )}
+        {/* ── Mass Campaign — 3-stage wizard ────────────────────────────── */}
+        <TabsContent value="campaign" className="mt-4">
+          <Card>
+            <CardContent className="pt-5 space-y-5">
+              {/* Stage indicator */}
+              <div className="flex items-center gap-2 text-sm select-none">
+                {([
+                  { n: 1, label: "Recipients" },
+                  { n: 2, label: "Details" },
+                  { n: 3, label: "Compose" },
+                ] as { n: 1 | 2 | 3; label: string }[]).map(({ n, label }, i) => (
+                  <div key={n} className="flex items-center gap-2">
+                    {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0" />}
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn(
+                        "inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold transition-colors",
+                        campStep === n
+                          ? "bg-primary text-white"
+                          : campStep > n
+                            ? "bg-emerald-500 text-white"
+                            : "bg-muted text-muted-foreground"
+                      )}>
+                        {campStep > n ? "✓" : n}
+                      </span>
+                      <span className={cn(
+                        "text-xs font-medium transition-colors",
+                        campStep === n ? "text-foreground" : "text-muted-foreground"
+                      )}>
+                        {label}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-          <div className={cn("grid gap-5", campEmailFormat === "html" ? "grid-cols-1" : "lg:grid-cols-2")}>
-            {/* Left: Lead selection */}
-            <Card className={campEmailFormat === "html" ? "hidden" : ""}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Select Recipients</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1.5">
-                    <Tag className="h-3 w-3" /> Segment
-                    {loadingSegment && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
-                  </Label>
-                  <Select value={segmentFilter} onValueChange={(v) => handleSegmentChange(v ?? "all")}>
-                    <SelectTrigger className="h-8 text-sm">
-                      {segmentFilter === "all" ? (
-                        <span className="text-muted-foreground text-sm">All Leads</span>
-                      ) : (() => {
-                        const seg = segments.find((s) => s.id === segmentFilter)
-                        return seg ? (
-                          <span className="flex items-center gap-2 text-sm">
-                            <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
-                            {seg.name}
-                          </span>
-                        ) : <span className="text-muted-foreground text-sm">All Leads</span>
-                      })()}
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Leads</SelectItem>
-                      {segments.map((seg) => (
-                        <SelectItem key={seg.id} value={seg.id}>
-                          <span className="flex items-center gap-2">
-                            <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
-                            {seg.name}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {segments.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      No segments yet — create one in <a href="/prospecting" className="underline">Prospecting</a>.
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="space-y-1 flex-1">
-                    <Label className="text-xs">Status Filter</Label>
-                    <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | "all")}>
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
+              {/* ── Stage 1: Recipients ── */}
+              {campStep === 1 && (
+                <div className="space-y-4">
+                  {/* Segment */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1.5">
+                      <Tag className="h-3 w-3" /> Segment
+                      {loadingSegment && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
+                    </Label>
+                    <Select value={segmentFilter} onValueChange={(v) => handleSegmentChange(v ?? "all")}>
+                      <SelectTrigger className="h-9 text-sm">
+                        {segmentFilter === "all" ? (
+                          <span className="text-muted-foreground text-sm">All Leads</span>
+                        ) : (() => {
+                          const seg = segments.find((s) => s.id === segmentFilter)
+                          return seg ? (
+                            <span className="flex items-center gap-2 text-sm">
+                              <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
+                              {seg.name}
+                            </span>
+                          ) : <span className="text-muted-foreground text-sm">All Leads</span>
+                        })()}
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        {(Object.keys(LEAD_STATUS_CONFIG) as LeadStatus[]).map((s) => (
-                          <SelectItem key={s} value={s}>{LEAD_STATUS_CONFIG[s].label}</SelectItem>
+                        <SelectItem value="all">All Leads</SelectItem>
+                        {segments.map((seg) => (
+                          <SelectItem key={seg.id} value={seg.id}>
+                            <span className="flex items-center gap-2">
+                              <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: seg.color }} />
+                              {seg.name}
+                            </span>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1 flex-1">
-                    <Label className="text-xs">Min Score</Label>
-                    <Input
-                      type="number"
-                      min={0} max={100}
-                      className="h-8 text-sm"
-                      value={minScore}
-                      onChange={(e) => setMinScore(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between py-1 border-b">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={selectedLeadIds.size === massLeads.length && massLeads.length > 0}
-                      onCheckedChange={toggleAll}
-                    />
-                    <span className="text-xs text-muted-foreground">{selectedLeadIds.size} / {massLeads.length} selected</span>
-                  </div>
-                </div>
-
-                <div className="max-h-64 overflow-y-auto space-y-1">
-                  {massLeads.map((l) => (
-                    <div key={l.id} className="flex items-center gap-2 py-1.5">
-                      <Checkbox
-                        checked={selectedLeadIds.has(l.id)}
-                        onCheckedChange={() => toggleLead(l.id)}
+                  {/* Status + Score filters */}
+                  <div className="flex items-end gap-3">
+                    <div className="space-y-1.5 flex-1">
+                      <Label className="text-xs">Status</Label>
+                      <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as LeadStatus | "all")}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          {(Object.keys(LEAD_STATUS_CONFIG) as LeadStatus[]).map((s) => (
+                            <SelectItem key={s} value={s}>{LEAD_STATUS_CONFIG[s].label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5 w-28">
+                      <Label className="text-xs">Min Score</Label>
+                      <Input
+                        type="number" min={0} max={100}
+                        className="h-9 text-sm"
+                        value={minScore}
+                        onChange={(e) => setMinScore(Number(e.target.value))}
                       />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{l.full_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{l.company ?? l.email}</p>
+                    </div>
+                  </div>
+
+                  {/* Lead checklist */}
+                  <div className="rounded-lg border overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selectedLeadIds.size === massLeads.length && massLeads.length > 0}
+                          onCheckedChange={toggleAll}
+                        />
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {selectedLeadIds.size} / {massLeads.length} selected
+                        </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">{l.relevance_score}</span>
-                    </div>
-                  ))}
-                  {massLeads.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">No leads match filters</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Right: Compose */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Compose Campaign</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Campaign Name</Label>
-                  <Input className="h-8 text-sm" value={campName} onChange={(e) => setCampName(e.target.value)} placeholder="e.g. Q1 Asia Outreach" />
-                </div>
-
-                {/* From dropdown */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">From</Label>
-                  {gmailAccounts.length > 0 ? (
-                    <Select value={campFromEmail} onValueChange={(v) => v && setCampFromEmail(v)}>
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue placeholder="Select sender account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {gmailAccounts.map((acc) => (
-                          <SelectItem key={acc.id} value={acc.email}>{acc.email}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="flex items-center gap-2 h-8 px-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5 shrink-0" />
-                      No Gmail connected —{" "}
-                      <Link href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</Link>
-                    </div>
-                  )}
-                </div>
-
-                {/* Subject A */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">{showSubjectB ? "Subject A" : "Subject Line"}</Label>
-                    {!showSubjectB && (
-                      <button
-                        onClick={() => setShowSubjectB(true)}
-                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <FlaskConical className="h-3 w-3" /> A/B Test
+                      <button onClick={toggleAll} className="text-xs text-primary hover:underline">
+                        {selectedLeadIds.size === massLeads.length && massLeads.length > 0 ? "Deselect all" : "Select all"}
                       </button>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto divide-y divide-border/50">
+                      {massLeads.map((l) => (
+                        <div
+                          key={l.id}
+                          onClick={() => toggleLead(l.id)}
+                          className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 cursor-pointer transition-colors"
+                        >
+                          <Checkbox checked={selectedLeadIds.has(l.id)} onCheckedChange={() => toggleLead(l.id)} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{l.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{l.company ?? l.email}</p>
+                          </div>
+                          <span className={cn("text-xs px-1.5 py-0.5 rounded-full shrink-0", LEAD_STATUS_CONFIG[l.status]?.className)}>
+                            {LEAD_STATUS_CONFIG[l.status]?.label}
+                          </span>
+                          <span className="text-xs text-muted-foreground w-8 text-right shrink-0">{l.relevance_score}</span>
+                        </div>
+                      ))}
+                      {massLeads.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-6">No leads match filters</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      onClick={() => setCampStep(2)}
+                      disabled={selectedLeadIds.size === 0}
+                      className="gap-2"
+                    >
+                      Next — Details <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Stage 2: Details ── */}
+              {campStep === 2 && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Campaign Name</Label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={campName}
+                      onChange={(e) => setCampName(e.target.value)}
+                      placeholder="e.g. Q1 Asia Outreach"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* From */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">From</Label>
+                    {gmailAccounts.length > 0 ? (
+                      <Select value={campFromEmail} onValueChange={(v) => v && setCampFromEmail(v)}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Select sender account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {gmailAccounts.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.email}>{acc.email}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-dashed border-border text-xs text-muted-foreground">
+                        <Mail className="h-3.5 w-3.5 shrink-0" />
+                        No Gmail connected —{" "}
+                        <Link href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</Link>
+                      </div>
                     )}
                   </div>
-                  <Input className="h-8 text-sm" value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder="Email subject" />
-                </div>
 
-                {/* Subject B (A/B test) */}
-                {showSubjectB && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs flex items-center gap-1.5">
-                        <FlaskConical className="h-3 w-3 text-violet-500" />
-                        Subject B
-                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">A/B</Badge>
-                      </Label>
+                  {/* Send timing */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Send Timing</Label>
+                    <div className="grid grid-cols-2 gap-3">
                       <button
-                        onClick={() => { setShowSubjectB(false); setCampSubjectB("") }}
-                        className="text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setUseSchedule(false)}
+                        className={cn(
+                          "flex flex-col items-start gap-1 p-4 rounded-xl border-2 transition-all text-left",
+                          !useSchedule ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                        )}
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <div className="flex items-center gap-2">
+                          <Send className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold">Send Now</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Campaign sends immediately after you review</p>
+                      </button>
+                      <button
+                        onClick={() => setUseSchedule(true)}
+                        className={cn(
+                          "flex flex-col items-start gap-1 p-4 rounded-xl border-2 transition-all text-left",
+                          useSchedule ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold">Schedule</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Choose a date and time for automatic send</p>
                       </button>
                     </div>
-                    <Input className="h-8 text-sm" value={campSubjectB} onChange={(e) => setCampSubjectB(e.target.value)} placeholder="Alternate subject for half the recipients" />
-                    <p className="text-xs text-muted-foreground">Recipients are split 50/50 between Subject A and Subject B.</p>
-                  </div>
-                )}
-
-                {/* Email Body */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">Email Body</Label>
-                    <div className="flex items-center gap-2">
-                      {campEmailFormat !== "none" && (
-                        <TemplatePicker
-                          templates={templates}
-                          onLoad={(t) => loadTemplate(t, "camp")}
-                          onSave={(name) => { setCampTemplateName(name); handleSaveTemplate("camp") }}
-                          savingName={campTemplateName}
-                          setSavingName={setCampTemplateName}
-                          isSaving={savingTemplate}
+                    {useSchedule && (
+                      <div className="space-y-1 pt-1">
+                        <input
+                          type="datetime-local"
+                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          value={scheduledFor}
+                          onChange={(e) => setScheduledFor(e.target.value)}
+                          min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
                         />
+                        <p className="text-xs text-muted-foreground">Campaign will send automatically at the scheduled time.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <Button variant="ghost" onClick={() => setCampStep(1)} className="gap-1.5 text-muted-foreground">
+                      <ChevronLeft className="h-4 w-4" /> Back
+                    </Button>
+                    <Button
+                      onClick={() => setCampStep(3)}
+                      disabled={!campName.trim() || (useSchedule && !scheduledFor)}
+                      className="gap-2"
+                    >
+                      Next — Compose <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Stage 3: Compose ── */}
+              {campStep === 3 && (
+                <div className="space-y-4">
+                  {/* Subject A */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">{showSubjectB ? "Subject A" : "Subject Line"}</Label>
+                      {!showSubjectB && (
+                        <button
+                          onClick={() => setShowSubjectB(true)}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <FlaskConical className="h-3 w-3" /> A/B Test
+                        </button>
                       )}
+                    </div>
+                    <Input className="h-9 text-sm" value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder="Email subject" />
+                  </div>
+
+                  {/* Subject B */}
+                  {showSubjectB && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs flex items-center gap-1.5">
+                          <FlaskConical className="h-3 w-3 text-violet-500" />
+                          Subject B
+                          <Badge variant="secondary" className="text-[10px] py-0 px-1.5">A/B</Badge>
+                        </Label>
+                        <button onClick={() => { setShowSubjectB(false); setCampSubjectB("") }} className="text-muted-foreground hover:text-foreground">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <Input className="h-9 text-sm" value={campSubjectB} onChange={(e) => setCampSubjectB(e.target.value)} placeholder="Alternate subject for half the recipients" />
+                      <p className="text-xs text-muted-foreground">Recipients are split 50/50 between Subject A and Subject B.</p>
+                    </div>
+                  )}
+
+                  {/* Body / Format */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Email Body</Label>
                       {campEmailFormat !== "none" && (
                         <button
                           onClick={() => { setCampEmailFormat("none"); setCampBody("") }}
@@ -1178,144 +1057,101 @@ export default function OutreachPage() {
                         </button>
                       )}
                     </div>
-                  </div>
 
-                  {campEmailFormat === "none" && (
-                    <>
-                      {templates.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <TemplatePicker
-                            templates={templates}
-                            onLoad={(t) => loadTemplate(t, "camp")}
-                            onSave={(name) => { setCampTemplateName(name); handleSaveTemplate("camp") }}
-                            savingName={campTemplateName}
-                            setSavingName={setCampTemplateName}
-                            isSaving={savingTemplate}
-                          />
-                          <span className="text-xs text-muted-foreground">or choose a format below</span>
-                        </div>
-                      )}
+                    {campEmailFormat === "none" && (
                       <FormatChooser onChoose={setCampEmailFormat} />
-                    </>
-                  )}
+                    )}
 
-                  {campEmailFormat === "plain" && (
-                    <>
-                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} lead={massLeads.find(l => selectedLeadIds.has(l.id))} />
-                      <Textarea
-                        ref={campBodyRef}
-                        className="text-sm resize-none"
-                        rows={6}
-                        value={campBody}
-                        onChange={(e) => setCampBody(e.target.value)}
-                        placeholder="Write your campaign email... Use {{first_name}}, {{company}} etc."
-                      />
-                    </>
-                  )}
+                    {campEmailFormat === "plain" && (
+                      <>
+                        <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} lead={massLeads.find(l => selectedLeadIds.has(l.id))} />
+                        <Textarea
+                          ref={campBodyRef}
+                          className="text-sm resize-none"
+                          rows={8}
+                          value={campBody}
+                          onChange={(e) => setCampBody(e.target.value)}
+                          placeholder="Write your campaign email... Use {{first_name}}, {{company}} etc."
+                        />
+                      </>
+                    )}
 
-                  {campEmailFormat === "html" && (
-                    <>
-                      <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} lead={massLeads.find(l => selectedLeadIds.has(l.id))} />
-                      <HtmlEditor
-                        value={campBody}
-                        onChange={setCampBody}
-                        device={campPreviewDevice}
-                        onDeviceChange={setCampPreviewDevice}
-                        textareaRef={campBodyRef}
-                      />
-                    </>
-                  )}
-                </div>
-
-                {/* Schedule toggle */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setUseSchedule(!useSchedule)}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border transition-colors",
-                        useSchedule
-                          ? "border-primary text-primary bg-primary/5"
-                          : "border-border text-muted-foreground hover:border-primary hover:text-primary"
-                      )}
-                    >
-                      <Calendar className="h-3.5 w-3.5" />
-                      {useSchedule ? "Scheduled send" : "Schedule send"}
-                    </button>
-                    {useSchedule && (
-                      <button onClick={() => { setUseSchedule(false); setScheduledFor("") }} className="text-muted-foreground hover:text-foreground">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                    {campEmailFormat === "html" && (
+                      <>
+                        <MergeTagChips onInsert={(tag) => insertAtCursor(campBodyRef, setCampBody, tag)} lead={massLeads.find(l => selectedLeadIds.has(l.id))} />
+                        <HtmlEditor
+                          value={campBody}
+                          onChange={setCampBody}
+                          device={campPreviewDevice}
+                          onDeviceChange={setCampPreviewDevice}
+                          textareaRef={campBodyRef}
+                        />
+                      </>
                     )}
                   </div>
-                  {useSchedule && (
-                    <div className="space-y-1">
-                      <input
-                        type="datetime-local"
-                        className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                        value={scheduledFor}
-                        onChange={(e) => setScheduledFor(e.target.value)}
-                        min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Campaign will be sent automatically at the scheduled time.
-                      </p>
+
+                  {campError && (
+                    <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{campError}</div>
+                  )}
+                  {campSuccess && (
+                    <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-md px-3 py-2">
+                      <CheckCircle2 className="h-4 w-4" /> Campaign {useSchedule ? "scheduled" : "sent"} successfully!
                     </div>
                   )}
-                </div>
 
-                {campError && (
-                  <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{campError}</div>
-                )}
-                {campSuccess && (
-                  <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-md px-3 py-2">
-                    <CheckCircle2 className="h-4 w-4" /> Campaign sent!
-                  </div>
-                )}
-
-                {campaignDraft ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      Campaign created: <span className="font-medium">{campaignDraft.name}</span>
-                      {campaignDraft.status === "scheduled" && campaignDraft.scheduled_for && (
-                        <Badge variant="secondary" className="text-xs ml-auto">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {format(new Date(campaignDraft.scheduled_for), "MMM d, HH:mm")}
-                        </Badge>
+                  {campaignDraft ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md px-3 py-2.5">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                        <span>Campaign created: <span className="font-medium">{campaignDraft.name}</span></span>
+                        {campaignDraft.status === "scheduled" && campaignDraft.scheduled_for && (
+                          <Badge variant="secondary" className="text-xs ml-auto">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {format(new Date(campaignDraft.scheduled_for), "MMM d, HH:mm")}
+                          </Badge>
+                        )}
+                      </div>
+                      {campaignDraft.status !== "scheduled" ? (
+                        <Button onClick={handleSendCampaign} disabled={sendingCampaign} className="w-full gap-2">
+                          {sendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          {sendingCampaign ? "Sending..." : `Send to ${campaignDraft.recipient_count} recipients`}
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-center text-muted-foreground">
+                          This campaign will be sent automatically at the scheduled time.
+                        </p>
                       )}
                     </div>
-                    {campaignDraft.status !== "scheduled" && (
-                      <Button onClick={handleSendCampaign} disabled={sendingCampaign} className="w-full gap-2">
-                        {sendingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                        {sendingCampaign ? "Sending..." : `Send to ${campaignDraft.recipient_count} recipients`}
+                  ) : (
+                    <div className="flex items-center justify-between pt-1">
+                      <Button variant="ghost" onClick={() => setCampStep(2)} className="gap-1.5 text-muted-foreground">
+                        <ChevronLeft className="h-4 w-4" /> Back
                       </Button>
-                    )}
-                    {campaignDraft.status === "scheduled" && (
-                      <p className="text-xs text-center text-muted-foreground">
-                        This campaign will be sent automatically at the scheduled time.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <Button
-                    onClick={handleCreateCampaign}
-                    disabled={!campName.trim() || !selectedLeadIds.size || creatingCampaign || campEmailFormat === "none" || (useSchedule && !scheduledFor)}
-                    className="w-full gap-2"
-                    variant="outline"
-                  >
-                    {creatingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : useSchedule ? <Calendar className="h-4 w-4" /> : <Users className="h-4 w-4" />}
-                    {creatingCampaign
-                      ? "Creating..."
-                      : useSchedule
-                        ? `Schedule Campaign (${selectedLeadIds.size} recipients)`
-                        : `Create Campaign (${selectedLeadIds.size} recipients)`
-                    }
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                      <Button
+                        onClick={handleCreateCampaign}
+                        disabled={!campSubject.trim() || !campBody.trim() || creatingCampaign || campEmailFormat === "none"}
+                        className="gap-2"
+                      >
+                        {creatingCampaign ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : useSchedule ? (
+                          <Calendar className="h-4 w-4" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                        {creatingCampaign
+                          ? "Creating..."
+                          : useSchedule
+                            ? `Schedule for ${selectedLeadIds.size} recipients`
+                            : `Create & Send to ${selectedLeadIds.size}`
+                        }
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── History ───────────────────────────────────────────────────────── */}
