@@ -716,7 +716,7 @@ export default function OutreachPage() {
                     <Textarea
                       ref={indBodyRef}
                       className="text-sm resize-none"
-                      rows={8}
+                      rows={18}
                       placeholder="Write your personalized email..."
                       value={indBody}
                       onChange={(e) => setIndBody(e.target.value)}
@@ -1068,7 +1068,7 @@ export default function OutreachPage() {
                         <Textarea
                           ref={campBodyRef}
                           className="text-sm resize-none"
-                          rows={8}
+                          rows={18}
                           value={campBody}
                           onChange={(e) => setCampBody(e.target.value)}
                           placeholder="Write your campaign email... Use {{first_name}}, {{company}} etc."

@@ -32,12 +32,23 @@ export async function POST(req: NextRequest) {
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
   if (!wsId) return NextResponse.json({ error: "Invalid workspace" }, { status: 400 })
 
-  const { data: seq, error } = await supabase
+  // Try insert with from_email; fall back without it if the column doesn't exist yet
+  // (migration supabase/sequences_from_email.sql may not have been run)
+  let result = await supabase
     .from("sequences")
     .insert({ user_id: user.id, workspace_id: wsId, name: name.trim(), description, from_email: fromEmail ?? null })
     .select()
     .single()
 
+  if (result.error) {
+    result = await supabase
+      .from("sequences")
+      .insert({ user_id: user.id, workspace_id: wsId, name: name.trim(), description })
+      .select()
+      .single()
+  }
+
+  const { data: seq, error } = result
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   if (steps?.length) {

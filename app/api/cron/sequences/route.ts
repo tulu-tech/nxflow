@@ -132,6 +132,15 @@ export async function GET(req: NextRequest) {
       if (!res.ok) {
         const err = await res.json().catch(() => null)
         errors.push(`${lead.email}: ${err?.error?.message ?? `HTTP ${res.status}`}`)
+        // Remove the orphaned log row so it doesn't show as a sent email
+        if (logRow?.id) {
+          await supabase.from("email_logs").delete().eq("id", logRow.id)
+        }
+        // Reschedule 1 hour out so the cron doesn't hammer the same enrollment every tick
+        await supabase
+          .from("sequence_enrollments")
+          .update({ next_send_at: new Date(Date.now() + 3600_000).toISOString() })
+          .eq("id", enrollment.id)
         continue
       }
 
