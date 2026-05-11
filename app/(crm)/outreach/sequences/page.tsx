@@ -54,7 +54,12 @@ interface Enrollment {
   current_step: number
   status: "active" | "completed" | "replied" | "paused"
   next_send_at: string | null
-  leadboard: { full_name: string; email: string } | null
+  created_at: string
+  leadName: string
+  leadEmail: string
+  emailsSent: number
+  emailsOpened: number
+  emailsClicked: number
 }
 
 interface GmailAccount {
@@ -152,16 +157,52 @@ export default function SequencesPage() {
 
   const loadEnrollments = useCallback(async (sequenceId: string) => {
     setEnrollmentsLoading(true)
-    const { data } = await supabase
+
+    // Step 1: fetch enrollments (no FK join — works regardless of schema)
+    const { data: enrollData } = await supabase
       .from("sequence_enrollments")
-      .select("id, lead_id, current_step, status, next_send_at, leadboard(full_name, email)")
+      .select("id, lead_id, current_step, status, next_send_at, created_at")
       .eq("sequence_id", sequenceId)
       .order("created_at", { ascending: false })
 
-    setEnrollments((data ?? []).map((e) => ({
-      ...e,
-      leadboard: Array.isArray(e.leadboard) ? (e.leadboard[0] ?? null) : (e.leadboard ?? null),
-    })) as Enrollment[])
+    if (!enrollData || enrollData.length === 0) {
+      setEnrollments([])
+      setEnrollmentsLoading(false)
+      return
+    }
+
+    const leadIds = [...new Set(enrollData.map((e) => e.lead_id))]
+
+    // Step 2: lead info + email stats in parallel
+    const [leadsRes, logsRes] = await Promise.all([
+      supabase.from("leadboard").select("id, full_name, email").in("id", leadIds),
+      supabase.from("email_logs").select("lead_id, open_count, click_count").in("lead_id", leadIds),
+    ])
+
+    const leadMap: Record<string, { full_name: string; email: string }> = {}
+    for (const l of leadsRes.data ?? []) {
+      leadMap[l.id] = { full_name: l.full_name, email: l.email }
+    }
+
+    // Aggregate per-lead stats across all their email_logs rows
+    const statsMap: Record<string, { sent: number; opened: number; clicked: number }> = {}
+    for (const log of logsRes.data ?? []) {
+      if (!statsMap[log.lead_id]) statsMap[log.lead_id] = { sent: 0, opened: 0, clicked: 0 }
+      statsMap[log.lead_id].sent++
+      if ((log.open_count ?? 0) > 0) statsMap[log.lead_id].opened++
+      if ((log.click_count ?? 0) > 0) statsMap[log.lead_id].clicked++
+    }
+
+    setEnrollments(
+      enrollData.map((e) => ({
+        ...e,
+        leadName: leadMap[e.lead_id]?.full_name ?? "Unknown",
+        leadEmail: leadMap[e.lead_id]?.email ?? "—",
+        emailsSent: statsMap[e.lead_id]?.sent ?? 0,
+        emailsOpened: statsMap[e.lead_id]?.opened ?? 0,
+        emailsClicked: statsMap[e.lead_id]?.clicked ?? 0,
+      }))
+    )
     setEnrollmentsLoading(false)
   }, [supabase])
 
@@ -512,67 +553,165 @@ export default function SequencesPage() {
                           <p className="text-xs mt-1">Click "Enroll Leads" to add leads to this sequence</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto rounded-lg border">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-muted/40 border-b">
-                                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Lead</th>
-                                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Step</th>
-                                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Status</th>
-                                <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground hidden sm:table-cell">Next Send</th>
-                                <th className="px-3 py-2" />
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {enrollments.map((e) => {
-                                const totalSteps = selected.sequence_steps?.length ?? 0
-                                const stepLabel = `${e.current_step + 1} / ${totalSteps}`
-                                return (
-                                  <tr key={e.id} className="border-b last:border-0 hover:bg-muted/20">
-                                    <td className="px-3 py-2.5">
-                                      <p className="font-medium text-foreground truncate max-w-[140px]">
-                                        {e.leadboard?.full_name ?? "Unknown"}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground truncate max-w-[140px]">
-                                        {e.leadboard?.email ?? "—"}
-                                      </p>
-                                    </td>
-                                    <td className="px-3 py-2.5">
-                                      <span className="text-xs font-mono text-muted-foreground">{stepLabel}</span>
-                                    </td>
-                                    <td className="px-3 py-2.5">
-                                      <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", STATUS_COLORS[e.status])}>
-                                        {e.status}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2.5 hidden sm:table-cell">
-                                      <span className="text-xs text-muted-foreground">
-                                        {e.next_send_at && e.status === "active"
-                                          ? format(new Date(e.next_send_at), "MMM d, HH:mm")
-                                          : "—"}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-right">
-                                      {(e.status === "active") && (
-                                        <button
-                                          onClick={() => handleUnenroll(e.id)}
-                                          disabled={unenrolling === e.id}
-                                          title="Unenroll"
-                                          className="text-muted-foreground hover:text-destructive transition-colors"
-                                        >
-                                          {unenrolling === e.id
-                                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                            : <UserMinus className="h-3.5 w-3.5" />
-                                          }
-                                        </button>
-                                      )}
-                                    </td>
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                        <>
+                          {/* Summary stats row */}
+                          {(() => {
+                            const total = enrollments.length
+                            const active = enrollments.filter(e => e.status === "active").length
+                            const completed = enrollments.filter(e => e.status === "completed").length
+                            const replied = enrollments.filter(e => e.status === "replied").length
+                            const totalSent = enrollments.reduce((s, e) => s + e.emailsSent, 0)
+                            const totalOpened = enrollments.reduce((s, e) => s + e.emailsOpened, 0)
+                            const totalClicked = enrollments.reduce((s, e) => s + e.emailsClicked, 0)
+                            return (
+                              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4 text-center">
+                                {[
+                                  { label: "Total", value: total, color: "text-foreground" },
+                                  { label: "Active", value: active, color: "text-blue-600 dark:text-blue-400" },
+                                  { label: "Completed", value: completed, color: "text-emerald-600 dark:text-emerald-400" },
+                                  { label: "Replied", value: replied, color: "text-purple-600 dark:text-purple-400" },
+                                  { label: "Sent", value: totalSent, color: "text-foreground" },
+                                  { label: "Opened", value: totalSent > 0 ? `${Math.round(totalOpened / totalSent * 100)}%` : "—", color: "text-amber-600 dark:text-amber-400" },
+                                ].map(({ label, value, color }) => (
+                                  <div key={label} className="rounded-lg bg-muted/50 px-2 py-2">
+                                    <p className={cn("text-lg font-bold leading-none", color)}>{value}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          })()}
+
+                          {/* Per-lead table */}
+                          <div className="overflow-x-auto rounded-lg border">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-muted/40 border-b">
+                                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Lead</th>
+                                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Progress</th>
+                                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Status</th>
+                                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground hidden md:table-cell">Emails</th>
+                                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground hidden lg:table-cell">Next Send</th>
+                                  <th className="px-3 py-2" />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {enrollments.map((e) => {
+                                  const totalSteps = selected.sequence_steps?.length ?? 0
+                                  const stepIndex = e.current_step  // 0-based index of step to send next
+                                  const stepsDone = e.status === "completed" ? totalSteps : stepIndex
+                                  const progressPct = totalSteps > 0 ? Math.round((stepsDone / totalSteps) * 100) : 0
+
+                                  // Next send countdown
+                                  let nextSendLabel = "—"
+                                  if (e.status === "active" && e.next_send_at) {
+                                    const diff = new Date(e.next_send_at).getTime() - Date.now()
+                                    if (diff <= 0) {
+                                      nextSendLabel = "Sending soon"
+                                    } else {
+                                      const hours = Math.floor(diff / 3_600_000)
+                                      const days = Math.floor(hours / 24)
+                                      nextSendLabel = days > 0 ? `in ${days}d` : `in ${hours}h`
+                                    }
+                                  }
+
+                                  return (
+                                    <tr key={e.id} className="border-b last:border-0 hover:bg-muted/20">
+                                      {/* Lead */}
+                                      <td className="px-3 py-3">
+                                        <p className="font-medium text-foreground truncate max-w-[130px] text-sm">
+                                          {e.leadName}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground truncate max-w-[130px]">
+                                          {e.leadEmail}
+                                        </p>
+                                      </td>
+
+                                      {/* Progress */}
+                                      <td className="px-3 py-3">
+                                        <div className="flex items-center gap-2 min-w-[90px]">
+                                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                            <div
+                                              className={cn(
+                                                "h-full rounded-full transition-all",
+                                                e.status === "completed" ? "bg-emerald-500" :
+                                                e.status === "replied" ? "bg-purple-500" : "bg-primary"
+                                              )}
+                                              style={{ width: `${progressPct}%` }}
+                                            />
+                                          </div>
+                                          <span className="text-[11px] font-mono text-muted-foreground whitespace-nowrap shrink-0">
+                                            {stepsDone}/{totalSteps}
+                                          </span>
+                                        </div>
+                                      </td>
+
+                                      {/* Status */}
+                                      <td className="px-3 py-3">
+                                        <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", STATUS_COLORS[e.status])}>
+                                          {e.status}
+                                        </span>
+                                      </td>
+
+                                      {/* Email stats */}
+                                      <td className="px-3 py-3 hidden md:table-cell">
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                          <span title="Sent" className="flex items-center gap-0.5">
+                                            <Mail className="h-3 w-3" /> {e.emailsSent}
+                                          </span>
+                                          {e.emailsSent > 0 && (
+                                            <>
+                                              <span title="Opened" className={cn("flex items-center gap-0.5", e.emailsOpened > 0 ? "text-amber-600 dark:text-amber-400 font-medium" : "")}>
+                                                👁 {e.emailsOpened}
+                                              </span>
+                                              <span title="Clicked" className={cn("flex items-center gap-0.5", e.emailsClicked > 0 ? "text-blue-600 dark:text-blue-400 font-medium" : "")}>
+                                                🔗 {e.emailsClicked}
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </td>
+
+                                      {/* Next send */}
+                                      <td className="px-3 py-3 hidden lg:table-cell">
+                                        <span className={cn(
+                                          "text-xs",
+                                          nextSendLabel === "Sending soon"
+                                            ? "text-amber-600 dark:text-amber-400 font-medium"
+                                            : "text-muted-foreground"
+                                        )}>
+                                          {nextSendLabel}
+                                        </span>
+                                        {e.status === "active" && e.next_send_at && (
+                                          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                                            {format(new Date(e.next_send_at), "MMM d, HH:mm")}
+                                          </p>
+                                        )}
+                                      </td>
+
+                                      {/* Unenroll */}
+                                      <td className="px-3 py-3 text-right">
+                                        {e.status === "active" && (
+                                          <button
+                                            onClick={() => handleUnenroll(e.id)}
+                                            disabled={unenrolling === e.id}
+                                            title="Unenroll"
+                                            className="text-muted-foreground hover:text-destructive transition-colors"
+                                          >
+                                            {unenrolling === e.id
+                                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                              : <UserMinus className="h-3.5 w-3.5" />
+                                            }
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
