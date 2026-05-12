@@ -158,11 +158,15 @@ export default function SequencesPage() {
   const loadEnrollments = useCallback(async (sequenceId: string) => {
     setEnrollmentsLoading(true)
 
-    // Step 1: fetch enrollments (no FK join — works regardless of schema)
+    // Step 1: fetch enrollments (explicit user_id filter mirrors load() to satisfy RLS)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setEnrollmentsLoading(false); return }
+
     const { data: enrollData } = await supabase
       .from("sequence_enrollments")
       .select("id, lead_id, current_step, status, next_send_at, created_at")
       .eq("sequence_id", sequenceId)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false })
 
     if (!enrollData || enrollData.length === 0) {
