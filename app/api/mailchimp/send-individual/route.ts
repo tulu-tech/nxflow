@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { to, subject, body, leadId, fromEmail, isHtml, workspaceId } = await req.json()
+  const { to, cc, subject, body, leadId, fromEmail, isHtml, workspaceId } = await req.json()
   if (!to || !subject || !body) {
     return NextResponse.json({ error: "to, subject, and body are required" }, { status: 400 })
   }
@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
     finalBody = injectUnsubscribe(finalBody, logRow.id, appUrl)
   }
 
-  let gmailRes = await sendViaGmail(gmailToken.access_token, fromAddr, to, subject, finalBody, !!isHtml)
+  const ccAddr = cc?.trim() || undefined
+  let gmailRes = await sendViaGmail(gmailToken.access_token, fromAddr, to, subject, finalBody, !!isHtml, ccAddr)
 
   // 401 → try token refresh
   if (gmailRes.status === 401 && gmailToken.refresh_token) {
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
         .from("gmail_tokens")
         .update({ access_token: newAccessToken, updated_at: new Date().toISOString() })
         .eq("id", gmailToken.id)
-      gmailRes = await sendViaGmail(newAccessToken, fromAddr, to, subject, finalBody, !!isHtml)
+      gmailRes = await sendViaGmail(newAccessToken, fromAddr, to, subject, finalBody, !!isHtml, ccAddr)
     }
   }
 

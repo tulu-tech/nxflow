@@ -31,11 +31,13 @@ export async function sendViaGmail(
   subject: string,
   body: string,
   isHtml = false,
+  cc?: string,
 ): Promise<Response> {
   const contentType = isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8"
   const emailLines = [
     `From: ${from}`,
     `To: ${to}`,
+    ...(cc ? [`Cc: ${cc}`] : []),
     `Subject: ${subject}`,
     `MIME-Version: 1.0`,
     `Content-Type: ${contentType}`,

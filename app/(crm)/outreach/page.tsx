@@ -297,6 +297,7 @@ export default function OutreachPage() {
   const [indEmailFormat, setIndEmailFormat] = useState<EmailFormat>("none")
   const [indPreviewDevice, setIndPreviewDevice] = useState<PreviewDevice>("desktop")
   const [fromEmail, setFromEmail] = useState("")
+  const [indCc, setIndCc] = useState("")
   const [sending, setSending] = useState(false)
   const [sendSuccess, setSendSuccess] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
@@ -464,6 +465,7 @@ export default function OutreachPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: selectedLead.email,
+          cc: indCc.trim() || undefined,
           subject: fillMergeTags(indSubject, selectedLead),
           body: fillMergeTags(indBody, selectedLead),
           leadId: selectedLead.id,
@@ -477,6 +479,7 @@ export default function OutreachPage() {
       setSendSuccess(true)
       setIndSubject("")
       setIndBody("")
+      setIndCc("")
       setSelectedLeadId("")
       setIndEmailFormat("none")
     } catch (e) {
@@ -685,6 +688,17 @@ export default function OutreachPage() {
                     <Link href="/settings?tab=api" className="text-primary underline underline-offset-2">connect in Settings</Link>
                   </div>
                 )}
+              </div>
+
+              {/* CC field */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">CC <span className="text-muted-foreground font-normal">(optional — comma-separated)</span></Label>
+                <Input
+                  className="h-9 text-sm"
+                  placeholder="cc@example.com, another@example.com"
+                  value={indCc}
+                  onChange={(e) => setIndCc(e.target.value)}
+                />
               </div>
 
               <div className="space-y-1.5">

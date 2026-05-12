@@ -501,10 +501,31 @@ export default function SettingsPage() {
             <CardContent className="space-y-3">
               <Textarea
                 className="text-sm font-mono min-h-[140px] resize-y"
-                placeholder={"Best regards,\nYour Name\n\n<a href=\"https://yoursite.com\">yoursite.com</a>"}
+                placeholder={"Best regards,\nYour Name\nTitle | Company\nphone@email.com"}
                 value={emailSignature}
                 onChange={(e) => setEmailSignature(e.target.value)}
               />
+
+              {/* Live preview */}
+              {emailSignature.trim() && (
+                <div className="rounded-md border border-dashed border-border bg-muted/30 p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2 font-medium">Preview</p>
+                  <div className="border-t border-border pt-2 text-sm text-muted-foreground">
+                    {/^<[a-z][\s\S]*>/i.test(emailSignature.trim()) ? (
+                      // HTML signature — render as-is
+                      <div dangerouslySetInnerHTML={{ __html: emailSignature }} />
+                    ) : (
+                      // Plain text — render each line separately
+                      emailSignature.split("\n").map((line, i) => (
+                        <div key={i} className={line.trim() === "" ? "h-3" : "leading-snug"}>
+                          {line.trim() === "" ? null : line}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <Button
                   size="sm"

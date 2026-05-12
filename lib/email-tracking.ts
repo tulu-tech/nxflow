@@ -12,7 +12,13 @@ export function appendSignature(
   if (!signature?.trim()) return body
   if (isHtml) {
     const divider = `<hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;" />`
-    const sigBlock = `<div class="email-signature" style="color:#555;font-size:13px;line-height:1.5;">${signature}</div>`
+    // If the signature doesn't already contain HTML tags, convert newlines to <br> so
+    // plain-text signatures render with proper line breaks in HTML emails.
+    const hasHtmlTags = /<[a-z][\s\S]*?>/i.test(signature)
+    const renderedSig = hasHtmlTags
+      ? signature
+      : signature.replace(/\n/g, "<br>")
+    const sigBlock = `<div class="email-signature" style="color:#555;font-size:13px;line-height:1.6;">${renderedSig}</div>`
     return body.includes("</body>")
       ? body.replace("</body>", `${divider}${sigBlock}</body>`)
       : `${body}${divider}${sigBlock}`
