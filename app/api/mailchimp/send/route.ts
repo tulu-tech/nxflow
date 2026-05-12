@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { campaignId, recipientIds, fromEmail, isHtml, workspaceId } = await req.json()
+  const { campaignId, recipientIds, cc, fromEmail, isHtml, workspaceId } = await req.json()
   if (!campaignId) return NextResponse.json({ error: "campaignId required" }, { status: 400 })
 
   const wsId = await getValidatedWorkspaceId(supabase, user, workspaceId)
@@ -98,14 +98,15 @@ export async function POST(req: NextRequest) {
         finalBody = injectUnsubscribe(finalBody, logRow.id, appUrl)
       }
 
-      let res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml)
+      const ccAddr = (cc as string | undefined)?.trim() || undefined
+      let res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml, ccAddr)
 
       if (res.status === 401 && gmailToken.refresh_token) {
         const fresh = await refreshGmailToken(gmailToken.refresh_token)
         if (fresh) {
           accessToken = fresh
           await supabase.from("gmail_tokens").update({ access_token: fresh, updated_at: new Date().toISOString() }).eq("id", gmailToken.id)
-          res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml)
+          res = await sendViaGmail(accessToken, fromAddr, lead.email, personalizedSubject, finalBody, !!isHtml, ccAddr)
         }
       }
 

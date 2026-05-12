@@ -54,7 +54,6 @@ interface Enrollment {
   current_step: number
   status: "active" | "completed" | "replied" | "paused"
   next_send_at: string | null
-  created_at: string
   leadName: string
   leadEmail: string
   emailsSent: number
@@ -162,12 +161,25 @@ export default function SequencesPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setEnrollmentsLoading(false); return }
 
-    const { data: enrollData } = await supabase
+    // Try with user_id filter first; if it returns nothing, fall back without it
+    // (handles edge cases where enrollment was created with a different user context)
+    let { data: enrollData, error: enrollError } = await supabase
       .from("sequence_enrollments")
-      .select("id, lead_id, current_step, status, next_send_at, created_at")
+      .select("id, lead_id, current_step, status, next_send_at")
       .eq("sequence_id", sequenceId)
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
+
+    if (enrollError) console.error("[loadEnrollments] user_id query error:", enrollError)
+
+    // Fallback: drop user_id filter — rely on RLS alone
+    if (!enrollData || enrollData.length === 0) {
+      const fb = await supabase
+        .from("sequence_enrollments")
+        .select("id, lead_id, current_step, status, next_send_at")
+        .eq("sequence_id", sequenceId)
+      if (fb.error) console.error("[loadEnrollments] fallback query error:", fb.error)
+      enrollData = fb.data
+    }
 
     if (!enrollData || enrollData.length === 0) {
       setEnrollments([])

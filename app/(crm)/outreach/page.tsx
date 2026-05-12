@@ -311,6 +311,7 @@ export default function OutreachPage() {
   const [segmentFilter, setSegmentFilter] = useState<string>("all")
   const [segmentMemberIds, setSegmentMemberIds] = useState<Set<string>>(new Set())
   const [loadingSegment, setLoadingSegment] = useState(false)
+  const [campCc, setCampCc] = useState("")
   const [campName, setCampName] = useState("")
   const [campSubject, setCampSubject] = useState("")
   const [campSubjectB, setCampSubjectB] = useState("")
@@ -545,6 +546,7 @@ export default function OutreachPage() {
           name: campName,
           subject: campSubject,
           body: campBody,
+          cc: campCc.trim() || undefined,
           workspaceId: activeWorkspaceId,
           subjectB: showSubjectB && campSubjectB.trim() ? campSubjectB : undefined,
           scheduledFor: useSchedule && scheduledFor ? scheduledFor : undefined,
@@ -577,6 +579,7 @@ export default function OutreachPage() {
         body: JSON.stringify({
           campaignId: campaignDraft.id,
           recipientIds: Array.from(selectedLeadIds),
+          cc: campCc.trim() || undefined,
           fromEmail: campFromEmail || undefined,
           isHtml: campEmailFormat === "html",
           workspaceId: activeWorkspaceId,
@@ -591,6 +594,7 @@ export default function OutreachPage() {
       setCampSubjectB("")
       setShowSubjectB(false)
       setCampBody("")
+      setCampCc("")
       setCampEmailFormat("none")
       setSelectedLeadIds(new Set())
       setUseSchedule(false)
@@ -1024,6 +1028,17 @@ export default function OutreachPage() {
               {/* ── Stage 3: Compose ── */}
               {campStep === 3 && (
                 <div className="space-y-4">
+                  {/* CC */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">CC <span className="text-muted-foreground font-normal">(optional — comma-separated)</span></Label>
+                    <Input
+                      className="h-9 text-sm"
+                      placeholder="cc@example.com, another@example.com"
+                      value={campCc}
+                      onChange={(e) => setCampCc(e.target.value)}
+                    />
+                  </div>
+
                   {/* Subject A */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">

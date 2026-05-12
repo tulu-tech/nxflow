@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import Anthropic from "@anthropic-ai/sdk"
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+import OpenAI from "openai"
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: "OPENAI_API_KEY is not configured." }, { status: 500 })
+  }
+
   const { leadIds, directive } = await req.json()
 
   if (!leadIds?.length) return NextResponse.json({ error: "No lead IDs provided" }, { status: 400 })
   if (!directive?.trim()) return NextResponse.json({ error: "No scoring directive provided" }, { status: 400 })
+
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
   const { data: leads, error: leadsError } = await supabase
     .from("leadboard")
@@ -54,13 +58,19 @@ Return ONLY a JSON array (no markdown, no explanation outside the array):
 Leads to score:
 ${leadsJson}`
 
-  const res = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 2048,
-    messages: [{ role: "user", content: prompt }],
-  })
+  let completion
+  try {
+    completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 2048,
+      messages: [{ role: "user", content: prompt }],
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: `OpenAI API error: ${msg}` }, { status: 500 })
+  }
 
-  const text = res.content[0].type === "text" ? res.content[0].text : "[]"
+  const text = completion.choices[0]?.message?.content ?? "[]"
 
   let scores: { id: string; score: number; reason: string }[] = []
   try {
@@ -80,11 +90,10 @@ ${leadsJson}`
   )
   await Promise.all(updates)
 
-  // Log Claude token usage
-  const tokens = (res.usage?.input_tokens ?? 0) + (res.usage?.output_tokens ?? 0)
+  const tokens = (completion.usage?.prompt_tokens ?? 0) + (completion.usage?.completion_tokens ?? 0)
   await supabase.from("credit_usage").insert({
     user_id: user.id,
-    type: "claude_tokens",
+    type: "openai_tokens",
     amount: tokens,
     metadata: { leads_scored: leadIds.length, directive: directive.slice(0, 100) },
   })
