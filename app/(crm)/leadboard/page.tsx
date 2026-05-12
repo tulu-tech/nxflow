@@ -259,6 +259,7 @@ export default function LeadboardPage() {
   const [dueReminders, setDueReminders] = useState<DueReminder[]>([])
   const [sequences, setSequences] = useState<Sequence[]>([])
   const [rules, setRules] = useState<ScoringRule[]>([])
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   // ── View ────────────────────────────────────────────────────────────────────
@@ -375,6 +376,7 @@ export default function LeadboardPage() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
+    setCurrentUserId(user.id)
 
     const [leadsRes, initRes, remindersRes, rulesRes] = await Promise.all([
       supabase
@@ -391,7 +393,7 @@ export default function LeadboardPage() {
         .eq("workspace_id", activeWorkspaceId)
         .eq("is_done", false)
         .lte("remind_at", new Date().toISOString()),
-      supabase.from("scoring_rules").select("*").order("created_at", { ascending: false }),
+      supabase.from("scoring_rules").select("*").eq("user_id", user.id).eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }),
     ])
 
     const rawLeads = (leadsRes.data ?? []) as (LeadboardEntry & { lead_tag_assignments: { tag_id: string }[] })[]
@@ -1092,9 +1094,11 @@ export default function LeadboardPage() {
   }
 
   async function handleToggleRule(id: string, current: boolean) {
-    if (!current) await supabase.from("scoring_rules").update({ is_active: false }).neq("id", id)
+    if (!current && currentUserId && activeWorkspaceId) {
+      await supabase.from("scoring_rules").update({ is_active: false }).eq("user_id", currentUserId).eq("workspace_id", activeWorkspaceId).neq("id", id)
+    }
     await supabase.from("scoring_rules").update({ is_active: !current }).eq("id", id)
-    const { data } = await supabase.from("scoring_rules").select("*").order("created_at", { ascending: false })
+    const { data } = await supabase.from("scoring_rules").select("*").eq("user_id", currentUserId!).eq("workspace_id", activeWorkspaceId!).order("created_at", { ascending: false })
     setRules((data as ScoringRule[]) ?? [])
   }
 
@@ -1104,10 +1108,17 @@ export default function LeadboardPage() {
   }
 
   async function handleAddRule(directive: string) {
-    if (!directive.trim()) return
-    await supabase.from("scoring_rules").insert({ directive: directive.trim(), is_active: true })
-    await supabase.from("scoring_rules").update({ is_active: false }).neq("directive", directive.trim())
-    const { data } = await supabase.from("scoring_rules").select("*").order("created_at", { ascending: false })
+    if (!directive.trim() || !currentUserId || !activeWorkspaceId) return
+    // Deactivate all existing rules first
+    await supabase.from("scoring_rules").update({ is_active: false }).eq("user_id", currentUserId).eq("workspace_id", activeWorkspaceId)
+    const { error } = await supabase.from("scoring_rules").insert({
+      directive: directive.trim(),
+      is_active: true,
+      user_id: currentUserId,
+      workspace_id: activeWorkspaceId,
+    })
+    if (error) { console.error("[handleAddRule] insert error:", error); return }
+    const { data } = await supabase.from("scoring_rules").select("*").eq("user_id", currentUserId).eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false })
     setRules((data as ScoringRule[]) ?? [])
   }
 
