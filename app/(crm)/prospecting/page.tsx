@@ -335,20 +335,20 @@ export default function ProspectingPage() {
   const totalPages = Math.ceil(total / 25)
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Prospecting</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Search Lusha&apos;s 100M+ B2B contact database
+          <h1 className="text-2xl font-semibold text-foreground">Prospecting</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Search Lusha's 100M+ B2B contact database
             {loadedSavedName && (
-              <span className="ml-2 inline-flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-primary">
                 <Bookmark className="h-3 w-3" />
-                <b>{loadedSavedName}</b>
+                Loaded: <b>{loadedSavedName}</b>
                 <button
                   onClick={handleClearSaved}
-                  className="ml-0.5 hover:text-destructive transition-colors"
+                  className="ml-1 hover:text-destructive"
                   title="Clear filters"
                 >
                   <X className="h-3 w-3" />
@@ -359,12 +359,12 @@ export default function ProspectingPage() {
         </div>
         <div className="flex items-center gap-3">
           {(searchCredits !== null || emailCredits !== null) && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 border border-border/50 px-4 py-2 rounded-full">
-              <Zap className="h-4 w-4 text-amber-500" />
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-full">
+              <Zap className="h-3.5 w-3.5 text-amber-500" />
               <span>
-                <b className="text-foreground">{(searchCredits ?? 0) + (emailCredits ?? 0)}</b> credits this month
+                <b>{(searchCredits ?? 0) + (emailCredits ?? 0)}</b> credits this month
                 {" "}
-                <span className="text-xs opacity-60">({searchCredits ?? 0} search · {emailCredits ?? 0} email)</span>
+                <span className="text-xs opacity-70">({searchCredits ?? 0} search · {emailCredits ?? 0} email)</span>
               </span>
             </div>
           )}
@@ -391,23 +391,23 @@ export default function ProspectingPage() {
       )}
 
       {/* ── Filters Panel ──────────────────────────────────────────────────────── */}
-      <div className="border rounded-xl bg-card overflow-hidden shadow-sm">
+      <div className="border rounded-xl bg-card overflow-hidden">
         <button
           onClick={() => setFiltersOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/20 transition-colors"
+          className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors"
         >
-          <div className="flex items-center gap-2.5">
-            <Filter className="h-4 w-4 text-primary/70" />
-            <span className="font-semibold text-sm">Search Filters</span>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-sm">Search Filters</span>
             {activeFilterCount > 0 && (
-              <Badge className="text-[11px] h-5 px-2 font-semibold">{activeFilterCount} active</Badge>
+              <Badge className="text-xs h-5 px-1.5">{activeFilterCount} active</Badge>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {activeFilterCount > 0 && (
               <button
                 onClick={(e) => { e.stopPropagation(); setFilters(EMPTY_FILTERS) }}
-                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
               >
                 <X className="h-3 w-3" /> Clear all
               </button>
@@ -417,17 +417,17 @@ export default function ProspectingPage() {
         </button>
 
         {filtersOpen && (
-          <div className="px-6 pb-6 pt-2 space-y-6 border-t">
+          <div className="px-5 pb-5 pt-1 space-y-5 border-t">
 
             {/* ── Person ── */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2.5 bg-primary/5 border-l-2 border-primary rounded-r-md px-3 py-2 -ml-1">
-                <Users className="h-4 w-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-wider text-primary/80">Person</span>
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Person</span>
               </div>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4 pl-1">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Job Title(s)</Label>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Job Title(s)</Label>
                   <FilterCombobox
                     options={COMMON_JOB_TITLES}
                     value={filters.jobTitles ?? ""}
@@ -436,8 +436,8 @@ export default function ProspectingPage() {
                     multi
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Seniority</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Seniority</Label>
                   <FilterCombobox
                     options={SENIORITY_LABELS}
                     value={filters.seniority ?? ""}
@@ -446,8 +446,8 @@ export default function ProspectingPage() {
                     multi
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Department</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Department</Label>
                   <FilterCombobox
                     options={DEPARTMENTS}
                     value={filters.departments ?? ""}
@@ -456,23 +456,23 @@ export default function ProspectingPage() {
                     multi
                   />
                 </div>
-                <div className="space-y-2 col-span-2 lg:col-span-3">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Free-text search</Label>
-                  <Input className="h-9 text-sm" placeholder="Search across name, company, keywords…" value={filters.searchText ?? ""} onChange={(e) => set("searchText", e.target.value)} />
+                <div className="space-y-1.5 col-span-2 lg:col-span-3">
+                  <Label className="text-xs">Free-text search</Label>
+                  <Input className="h-8 text-sm" placeholder="Search across name, company, keywords…" value={filters.searchText ?? ""} onChange={(e) => set("searchText", e.target.value)} />
                 </div>
               </div>
-              <div className="flex items-center gap-5 pl-1 pt-0.5">
-                <label className="flex items-center gap-2.5 cursor-pointer group">
+              <div className="flex items-center gap-6 mt-3">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={!!filters.hasEmail} onCheckedChange={(v) => set("hasEmail", !!v)} />
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Has work email</span>
+                  <span className="text-xs text-muted-foreground">Has work email</span>
                 </label>
-                <label className="flex items-center gap-2.5 cursor-pointer group">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={!!filters.hasPhone} onCheckedChange={(v) => set("hasPhone", !!v)} />
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Has phone</span>
+                  <span className="text-xs text-muted-foreground">Has phone</span>
                 </label>
-                <label className="flex items-center gap-2.5 cursor-pointer group">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <Checkbox checked={!!filters.hasMobilePhone} onCheckedChange={(v) => set("hasMobilePhone", !!v)} />
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Has mobile phone</span>
+                  <span className="text-xs text-muted-foreground">Has mobile phone</span>
                 </label>
               </div>
             </div>
@@ -480,14 +480,14 @@ export default function ProspectingPage() {
             <Separator />
 
             {/* ── Person Location ── */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2.5 bg-emerald-500/5 border-l-2 border-emerald-500 rounded-r-md px-3 py-2 -ml-1">
-                <MapPin className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-500/80">Person Location</span>
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <MapPin className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Person Location</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-4 pl-1">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Country</Label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Country</Label>
                   <FilterCombobox
                     options={COUNTRIES}
                     value={filters.country ?? ""}
@@ -496,13 +496,13 @@ export default function ProspectingPage() {
                     multi
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">State / Region</Label>
-                  <Input className="h-9 text-sm" placeholder="e.g. New York" value={filters.state ?? ""} onChange={(e) => set("state", e.target.value)} />
+                <div className="space-y-1.5">
+                  <Label className="text-xs">State / Region</Label>
+                  <Input className="h-8 text-sm" placeholder="e.g. New York" value={filters.state ?? ""} onChange={(e) => set("state", e.target.value)} />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">City</Label>
-                  <Input className="h-9 text-sm" placeholder="e.g. Manhattan" value={filters.city ?? ""} onChange={(e) => set("city", e.target.value)} />
+                <div className="space-y-1.5">
+                  <Label className="text-xs">City</Label>
+                  <Input className="h-8 text-sm" placeholder="e.g. Manhattan" value={filters.city ?? ""} onChange={(e) => set("city", e.target.value)} />
                 </div>
               </div>
             </div>
@@ -510,22 +510,22 @@ export default function ProspectingPage() {
             <Separator />
 
             {/* ── Company ── */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2.5 bg-amber-500/5 border-l-2 border-amber-500 rounded-r-md px-3 py-2 -ml-1">
-                <Building2 className="h-4 w-4 text-amber-500" />
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-500/80">Company</span>
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Company</span>
               </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-4 pl-1">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Company Name(s)</Label>
-                  <Input className="h-9 text-sm" placeholder="Google, Salesforce, … (comma-separated)" value={filters.companyName ?? ""} onChange={(e) => set("companyName", e.target.value)} />
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Company Name(s)</Label>
+                  <Input className="h-8 text-sm" placeholder="Google, Salesforce, … (comma-separated)" value={filters.companyName ?? ""} onChange={(e) => set("companyName", e.target.value)} />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Company Domain(s)</Label>
-                  <Input className="h-9 text-sm" placeholder="google.com, salesforce.com, …" value={filters.companyDomain ?? ""} onChange={(e) => set("companyDomain", e.target.value)} />
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Company Domain(s)</Label>
+                  <Input className="h-8 text-sm" placeholder="google.com, salesforce.com, …" value={filters.companyDomain ?? ""} onChange={(e) => set("companyDomain", e.target.value)} />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Company Size</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Company Size</Label>
                   <FilterCombobox
                     options={COMPANY_SIZE_LABELS}
                     value={filters.companySize ?? ""}
@@ -534,8 +534,8 @@ export default function ProspectingPage() {
                     multi
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground/90">Company Country</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Company Country</Label>
                   <FilterCombobox
                     options={COUNTRIES}
                     value={filters.companyCountry ?? ""}
@@ -548,25 +548,24 @@ export default function ProspectingPage() {
             </div>
 
             {/* Search + Save buttons */}
-            <Separator />
-            <div className="flex items-center justify-between pt-0.5">
+            <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-3">
-                <p className="text-xs text-muted-foreground italic">At least one filter is required to search</p>
+                <p className="text-xs text-muted-foreground">At least one filter is required to search</p>
                 {saveMsg && (
-                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{saveMsg}</span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400">{saveMsg}</span>
                 )}
               </div>
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   onClick={handleSaveSearch}
                   disabled={savingSearch || activeFilterCount === 0}
-                  className="gap-1.5 h-9"
+                  className="gap-1.5"
                 >
                   {savingSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookmarkPlus className="h-4 w-4" />}
                   {loadedSavedName ? "Update Saved" : "Save Search"}
                 </Button>
-                <Button onClick={() => search(1)} disabled={searching} className="gap-2 px-7 h-9 font-semibold">
+                <Button onClick={() => search(1)} disabled={searching} className="gap-2 px-6">
                   {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   {searching ? "Searching…" : "Search Lusha"}
                 </Button>
@@ -724,21 +723,17 @@ export default function ProspectingPage() {
       )}
 
       {!hasSearched && !searching && (
-        <div className="text-center py-28 text-muted-foreground">
-          <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-muted/50 border border-border/50 mb-5">
-            <Search className="h-7 w-7 opacity-40" />
-          </div>
-          <p className="text-base font-semibold text-foreground/80">Set your filters and search</p>
-          <p className="text-sm mt-1.5 max-w-md mx-auto leading-relaxed">
-            Results will appear here — name, company, and position only until you reveal emails
-          </p>
+        <div className="text-center py-24 text-muted-foreground">
+          <Search className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-base font-medium">Set your filters and search</p>
+          <p className="text-sm mt-1">Results will appear here — name, company, and position only until you reveal emails</p>
         </div>
       )}
 
       {searching && (
-        <div className="flex flex-col items-center justify-center py-28 gap-4 text-muted-foreground">
-          <Loader2 className="h-7 w-7 animate-spin text-primary/60" />
-          <span className="text-sm font-medium">Searching Lusha database…</span>
+        <div className="flex items-center justify-center py-24 gap-3 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Searching Lusha database…</span>
         </div>
       )}
     </div>
