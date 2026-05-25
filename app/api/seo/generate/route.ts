@@ -987,8 +987,8 @@ export async function POST(req: NextRequest) {
           const intResult = mockInternalLinkPlan(body as InternalLinkPlanInput);
           const extResult = mockExternalLinkPlan(body as ExternalLinkPlanInput);
           return NextResponse.json({
-            internalLinkPlan: intResult.internalLinkPlan ?? intResult.internalLinks ?? [],
-            externalLinkPlan: extResult.externalLinkPlan ?? extResult.externalLinks ?? [],
+            internalLinkPlan: intResult.internalLinkPlan ?? [],
+            externalLinkPlan: extResult.externalLinkPlan ?? [],
           });
         }
         case 'inject-approved-links':

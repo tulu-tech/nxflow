@@ -745,20 +745,22 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
           contentGoal={contentGoal || customGoal}
           onApprove={(data) => {
             // Persist to project store
-            if (step === 5) updateProjectField(pid, 'keywordStrategy', data);
-            if (step === 6) updateProjectField(pid, 'contentBrief', data);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const d = data as any;
+            if (step === 5) updateProjectField(pid, 'keywordStrategy', d);
+            if (step === 6) updateProjectField(pid, 'contentBrief', d);
             if (step === 7) {
               // Extract content string - handles {article: {content}} and {content} shapes
-              const contentStr = data?.article?.content ?? data?.content ?? (typeof data === 'string' ? data : '');
+              const contentStr = d?.article?.content ?? d?.content ?? (typeof d === 'string' ? d : '');
               updateProjectField(pid, 'rawContent', contentStr);
-              updateProjectField(pid, 'generatedArticle', data);
+              updateProjectField(pid, 'generatedArticle', d);
             }
             if (step === 8) {
               // Combined link plan — store the full response so step 9 can extract arrays
-              updateProjectField(pid, 'internalLinkPlan', data);
-              updateProjectField(pid, 'externalLinkPlan', data);
+              updateProjectField(pid, 'internalLinkPlan', d);
+              updateProjectField(pid, 'externalLinkPlan', d);
             }
-            if (step === 9) updateProjectField(pid, 'linkedContent', data?.linkedContent ?? data?.content ?? data);
+            if (step === 9) updateProjectField(pid, 'linkedContent', d?.linkedContent ?? d?.content ?? d);
             goNext();
           }}
         />
