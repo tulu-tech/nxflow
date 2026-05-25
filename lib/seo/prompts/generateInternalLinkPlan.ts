@@ -99,7 +99,10 @@ Return strict JSON matching the schema provided.`;
 export function buildInternalLinkPlanUserPrompt(input: InternalLinkPlanInput): string {
   const pagesStr = (input.sitemapPages ?? []).length > 0
     ? input.sitemapPages
-        .filter(p => p.path !== '/' && p.path !== '')
+        .filter(p => {
+          const path = p.path || (() => { try { return new URL(p.url).pathname; } catch { return p.url; } })();
+          return path !== '/' && path !== '';
+        })
         .slice(0, 100)
         .map(p => `  - [${p.pageType}] ${p.url} | title="${p.title}"${p.detectedBrand ? ` | brand=${p.detectedBrand}` : ''}${p.detectedProduct ? ` | product=${p.detectedProduct}` : ''}`)
         .join('\n')
@@ -156,7 +159,9 @@ Return strict JSON:
 // ─── Mock Response ───────────────────────────────────────────────────────────
 
 export function mockInternalLinkPlan(input: InternalLinkPlanInput): InternalLinkPlanResult {
-  const pages = (input.sitemapPages ?? []).filter(p => p.path !== '/' && p.path !== '');
+  const pages = (input.sitemapPages ?? [])
+    .map(p => ({ ...p, path: p.path || (() => { try { return new URL(p.url).pathname; } catch { return p.url; } })() }))
+    .filter(p => p.path !== '/' && p.path !== '');
 
   if (pages.length === 0) {
     return {

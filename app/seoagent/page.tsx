@@ -4,7 +4,7 @@ import { useWorkspaceStore } from '@/store/seoWorkspaceStore';
 import { WorkspaceCard } from '@/components/seo/WorkspaceCard';
 import { CreateWorkspaceForm } from '@/components/seo/CreateWorkspaceForm';
 import { useState, useEffect } from 'react';
-import { Building2 } from 'lucide-react';
+import { Building2, Search, Sparkles, ArrowRight } from 'lucide-react';
 import { MCM_WORKSPACE_ID, buildMCMWorkspace } from '@/lib/seo/seeds/mcm';
 import { HOMC_WORKSPACE_ID, buildHOMCWorkspace } from '@/lib/seo/seeds/homc';
 
@@ -37,6 +37,10 @@ export default function SEODashboard() {
     <>
       {/* Hero */}
       <div className="seo-hero">
+        <div className="seo-hero-badge">
+          <Sparkles size={12} />
+          <span>AI-Powered SEO Platform</span>
+        </div>
         <h1>SEO Content Agent</h1>
         <p>
           Multi-client SEO content workspace — manage brands, keywords, and generate high-ranking content at scale.
@@ -58,6 +62,16 @@ export default function SEODashboard() {
             onSubmit={handleCreate}
             onCancel={() => setShowCreate(false)}
           />
+        </div>
+      )}
+
+      {/* Section header */}
+      {workspaceList.length > 0 && (
+        <div className="seo-section-header">
+          <div className="seo-section-header-left">
+            <h2 className="seo-section-title">Your Workspaces</h2>
+            <span className="seo-section-count">{workspaceList.length}</span>
+          </div>
         </div>
       )}
 

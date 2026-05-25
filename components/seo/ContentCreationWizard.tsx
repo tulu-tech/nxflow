@@ -87,8 +87,20 @@ function FinalPreview({ project, workspace, persona, topic }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = project as any;
   const article = p.generatedArticle?.article ?? p.generatedArticle ?? {};
-  const rawContent = p.linkedContent ?? article?.content ?? p.rawContent ?? '';
-  const content = typeof rawContent === 'string' ? cleanContentMarkers(rawContent) : rawContent;
+  // Resolve content: prefer linkedContent (step 9) > article.content > rawContent
+  const resolveContent = (val: unknown): string => {
+    if (typeof val === 'string') return val;
+    if (val && typeof val === 'object') {
+      const obj = val as Record<string, unknown>;
+      if (typeof obj.linkedContent === 'string') return obj.linkedContent;
+      if (typeof obj.content === 'string') return obj.content;
+      if (obj.article && typeof (obj.article as Record<string, unknown>).content === 'string') return (obj.article as Record<string, unknown>).content as string;
+      return '';
+    }
+    return '';
+  };
+  const rawContent = resolveContent(p.linkedContent) || resolveContent(article?.content) || resolveContent(p.rawContent) || '';
+  const content = typeof rawContent === 'string' ? cleanContentMarkers(rawContent) : String(rawContent);
   const title = article?.title ?? article?.metaTitle ?? p.name ?? '';
   const metaDesc = article?.metaDescription ?? '';
   const slug = article?.slug ?? '';
@@ -720,7 +732,7 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
       )}
 
       {/* ── STEPS 5–12: Live AI Steps ── */}
-      {step >= 5 && step <= 12 && (
+      {step >= 5 && step <= 9 && (
         <AIStep
           key={step}
           step={step}
@@ -735,19 +747,25 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
             // Persist to project store
             if (step === 5) updateProjectField(pid, 'keywordStrategy', data);
             if (step === 6) updateProjectField(pid, 'contentBrief', data);
-            if (step === 7) { updateProjectField(pid, 'rawContent', data?.content ?? data); updateProjectField(pid, 'generatedArticle', data); }
-            if (step === 8) updateProjectField(pid, 'internalLinkPlan', data);
-            if (step === 9) updateProjectField(pid, 'externalLinkPlan', data);
-            if (step === 10) updateProjectField(pid, 'linkedContent', data?.content ?? data);
-            if (step === 11) updateProjectField(pid, 'imagePlan', data);
-            if (step === 12) { updateProjectField(pid, 'generatedImages', data); updateProjectField(pid, 'finalOutput', data); }
+            if (step === 7) {
+              // Extract content string - handles {article: {content}} and {content} shapes
+              const contentStr = data?.article?.content ?? data?.content ?? (typeof data === 'string' ? data : '');
+              updateProjectField(pid, 'rawContent', contentStr);
+              updateProjectField(pid, 'generatedArticle', data);
+            }
+            if (step === 8) {
+              // Combined link plan — store the full response so step 9 can extract arrays
+              updateProjectField(pid, 'internalLinkPlan', data);
+              updateProjectField(pid, 'externalLinkPlan', data);
+            }
+            if (step === 9) updateProjectField(pid, 'linkedContent', data?.linkedContent ?? data?.content ?? data);
             goNext();
           }}
         />
       )}
 
       {/* ── STEP 13: Final Preview & DOCX Export ── */}
-      {step === 13 && (
+      {step === 10 && (
         <FinalPreview project={project} workspace={workspace} persona={persona} topic={topic} />
       )}
 
@@ -766,7 +784,7 @@ export function ContentCreationWizard({ project, workspace, onBack }: Props) {
               Continue <ChevronRight size={14} />
             </button>
           )}
-          {step > 4 && step < 13 && (
+          {step > 4 && step < 10 && (
             <button className="seo-btn seo-btn-primary" onClick={goNext}>
               Next Step <ChevronRight size={14} />
             </button>

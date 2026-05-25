@@ -1,7 +1,7 @@
 'use client';
 
 import { GeneratedArticle, BrandIntake, ContentBrief as ContentBriefType, OutlineItem } from '@/lib/seo/types';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Sparkles, FileText, Copy, Check, List, ChevronRight, Pencil } from 'lucide-react';
 
 interface Props {
@@ -32,6 +32,7 @@ export function ContentGenerator({
   const [view, setView] = useState<'preview' | 'markdown'>('preview');
   const [editingOutline, setEditingOutline] = useState(false);
   const [localOutline, setLocalOutline] = useState<OutlineItem[] | null>(null);
+  const cachedPromptRef = useRef<string | null>(writingPrompt);
   const [localH1, setLocalH1] = useState<string>('');
 
   const displayOutline = localOutline ?? articleOutline;
@@ -41,7 +42,7 @@ export function ContentGenerator({
     setError(null);
     try {
       // Auto-generate writing prompt silently if not yet created
-      let activePrompt = writingPrompt;
+      let activePrompt = writingPrompt || cachedPromptRef.current;
       if (!activePrompt) {
         const promptRes = await fetch('/api/seo/generate', {
           method: 'POST',
@@ -52,6 +53,7 @@ export function ContentGenerator({
           const promptData = await promptRes.json();
           activePrompt = promptData.prompt || null;
           if (activePrompt) onSetWritingPrompt(activePrompt);
+          cachedPromptRef.current = activePrompt;
         }
       }
 
@@ -77,7 +79,7 @@ export function ContentGenerator({
     setGenerating(true);
     setError(null);
     try {
-      let activePrompt = writingPrompt;
+      let activePrompt = writingPrompt || cachedPromptRef.current;
       if (!activePrompt) {
         const promptRes = await fetch('/api/seo/generate', {
           method: 'POST',
@@ -88,6 +90,7 @@ export function ContentGenerator({
           const promptData = await promptRes.json();
           activePrompt = promptData.prompt || null;
           if (activePrompt) onSetWritingPrompt(activePrompt);
+          cachedPromptRef.current = activePrompt;
         }
       }
       const res = await fetch('/api/seo/generate', {

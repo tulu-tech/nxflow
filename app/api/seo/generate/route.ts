@@ -969,7 +969,7 @@ export async function POST(req: NextRequest) {
         case 'links':
           return NextResponse.json({ linkPlan: mockLinkPlan(body) });
         case 'inject-links':
-          return NextResponse.json(mockInjectLinks(body));
+          return NextResponse.json(mockInjectApprovedLinks(body as InjectLinksInput));
         case 'select-keywords-for-content':
           return NextResponse.json(mockKeywordStrategy(body as KeywordSelectionInput));
         case 'generate-content-brief':
@@ -982,6 +982,15 @@ export async function POST(req: NextRequest) {
           return NextResponse.json(mockInternalLinkPlan(body as InternalLinkPlanInput));
         case 'generate-external-link-plan':
           return NextResponse.json(mockExternalLinkPlan(body as ExternalLinkPlanInput));
+        case 'generate-link-plan': {
+          // Combined link plan — merges internal + external into single response
+          const intResult = mockInternalLinkPlan(body as InternalLinkPlanInput);
+          const extResult = mockExternalLinkPlan(body as ExternalLinkPlanInput);
+          return NextResponse.json({
+            internalLinkPlan: intResult.internalLinkPlan ?? intResult.internalLinks ?? [],
+            externalLinkPlan: extResult.externalLinkPlan ?? extResult.externalLinks ?? [],
+          });
+        }
         case 'inject-approved-links':
           return NextResponse.json(mockInjectApprovedLinks(body as InjectLinksInput));
         case 'discover-image-references':
@@ -1157,6 +1166,8 @@ Rules:
       ? buildInternalLinkPlanUserPrompt(body as InternalLinkPlanInput)
       : action === 'generate-external-link-plan'
       ? buildExternalLinkPlanUserPrompt(body as ExternalLinkPlanInput)
+      : action === 'generate-link-plan'
+      ? buildInternalLinkPlanUserPrompt(body as InternalLinkPlanInput)
       : action === 'inject-approved-links'
       ? buildInjectLinksUserPrompt(body as InjectLinksInput)
       : action === 'discover-image-references'
@@ -1290,6 +1301,9 @@ Generate 8-14 outline items. Mix H2 (main sections) and H3 (subsections). The ou
 
     case 'generate-external-link-plan':
       return EXTERNAL_LINK_PLAN_SYSTEM_PROMPT;
+
+    case 'generate-link-plan':
+      return `${INTERNAL_LINK_PLAN_SYSTEM_PROMPT}\n\nADDITIONAL: Also generate an external link plan with authoritative external sources. Return JSON with BOTH: { "internalLinkPlan": [...], "externalLinkPlan": [...] }`;
 
     case 'inject-approved-links':
       return INJECT_LINKS_SYSTEM_PROMPT;

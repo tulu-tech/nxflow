@@ -4,7 +4,7 @@ import type { SEOWorkspace } from '@/lib/seo/workspaceTypes';
 import { useWorkspaceStore } from '@/store/seoWorkspaceStore';
 import { useSEOStore } from '@/store/seoStore';
 import { useRouter } from 'next/navigation';
-import { Trash2, Globe, Tag, FileText } from 'lucide-react';
+import { Trash2, Globe, Tag, FileText, Layers, ArrowUpRight } from 'lucide-react';
 
 interface Props {
   workspace: SEOWorkspace;
@@ -27,83 +27,94 @@ export function WorkspaceCard({ workspace }: Props) {
     return `${Math.floor(diff / 86400000)}d ago`;
   };
 
+  // Generate a color from workspace name for consistent branding
+  const colors = [
+    { bg: 'linear-gradient(135deg, #6366f1, #818cf8)', glow: 'rgba(99,102,241,0.2)' },
+    { bg: 'linear-gradient(135deg, #059669, #10b981)', glow: 'rgba(16,185,129,0.2)' },
+    { bg: 'linear-gradient(135deg, #e11d48, #f43f5e)', glow: 'rgba(225,29,72,0.2)' },
+    { bg: 'linear-gradient(135deg, #0891b2, #06b6d4)', glow: 'rgba(8,145,178,0.2)' },
+    { bg: 'linear-gradient(135deg, #d97706, #f59e0b)', glow: 'rgba(245,158,11,0.2)' },
+    { bg: 'linear-gradient(135deg, #7c3aed, #a78bfa)', glow: 'rgba(124,58,237,0.2)' },
+  ];
+  const colorIdx = workspace.brandName.charCodeAt(0) % colors.length;
+  const color = colors[colorIdx];
+
   return (
     <div
-      className="seo-card seo-card-clickable"
+      className="seo-workspace-card"
       onClick={() => router.push(`/seoagent/workspace/${workspace.id}`)}
     >
-      <div className="seo-project-card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 8,
-            background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0,
-          }}>
-            {workspace.brandName.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <span className="seo-project-card-name">{workspace.brandName}</span>
-            {workspace.clientName !== workspace.brandName && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                {workspace.clientName}
-              </div>
-            )}
-          </div>
-        </div>
-        {workspace.industry && (
-          <span className="seo-badge seo-badge-progress" style={{ fontSize: 10 }}>
-            {workspace.industry}
-          </span>
-        )}
-      </div>
+      {/* Top accent line */}
+      <div className="seo-workspace-card-accent" style={{ background: color.bg }} />
 
-      {workspace.websiteUrl && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-          <Globe size={11} />
-          {workspace.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+      {/* Header */}
+      <div className="seo-workspace-card-header">
+        <div className="seo-workspace-card-avatar" style={{ background: color.bg, boxShadow: `0 4px 14px ${color.glow}` }}>
+          {workspace.brandName.charAt(0).toUpperCase()}
         </div>
-      )}
-
-      {/* Stats row */}
-      <div style={{
-        display: 'flex', gap: 16, marginTop: 12, paddingTop: 10,
-        borderTop: '1px solid var(--border-subtle)', fontSize: 12,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-muted)' }}>
-          <Tag size={11} />
-          <span style={{ fontWeight: 600, color: kwCount > 0 ? '#00c875' : 'var(--text-muted)' }}>
-            {kwCount}
-          </span>
-          keywords
+        <div className="seo-workspace-card-title-group">
+          <span className="seo-workspace-card-name">{workspace.brandName}</span>
+          {workspace.websiteUrl && (
+            <div className="seo-workspace-card-url">
+              <Globe size={10} />
+              {workspace.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-muted)' }}>
-          <FileText size={11} />
-          <span style={{ fontWeight: 600, color: projectCount > 0 ? '#818cf8' : 'var(--text-muted)' }}>
-            {projectCount}
-          </span>
-          projects
-        </div>
-        {enabledPlatforms > 0 && (
-          <div style={{ color: 'var(--text-muted)' }}>
-            {enabledPlatforms} platforms
-          </div>
-        )}
-      </div>
-
-      <div className="seo-project-card-meta">
-        <span>Updated {relTime(workspace.updatedAt)}</span>
-        <span style={{ flex: 1 }} />
         <button
-          className="seo-btn seo-btn-ghost"
-          style={{ padding: 4 }}
+          className="seo-workspace-card-delete"
           onClick={(e) => {
             e.stopPropagation();
             if (confirm(`Delete workspace "${workspace.brandName}"?`)) deleteWorkspace(workspace.id);
           }}
+          title="Delete workspace"
         >
-          <Trash2 size={14} />
+          <Trash2 size={13} />
         </button>
+      </div>
+
+      {/* Industry tags */}
+      {workspace.industry && (
+        <div className="seo-workspace-card-tags">
+          {workspace.industry.split(',').map((tag, i) => (
+            <span key={i} className="seo-workspace-card-tag">{tag.trim()}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="seo-workspace-card-stats">
+        <div className="seo-workspace-card-stat">
+          <Tag size={12} />
+          <span className="seo-workspace-card-stat-value" data-active={kwCount > 0}>
+            {kwCount.toLocaleString()}
+          </span>
+          <span>keywords</span>
+        </div>
+        <div className="seo-workspace-card-stat">
+          <FileText size={12} />
+          <span className="seo-workspace-card-stat-value" data-active={projectCount > 0}>
+            {projectCount}
+          </span>
+          <span>projects</span>
+        </div>
+        {enabledPlatforms > 0 && (
+          <div className="seo-workspace-card-stat">
+            <Layers size={12} />
+            <span className="seo-workspace-card-stat-value" data-active={true}>
+              {enabledPlatforms}
+            </span>
+            <span>platforms</span>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="seo-workspace-card-footer">
+        <span className="seo-workspace-card-updated">Updated {relTime(workspace.updatedAt)}</span>
+        <div className="seo-workspace-card-open">
+          Open <ArrowUpRight size={12} />
+        </div>
       </div>
     </div>
   );

@@ -103,19 +103,24 @@ MCM WORKSPACE RULES (apply only when mcmWorkspaceRulesIfApplicable is true):
 - Do not use cure/treatment/heal/therapeutic language unless the brief explicitly approves it with High claim risk guidance.
 
 DYNAMIC WORD COUNT:
-Use the brief's recommendedWordCount. General guidance:
-- Local/service page: 900–1,500 words
-- Product/model review: 1,500–2,300 words
-- Comparison guide: 1,800–2,800 words
-- Pillar buying guide: 2,500–3,500 words
-Do not force every article to 3,000+ words.
+MINIMUM 2,000 words for ALL article-blog content. No exceptions.
+Use the brief's recommendedWordCount as a target, but never go below 2,000 words.
+General guidance:
+- Local/service page: 2,000–2,500 words
+- Product/model review: 2,000–2,800 words
+- Comparison guide: 2,500–3,200 words
+- Pillar buying guide: 3,000–4,000 words
+If the outline has fewer sections, expand each section with more depth rather than adding filler.
 
 KEYWORD RULES:
 - Use primary keyword naturally in H1, intro, meta title, meta description, and at least one H2 if natural.
-- Do not force exact match density.
-- Use secondary keywords naturally where they fit.
-- Avoid keyword stuffing.
+- MANDATORY: Every single secondary keyword from the approved keyword strategy MUST appear at least once in the article. Do not skip any.
+- Distribute secondary keywords evenly across sections — do not cluster them.
+- Use semantic variations naturally but ensure the exact keyword phrase appears at least once.
+- Do not force exact match density for the primary keyword.
+- Avoid keyword stuffing — each secondary keyword should appear 1–3 times maximum.
 - Optimize for semantic coverage and search intent satisfaction.
+- Before returning, verify ALL secondary keywords are present. If any are missing, find a natural place to include them.
 
 STRUCTURE REQUIREMENTS:
 - H1 (must include primary keyword)
@@ -140,6 +145,16 @@ PARAGRAPH RULES:
 - Use "you" to address reader directly
 - Every paragraph must end with a fact, insight, or bridge
 
+TONE OF VOICE CONSISTENCY:
+- Maintain a consistent tone throughout the entire article.
+- Match the workspace's defined tone of voice exactly.
+- Every sentence must feel like it was written by the same author.
+- Avoid switching between formal and casual tone mid-article.
+- Do not use overly academic language in one paragraph and casual slang in the next.
+- Read the entire article as a whole — every paragraph should flow naturally into the next.
+- If the tone is "expert but approachable", maintain that balance consistently.
+- Avoid robotic or AI-sounding transitions like "Let's dive in", "Without further ado", "It's worth noting that".
+
 ENGAGEMENT MECHANICS:
 - Use callout boxes, tables, or numbered lists every 300–400 words
 - Include at least 2 expert-perspective quotes (constructed from brand voice)
@@ -158,7 +173,7 @@ Instead, mark image opportunities using:
 [IMAGE_OPPORTUNITY: visual concept | placement rationale]
 
 META REQUIREMENTS:
-- metaTitle: 50–60 characters, primary keyword in first 40 characters
+- metaTitle: MAXIMUM 60 characters. NEVER exceed 60 characters. Count carefully. Primary keyword in first 40 characters.
 - metaDescription: 145–160 characters, include primary keyword and value proposition
 - slug: primary keyword only, hyphenated, lowercase, max 5 words
 
@@ -175,6 +190,10 @@ Before returning, verify:
 - CTA is present and aligned with brief
 - All outline sections from the brief are covered
 - Content would make a practitioner nod in recognition
+- ALL secondary keywords from the approved strategy appear in the content
+- metaTitle is 60 characters or fewer (count carefully)
+- Word count is at least 2,000 words
+- Tone of voice is consistent throughout — no jarring shifts
 
 Return strict JSON matching the schema provided.`;
 

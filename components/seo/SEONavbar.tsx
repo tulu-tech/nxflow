@@ -26,7 +26,7 @@ export function SEONavbar() {
           <div className="seo-navbar-logo">N</div>
           <span className="seo-navbar-title">NXFlow</span>
         </Link>
-        <span className="seo-navbar-badge">SEO Agent</span>
+        <span className="seo-navbar-badge">SEO</span>
 
         {/* Breadcrumb */}
         {workspace && (

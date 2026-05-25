@@ -84,7 +84,8 @@ ABSOLUTE EXTERNAL LINK RULES:
    - Reputable research institutions (Gartner, Forrester, Statista, Pew Research, IBISWorld)
    - Neutral industry associations
 9. Use external links only where they genuinely support a factual claim, statistic, research finding, safety guidance, or consumer education point in the content.
-10. Do not over-link. Recommend 2–5 external links for long-form content. 0–2 for short-form content.
+10. For long-form article-blog content, recommend MINIMUM 1 and maximum 5 external links. At least 1 external link is MANDATORY for articles.
+    For short-form content, recommend 0–2 external links.
 11. Every external link must point to a specific page, article, or report — never a root domain.
 
 MCM-SPECIFIC EXTERNAL LINK LOGIC (apply only when mcmWorkspaceRulesIfApplicable is true):

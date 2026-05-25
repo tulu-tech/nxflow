@@ -19,13 +19,10 @@ interface Props {
 
 const STEP_CONFIG: Record<number, { action: string; title: string; desc: string }> = {
   5: { action: 'select-keywords-for-content', title: 'AI Keyword Selection', desc: 'Analyzing workspace keywords, topic, persona, and prior usage...' },
-  6: { action: 'generate-content-brief', title: 'Content Brief', desc: 'Creating a platform-specific content brief...' },
+  6: { action: 'generate-content-brief', title: 'Content Brief & Outline', desc: 'Creating a platform-specific content brief with article outline...' },
   7: { action: 'auto', title: 'Content Generation', desc: 'Writing the full content piece...' },
-  8: { action: 'generate-internal-link-plan', title: 'Internal Link Plan', desc: 'Selecting internal links from your sitemap...' },
-  9: { action: 'generate-external-link-plan', title: 'External Link Plan', desc: 'Finding authoritative external sources...' },
-  10: { action: 'inject-links', title: 'Link Injection', desc: 'Inserting approved links naturally into the content...' },
-  11: { action: 'generate-image-plan', title: 'Image Plan', desc: 'Creating a 5-image visual strategy...' },
-  12: { action: 'generate-content-images', title: 'Image Generation', desc: 'Generating premium on-brand images...' },
+  8: { action: 'generate-link-plan', title: 'Link Plan', desc: 'Generating internal and external link recommendations...' },
+  9: { action: 'inject-links', title: 'Link Injection', desc: 'Inserting approved links naturally into the content...' },
 };
 
 function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace, persona: WorkspacePersona | undefined, topic: WorkspaceContentTopic | undefined, platformFormat: string | null, contentGoal: string) {
@@ -130,31 +127,30 @@ function buildPayload(step: number, project: SEOProject, workspace: SEOWorkspace
         approvedContentBrief,
       };
     }
-    case 8: return {
-      ...base,
-      action: 'generate-internal-link-plan',
-      generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '',
-      approvedKeywordStrategy: keywordStrategy,
-      sitemapPages: pages.map(p => ({ url: p.url, pageType: p.pageType, title: p.title, detectedBrand: p.detectedBrand ?? '', detectedProduct: p.detectedProduct ?? '' })),
-    };
-    case 9: return { ...base, action: 'generate-external-link-plan', generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '', approvedKeywordStrategy: keywordStrategy };
-    case 10: return { ...base, action: 'inject-links', generatedContent: project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '', approvedInternalLinkPlan: project.internalLinkPlan ?? [], approvedExternalLinkPlan: project.externalLinkPlan ?? [] };
-    case 11: return { ...base, action: 'generate-image-plan', linkedContent: project.linkedContent ?? project.rawContent ?? '', approvedKeywordStrategy: keywordStrategy, imageReferencePages: pages.filter(p => ['product', 'collection', 'brand', 'local'].includes(p.pageType)).slice(0, 10).map(p => ({ url: p.url, pageType: p.pageType, title: p.title })) };
-    case 12: {
-      // project.imagePlan is the full response: { imagePlan: [...], warnings: [...] }
-      const rawPlan = project.imagePlan;
-      const planArray = Array.isArray(rawPlan) ? rawPlan : (rawPlan as unknown as Record<string, unknown>)?.imagePlan ?? [];
+    case 8: {
+      const raw = project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '';
+      const contentStr = typeof raw === 'string' ? raw : (typeof raw === 'object' && raw !== null ? ((raw as Record<string, unknown>).content as string ?? JSON.stringify(raw)) : String(raw));
       return {
         ...base,
-        action: 'generate-content-images',
-        approvedImagePlan: planArray,
+        action: 'generate-link-plan',
+        generatedContent: contentStr,
         approvedKeywordStrategy: keywordStrategy,
-        // Pass sitemap product images as reference
-        sitemapPages: pages.filter(p => ['product', 'collection', 'brand'].includes(p.pageType)).slice(0, 20).map(p => ({
-          url: p.url, pageType: p.pageType, title: p.title,
-          images: (p as unknown as Record<string, unknown>).images ?? [],
-        })),
+        sitemapPages: pages.map(p => {
+          let path = '';
+          try { path = new URL(p.url).pathname; } catch { path = p.url; }
+          return { url: p.url, path, pageType: p.pageType, title: p.title, detectedBrand: p.detectedBrand ?? '', detectedProduct: p.detectedProduct ?? '' };
+        }),
       };
+    }
+    case 9: {
+      const raw9 = project.rawContent ?? (project.generatedArticle as unknown as Record<string, unknown>)?.content ?? '';
+      const contentStr9 = typeof raw9 === 'string' ? raw9 : (typeof raw9 === 'object' && raw9 !== null ? ((raw9 as Record<string, unknown>).content as string ?? JSON.stringify(raw9)) : String(raw9));
+      // Extract link arrays from stored plan objects (step 8 stores full response)
+      const storedInt = project.internalLinkPlan as unknown as Record<string, unknown> | unknown[] | null;
+      const storedExt = project.externalLinkPlan as unknown as Record<string, unknown> | unknown[] | null;
+      const intArray = Array.isArray(storedInt) ? storedInt : (storedInt && typeof storedInt === 'object' ? ((storedInt as Record<string, unknown>).internalLinkPlan ?? (storedInt as Record<string, unknown>).internalLinks ?? []) : []);
+      const extArray = Array.isArray(storedExt) ? storedExt : (storedExt && typeof storedExt === 'object' ? ((storedExt as Record<string, unknown>).externalLinkPlan ?? (storedExt as Record<string, unknown>).externalLinks ?? []) : []);
+      return { ...base, action: 'inject-links', generatedContent: contentStr9, approvedInternalLinkPlan: intArray, approvedExternalLinkPlan: extArray };
     }
     default: return base;
   }
@@ -256,17 +252,17 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
     return <pre style={{ maxHeight: 300, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
   }
 
-  // Steps 8-9: Link Plans
-  if (step === 8 || step === 9) {
-    const links = step === 8
-      ? (data.internalLinkPlan ?? data.internalLinks ?? data.links ?? (Array.isArray(data) ? data : null))
-      : (data.externalLinkPlan ?? data.externalLinks ?? data.links ?? (Array.isArray(data) ? data : null));
-    const label2 = step === 8 ? 'Internal' : 'External';
-    if (Array.isArray(links)) {
+  // Step 8: Combined Link Plan
+  if (step === 8) {
+    const intLinks = data.internalLinkPlan ?? data.internalLinks ?? [];
+    const extLinks = data.externalLinkPlan ?? data.externalLinks ?? [];
+    const allLinks = [...(Array.isArray(intLinks) ? intLinks : []), ...(Array.isArray(extLinks) ? extLinks : [])];
+    if (allLinks.length > 0 || Array.isArray(data.links) || Array.isArray(data)) {
+      const links = allLinks.length > 0 ? allLinks : (data.links ?? (Array.isArray(data) ? data : []));
       return (
         <div style={{ fontSize: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 6, color: '#00c875' }}>✅ {links.length} {label2} Links</div>
-          {data.notes && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8, fontStyle: 'italic' }}>{str(data.notes)}</div>}
+          {Array.isArray(intLinks) && intLinks.length > 0 && <div style={{ fontWeight: 600, marginBottom: 6, color: '#34d399' }}>✅ {intLinks.length} Internal Links</div>}
+          {Array.isArray(extLinks) && extLinks.length > 0 && <div style={{ fontWeight: 600, marginBottom: 6, color: '#60a5fa' }}>✅ {extLinks.length} External Links</div>}
           {links.slice(0, 10).map((link: Record<string, string>, i: number) => (
             <div key={i} style={{ marginBottom: 8, paddingLeft: 8, borderLeft: `2px solid ${link.priority === 'High' ? '#00c875' : link.priority === 'Medium' ? '#fdab3d' : 'var(--border-subtle)'}` }}>
               <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>{link.anchorText || link.anchor || link.pageTitle || `Link ${i+1}`}</div>
@@ -274,7 +270,6 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
               {link.pageType && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: '#1e293b', color: '#94a3b8', marginRight: 4 }}>{link.pageType}</span>}
               {link.priority && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: link.priority === 'High' ? '#065f46' : link.priority === 'Medium' ? '#78350f' : '#1e293b', color: link.priority === 'High' ? '#6ee7b7' : link.priority === 'Medium' ? '#fcd34d' : '#94a3b8' }}>{link.priority}</span>}
               {(link.reason || link.placementReason) && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{link.reason || link.placementReason}</div>}
-              {link.placementSection && <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 1 }}>📍 {link.placementSection}</div>}
             </div>
           ))}
           {links.length > 10 && <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>+{links.length - 10} more...</div>}
@@ -284,59 +279,52 @@ function ResultDisplay({ step, data }: { step: number; data: any }) {
     return <pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
   }
 
-  // Step 10: Link Injection
-  if (step === 10) {
+  // Step 9: Link Injection — show full publishable content
+  if (step === 9) {
     const content = data.linkedContent ?? data.content ?? (typeof data === 'string' ? data : null);
-    if (typeof content === 'string') {
-      return (
-        <div style={{ maxHeight: 400, overflow: 'auto', fontSize: 12, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', padding: 12, background: 'rgba(0,0,0,0.08)', borderRadius: 6 }}>
-          {content}
+    const inserted = data.linksInserted;
+    const intCount = inserted?.internal?.length ?? 0;
+    const extCount = inserted?.external?.length ?? 0;
+    const warnings = data.warnings as string[] | undefined;
+    return (
+      <div style={{ fontSize: 12 }}>
+        {/* Links summary */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+          {intCount > 0 && <div style={{ padding: '6px 12px', borderRadius: 6, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', fontSize: 11 }}><span style={{ fontWeight: 700, color: '#34d399' }}>🔗 {intCount}</span> <span style={{ color: 'var(--text-muted)' }}>internal links inserted</span></div>}
+          {extCount > 0 && <div style={{ padding: '6px 12px', borderRadius: 6, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)', fontSize: 11 }}><span style={{ fontWeight: 700, color: '#60a5fa' }}>🌐 {extCount}</span> <span style={{ color: 'var(--text-muted)' }}>external links inserted</span></div>}
         </div>
-      );
-    }
-    return <pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
-  }
-
-  // Step 11: Image Plan
-  if (step === 11) {
-    const images = data.imagePlan ?? data.images ?? data.imagePrompts ?? (Array.isArray(data) ? data : null);
-    if (Array.isArray(images)) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontWeight: 600, color: '#00c875' }}>🖼️ {images.length} Image Concepts</div>
-          {images.map((img: Record<string, unknown>, i: number) => (
-            <div key={i} style={{ padding: 10, borderRadius: 6, background: 'rgba(129,140,248,0.06)', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>#{(img.imageNumber as number) ?? i+1} — {str(img.imagePurpose)} ({str(img.aspectRatio)})</div>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>{str(img.placementRecommendation)}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>Prompt: {str(img.imagePrompt).slice(0, 200)}...</div>
-              {!!img.notes && <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 2 }}>📝 {str(img.notes)}</div>}
-            </div>
-          ))}
-          {Array.isArray(data.warnings) && data.warnings.length > 0 && (
-            <div style={{ fontSize: 10, color: '#fdab3d', marginTop: 4 }}>⚠️ {(data.warnings as string[]).join(' · ')}</div>
-          )}
-        </div>
-      );
-    }
-    return <pre style={{ maxHeight: 250, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>;
-  }
-
-  // Step 12: Generated Images
-  if (step === 12) {
-    const images = data.images ?? data.generatedImages ?? (Array.isArray(data) ? data : null);
-    if (Array.isArray(images)) {
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          {images.map((img: Record<string, string>, i: number) => (
-            <div key={i} style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
-              {img.imageUrl && <img src={img.imageUrl} alt={img.altText ?? `Image ${i + 1}`} style={{ width: '100%', height: 100, objectFit: 'cover' }} />}
-              {!img.imageUrl && <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(129,140,248,0.06)', color: 'var(--text-muted)', fontSize: 10 }}>No URL</div>}
-              <div style={{ padding: 4, fontSize: 9, color: 'var(--text-muted)' }}>{img.altText ?? `Image ${i + 1}`}</div>
-            </div>
-          ))}
-        </div>
-      );
-    }
+        {/* Warnings */}
+        {Array.isArray(warnings) && warnings.length > 0 && (
+          <div style={{ fontSize: 10, color: '#fdab3d', marginBottom: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(253,171,61,0.06)', border: '1px solid rgba(253,171,61,0.15)' }}>
+            ⚠️ {warnings.join(' · ')}
+          </div>
+        )}
+        {/* Full content preview */}
+        {typeof content === 'string' && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>📄 Final Content (ready to publish):</div>
+            <div
+              style={{ maxHeight: 500, overflow: 'auto', lineHeight: 1.8, padding: '16px 20px', background: 'rgba(0,0,0,0.12)', borderRadius: 8, fontSize: 13, color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}
+              dangerouslySetInnerHTML={{
+                __html: content
+                  .replace(/^### (.+)$/gm, '<h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:16px 0 6px;">$1</h3>')
+                  .replace(/^## (.+)$/gm, '<h2 style="font-size:19px;font-weight:700;color:var(--text-primary);margin:22px 0 8px;border-bottom:1px solid var(--border-subtle);padding-bottom:4px;">$1</h2>')
+                  .replace(/^# (.+)$/gm, '<h1 style="font-size:24px;font-weight:800;color:#fff;margin:24px 0 10px;">$1</h1>')
+                  .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);font-weight:700;">$1</strong>')
+                  .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#60a5fa;text-decoration:underline;" target="_blank">$1</a>')
+                  .replace(/^- (.+)$/gm, '<li style="margin:3px 0;">$1</li>')
+                  .replace(/(\n|^)(<li.*<\/li>\n?)+/g, (m) => `<ul style="margin:8px 0 8px 16px;padding-left:16px;">${m}</ul>`)
+                  .replace(/\n\n/g, '</p><p style="margin:10px 0;">')
+                  .replace(/\n/g, '<br/>')
+              }}
+            />
+          </div>
+        )}
+        {typeof content !== 'string' && (
+          <pre style={{ maxHeight: 400, overflow: 'auto', fontSize: 10, whiteSpace: 'pre-wrap', background: 'rgba(0,0,0,0.08)', padding: 8, borderRadius: 6 }}>{str(data)}</pre>
+        )}
+      </div>
+    );
   }
 
   // Fallback: formatted JSON
