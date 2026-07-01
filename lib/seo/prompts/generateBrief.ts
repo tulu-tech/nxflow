@@ -117,6 +117,8 @@ If format is "article-blog" (Article/Blogs In-Depth Content):
 - Include internal link targets needed conceptually, but do not choose actual links yet
 - Include external citation needs conceptually, but do not choose actual links yet
 - Include image opportunities conceptually, but do not generate images yet
+- metaTitle MUST be 60 characters or fewer. NEVER exceed this limit.
+- Recommended word count must be at least 2,000 words for article-blog format.
 
 If format is "text-post" (Text Posts):
 - Create short-form social post brief

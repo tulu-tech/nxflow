@@ -199,8 +199,8 @@ export function KeywordManager({ workspaceId, keywords, versions, currentVersion
               </tr>
             </thead>
             <tbody>
-              {filtered.slice(0, 200).map(k => (
-                <tr key={k.keywordId} style={{ borderBottom: '1px solid var(--border-subtle)', background: k.status === 'archived' ? 'rgba(128,128,128,0.03)' : 'transparent' }}>
+              {filtered.slice(0, 200).map((k, idx) => (
+                <tr key={k.keywordId || `kw-${idx}`} style={{ borderBottom: '1px solid var(--border-subtle)', background: k.status === 'archived' ? 'rgba(128,128,128,0.03)' : 'transparent' }}>
                   <td style={{ padding: '5px 6px', fontWeight: 500, color: k.status === 'archived' ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                     {k.keyword}
                     {k.status === 'archived' && <span style={{ fontSize: 8, marginLeft: 4, color: '#888' }}>archived</span>}

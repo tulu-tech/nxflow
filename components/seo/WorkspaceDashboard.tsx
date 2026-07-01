@@ -9,6 +9,7 @@ import { useState } from 'react';
 import {
   Globe, Tag, FileText, Plus, Settings, Map,
   Pencil, Check, X, Trash2, ExternalLink, Users, BookOpen,
+  ChevronDown, ChevronRight, ArrowLeft, Sparkles,
 } from 'lucide-react';
 import { ProjectCard } from './ProjectCard';
 import { ContentTracker } from './ContentTracker';
@@ -43,11 +44,6 @@ export function WorkspaceDashboard({ workspace }: Props) {
   const [sitemapInput, setSitemapInput] = useState(workspace.sitemapUrl);
   const [showSitemapPages, setShowSitemapPages] = useState(false);
 
-
-
-
-
-
   // Projects in this workspace
   const wsProjects = workspace.projectIds
     .map((pid) => projects[pid])
@@ -59,8 +55,6 @@ export function WorkspaceDashboard({ workspace }: Props) {
     updateWorkspace(workspace.id, brandDraft);
     setEditingBrand(false);
   };
-
-
 
   // ── Create content project — go straight to wizard
   const handleStartCreate = () => {
@@ -96,74 +90,70 @@ export function WorkspaceDashboard({ workspace }: Props) {
     handleSitemapFetch();
   };
 
+  // Color helpers
+  const colors = [
+    { bg: 'linear-gradient(135deg, #6366f1, #818cf8)', glow: 'rgba(99,102,241,0.25)' },
+    { bg: 'linear-gradient(135deg, #059669, #10b981)', glow: 'rgba(16,185,129,0.25)' },
+    { bg: 'linear-gradient(135deg, #e11d48, #f43f5e)', glow: 'rgba(225,29,72,0.25)' },
+    { bg: 'linear-gradient(135deg, #0891b2, #06b6d4)', glow: 'rgba(8,145,178,0.25)' },
+    { bg: 'linear-gradient(135deg, #d97706, #f59e0b)', glow: 'rgba(245,158,11,0.25)' },
+    { bg: 'linear-gradient(135deg, #7c3aed, #a78bfa)', glow: 'rgba(124,58,237,0.25)' },
+  ];
+  const colorIdx = workspace.brandName.charCodeAt(0) % colors.length;
+  const color = colors[colorIdx];
+
   return (
-    <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button className="seo-btn seo-btn-ghost" onClick={() => router.push('/seoagent')} style={{ padding: '6px 8px' }}>
-          ←
-        </button>
-        <div style={{
-          width: 44, height: 44, borderRadius: 10,
-          background: 'linear-gradient(135deg, var(--accent), #a78bfa)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20, fontWeight: 700, color: '#fff', flexShrink: 0,
-        }}>
-          {workspace.brandName.charAt(0).toUpperCase()}
-        </div>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-            {workspace.brandName}
-          </h2>
-          {workspace.websiteUrl && (
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Globe size={11} />
-              {workspace.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-            </div>
-          )}
+    <div className="ws-dashboard">
+      {/* ── Page Header ─────────────────────────────────────────────── */}
+      <div className="ws-header">
+        <div className="ws-header-left">
+          <button className="ws-back-btn" onClick={() => router.push('/seoagent')}>
+            <ArrowLeft size={16} />
+          </button>
+          <div className="ws-header-avatar" style={{ background: color.bg, boxShadow: `0 6px 18px ${color.glow}` }}>
+            {workspace.brandName.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h1 className="ws-header-title">{workspace.brandName}</h1>
+            {workspace.websiteUrl && (
+              <div className="ws-header-url">
+                <Globe size={11} />
+                {workspace.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+              </div>
+            )}
+          </div>
         </div>
         <button className="seo-btn seo-btn-primary" onClick={handleStartCreate}>
-          <Plus size={14} /> Create Content
+          <Sparkles size={14} /> Create Content
         </button>
       </div>
 
-      {/* Overview stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+      {/* ── Stats Grid ──────────────────────────────────────────────── */}
+      <div className="ws-stats-grid">
         {[
-          { icon: <Tag size={16} />, label: 'Keywords', value: workspace.keywordList.length, color: workspace.keywordList.length > 0 ? '#00c875' : 'var(--text-muted)', sub: workspace.keywordList.length > 0 ? `${new Set(workspace.keywordList.map(k => k.tag)).size} tags · ${workspace.keywordList.filter(k => k.usage.usedAsPrimaryCount > 0).length} used` : 'Not uploaded' },
+          { icon: <Tag size={16} />, label: 'Keywords', value: workspace.keywordList.length, color: workspace.keywordList.length > 0 ? '#34d399' : 'var(--text-muted)', sub: workspace.keywordList.length > 0 ? `${new Set(workspace.keywordList.map(k => k.tag)).size} tags · ${workspace.keywordList.filter(k => k.usage.usedAsPrimaryCount > 0).length} used` : 'Not uploaded' },
           { icon: <FileText size={16} />, label: 'Content', value: (workspace.generatedContent ?? []).length, color: (workspace.generatedContent ?? []).length > 0 ? '#818cf8' : 'var(--text-muted)', sub: `${(workspace.generatedContent ?? []).filter(c => c.contentStatus === 'published').length} published · ${(workspace.generatedContent ?? []).filter(c => c.contentStatus === 'draft').length} draft` },
-          { icon: <Map size={16} />, label: 'Sitemap', value: workspace.sitemapUrl ? '✓' : '—', color: workspace.sitemapUrl ? '#00c875' : 'var(--text-muted)', sub: workspace.discoveredPages?.length > 0 ? workspace.discoveredPages.length + ' pages' : workspace.sitemapUrl ? 'Not fetched' : 'Not set' },
+          { icon: <Map size={16} />, label: 'Sitemap', value: workspace.sitemapUrl ? '✓' : '—', color: workspace.sitemapUrl ? '#34d399' : 'var(--text-muted)', sub: workspace.discoveredPages?.length > 0 ? workspace.discoveredPages.length + ' pages' : workspace.sitemapUrl ? 'Not fetched' : 'Not set' },
+          { icon: <Users size={16} />, label: 'Personas', value: workspace.personas.length, color: workspace.personas.length > 0 ? '#c084fc' : 'var(--text-muted)', sub: workspace.personas.length > 0 ? `${workspace.personas.filter(p => p.intentStages.includes('decision')).length} decision-stage` : 'Not configured' },
+          { icon: <BookOpen size={16} />, label: 'Topics', value: workspace.contentTopics.length, color: workspace.contentTopics.length > 0 ? '#fbbf24' : 'var(--text-muted)', sub: workspace.contentTopics.length > 0 ? `${new Set(workspace.contentTopics.map(t => t.topicCluster ?? t.category)).size} clusters` : 'Not configured' },
+          { icon: <Settings size={16} />, label: 'Platforms', value: workspace.platforms.filter(p => p.enabled).length, color: workspace.platforms.some(p => p.enabled) ? '#34d399' : 'var(--text-muted)', sub: 'enabled' },
         ].map((stat, i) => (
-          <div key={i} className="seo-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
-            <div style={{ color: 'var(--text-muted)', marginBottom: 6 }}>{stat.icon}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginTop: 4 }}>{stat.label}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{stat.sub}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-        {[
-          { icon: <Users size={16} />, label: 'Personas', value: workspace.personas.length, color: workspace.personas.length > 0 ? '#e78bfa' : 'var(--text-muted)', sub: workspace.personas.length > 0 ? `${workspace.personas.filter(p => p.intentStages.includes('decision')).length} decision-stage` : 'Not configured' },
-          { icon: <BookOpen size={16} />, label: 'Topics', value: workspace.contentTopics.length, color: workspace.contentTopics.length > 0 ? '#fdab3d' : 'var(--text-muted)', sub: workspace.contentTopics.length > 0 ? `${new Set(workspace.contentTopics.map(t => t.topicCluster ?? t.category)).size} clusters` : 'Not configured' },
-          { icon: <Settings size={16} />, label: 'Platforms', value: workspace.platforms.filter(p => p.enabled).length, color: workspace.platforms.some(p => p.enabled) ? '#00c875' : 'var(--text-muted)', sub: 'enabled' },
-        ].map((stat, i) => (
-          <div key={i} className="seo-card" style={{ textAlign: 'center', padding: '16px 12px' }}>
-            <div style={{ color: 'var(--text-muted)', marginBottom: 6 }}>{stat.icon}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginTop: 4 }}>{stat.label}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{stat.sub}</div>
+          <div key={i} className="ws-stat-card">
+            <div className="ws-stat-icon" style={{ color: stat.color }}>{stat.icon}</div>
+            <div className="ws-stat-value" style={{ color: stat.color }}>{stat.value}</div>
+            <div className="ws-stat-label">{stat.label}</div>
+            <div className="ws-stat-sub">{stat.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Two-column layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      {/* ── Two-Column Layout ───────────────────────────────────────── */}
+      <div className="ws-two-col">
 
         {/* Brand Info Card */}
-        <div className="seo-card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>🏢 Brand Info</h3>
+        <div className="ws-panel">
+          <div className="ws-panel-header">
+            <h3 className="ws-panel-title"><span className="ws-panel-icon">🏢</span> Brand Info</h3>
             <button className="seo-btn seo-btn-ghost seo-btn-sm" onClick={() => setEditingBrand(!editingBrand)}>
               {editingBrand ? <X size={12} /> : <Pencil size={12} />}
               {editingBrand ? 'Cancel' : 'Edit'}
@@ -171,7 +161,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
           </div>
 
           {editingBrand ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+            <div className="ws-brand-edit-form">
               {([
                 ['brandName', 'Brand Name'],
                 ['websiteUrl', 'Website'],
@@ -183,17 +173,17 @@ export function WorkspaceDashboard({ workspace }: Props) {
                 ['primaryCTA', 'Primary CTA'],
                 ['brandDifferentiators', 'Differentiators'],
               ] as [keyof typeof brandDraft, string][]).map(([field, label]) => (
-                <div key={field}>
+                <div key={field} className="ws-brand-edit-field">
                   <label className="seo-label" style={{ fontSize: 11 }}>{label}</label>
                   <input
                     className="seo-input"
                     value={String(brandDraft[field] ?? '')}
                     onChange={(e) => setBrandDraft({ ...brandDraft, [field]: e.target.value })}
-                    style={{ fontSize: 12, padding: '5px 8px' }}
+                    style={{ fontSize: 12, padding: '6px 10px' }}
                   />
                 </div>
               ))}
-              <div>
+              <div className="ws-brand-edit-field">
                 <label className="seo-label" style={{ fontSize: 11 }}>Business Type</label>
                 <div className="seo-radio-group">
                   {(['B2B', 'B2C', 'B2G', 'Both'] as BusinessType[]).map((t) => (
@@ -202,7 +192,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
                       className={`seo-radio-option ${brandDraft.businessType === t ? 'selected' : ''}`}
                       onClick={() => setBrandDraft({ ...brandDraft, businessType: t })}
                       type="button"
-                      style={{ fontSize: 11, padding: '3px 8px' }}
+                      style={{ fontSize: 11, padding: '4px 10px' }}
                     >
                       {t}
                     </button>
@@ -214,7 +204,7 @@ export function WorkspaceDashboard({ workspace }: Props) {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+            <div className="ws-brand-info-list">
               {([
                 ['Industry', workspace.industry],
                 ['Business Type', workspace.businessType],
@@ -224,15 +214,15 @@ export function WorkspaceDashboard({ workspace }: Props) {
                 ['CTA', workspace.primaryCTA],
                 ['Differentiators', workspace.brandDifferentiators],
               ] as [string, string][]).filter(([, v]) => v).map(([label, value]) => (
-                <div key={label}>
-                  <strong style={{ color: 'var(--text-muted)', fontSize: 11 }}>{label}:</strong>{' '}
-                  <span style={{ color: 'var(--text-secondary)' }}>{value}</span>
+                <div key={label} className="ws-brand-info-row">
+                  <span className="ws-brand-info-label">{label}</span>
+                  <span className="ws-brand-info-value">{value}</span>
                 </div>
               ))}
               {workspace.targetCountries.length > 0 && (
-                <div>
-                  <strong style={{ color: 'var(--text-muted)', fontSize: 11 }}>Countries:</strong>{' '}
-                  <span style={{ color: 'var(--text-secondary)' }}>{workspace.targetCountries.join(', ')}</span>
+                <div className="ws-brand-info-row">
+                  <span className="ws-brand-info-label">Countries</span>
+                  <span className="ws-brand-info-value">{workspace.targetCountries.join(', ')}</span>
                 </div>
               )}
             </div>
@@ -249,17 +239,19 @@ export function WorkspaceDashboard({ workspace }: Props) {
         />
       </div>
 
-      {/* Second row: Sitemap + Platforms */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      {/* ── Second Row: Sitemap + Platforms ──────────────────────────── */}
+      <div className="ws-two-col">
         {/* Sitemap Card */}
-        <div className="seo-card">
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
-            🗺️ Sitemap
-            {workspace.sitemapStatus === 'fetching' && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--accent)', marginLeft: 8 }}>Fetching...</span>}
-            {workspace.sitemapStatus === 'success' && <span style={{ fontSize: 11, fontWeight: 400, color: '#00c875', marginLeft: 8 }}>✓ Active</span>}
-            {workspace.sitemapStatus === 'error' && <span style={{ fontSize: 11, fontWeight: 400, color: '#f87171', marginLeft: 8 }}>✗ Error</span>}
-          </h3>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <div className="ws-panel">
+          <div className="ws-panel-header">
+            <h3 className="ws-panel-title">
+              <span className="ws-panel-icon">🗺️</span> Sitemap
+              {workspace.sitemapStatus === 'fetching' && <span className="ws-status-badge ws-status-fetching">Fetching...</span>}
+              {workspace.sitemapStatus === 'success' && <span className="ws-status-badge ws-status-success">✓ Active</span>}
+              {workspace.sitemapStatus === 'error' && <span className="ws-status-badge ws-status-error">✗ Error</span>}
+            </h3>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input
               className="seo-input"
               value={sitemapInput}
@@ -276,16 +268,12 @@ export function WorkspaceDashboard({ workspace }: Props) {
             </button>
           </div>
 
-          {/* Error */}
           {workspace.sitemapError && (
-            <div style={{ fontSize: 11, color: '#f87171', padding: '6px 8px', borderRadius: 4, background: 'rgba(239,68,68,0.06)', marginBottom: 8 }}>
-              {workspace.sitemapError}
-            </div>
+            <div className="ws-error-msg">{workspace.sitemapError}</div>
           )}
 
-          {/* Stats row */}
           {workspace.sitemapLastCheckedAt && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+            <div className="ws-sitemap-meta">
               <span>Last checked: {new Date(workspace.sitemapLastCheckedAt).toLocaleDateString()}</span>
               <span>·</span>
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{workspace.discoveredPages?.length ?? 0} pages</span>
@@ -293,43 +281,32 @@ export function WorkspaceDashboard({ workspace }: Props) {
                 const types: Record<string, number> = {};
                 workspace.discoveredPages.forEach((p) => { types[p.pageType] = (types[p.pageType] || 0) + 1; });
                 return Object.entries(types).map(([t, c]) => (
-                  <span key={t} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(129,140,248,0.08)' }}>{t}: {c}</span>
+                  <span key={t} className="ws-sitemap-type-badge">{t}: {c}</span>
                 ));
               })()}
             </div>
           )}
 
-          {/* Toggle pages list */}
           {workspace.discoveredPages?.length > 0 && (
             <div>
               <button
                 className="seo-btn seo-btn-ghost seo-btn-sm"
                 onClick={() => setShowSitemapPages(!showSitemapPages)}
-                style={{ fontSize: 11, marginBottom: showSitemapPages ? 8 : 0 }}
+                style={{ fontSize: 11, marginBottom: showSitemapPages ? 8 : 0, display: 'flex', alignItems: 'center', gap: 4 }}
               >
-                {showSitemapPages ? '▼ Hide' : '▶ View'} Discovered Pages ({workspace.discoveredPages.length})
+                {showSitemapPages ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {showSitemapPages ? 'Hide' : 'View'} Discovered Pages ({workspace.discoveredPages.length})
               </button>
               {showSitemapPages && (
-                <div style={{ maxHeight: 300, overflow: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 4 }}>
+                <div className="ws-sitemap-pages-list">
                   {workspace.discoveredPages.map((p) => (
-                    <div key={p.pageId} style={{
-                      display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px',
-                      fontSize: 11, borderBottom: '1px solid var(--border-subtle)',
-                    }}>
-                      <span style={{
-                        fontSize: 9, padding: '1px 5px', borderRadius: 3, flexShrink: 0, minWidth: 52, textAlign: 'center',
-                        background: p.pageType === 'product' ? 'rgba(0,200,117,0.1)' : p.pageType === 'blog' ? 'rgba(129,140,248,0.1)' : p.pageType === 'collection' ? 'rgba(253,171,61,0.1)' : 'rgba(129,140,248,0.04)',
-                        color: p.pageType === 'product' ? '#00c875' : p.pageType === 'blog' ? 'var(--accent)' : p.pageType === 'collection' ? '#fdab3d' : 'var(--text-muted)',
-                      }}>
+                    <div key={p.pageId} className="ws-sitemap-page-row">
+                      <span className={`ws-sitemap-page-type ws-sitemap-page-type--${p.pageType}`}>
                         {p.pageType}
                       </span>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
-                        {p.path}
-                      </span>
+                      <span className="ws-sitemap-page-path">{p.path}</span>
                       {p.detectedBrand && (
-                        <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, background: 'rgba(253,171,61,0.08)', color: '#fdab3d', flexShrink: 0 }}>
-                          {p.detectedBrand}
-                        </span>
+                        <span className="ws-sitemap-page-brand">{p.detectedBrand}</span>
                       )}
                     </div>
                   ))}
@@ -340,23 +317,16 @@ export function WorkspaceDashboard({ workspace }: Props) {
         </div>
 
         {/* Platforms Card */}
-        <div className="seo-card">
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
-            📡 Platforms
-          </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div className="ws-panel">
+          <div className="ws-panel-header">
+            <h3 className="ws-panel-title"><span className="ws-panel-icon">📡</span> Platforms</h3>
+          </div>
+          <div className="ws-platforms-grid">
             {workspace.platforms.map((p) => (
               <button
                 key={p.platform}
                 onClick={() => togglePlatform(workspace.id, p.platform, !p.enabled)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
-                  border: p.enabled ? 'none' : '1px solid var(--border)',
-                  background: p.enabled ? '#6366f1' : 'transparent',
-                  color: p.enabled ? '#ffffff' : 'var(--text-muted)',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}
+                className={`ws-platform-btn ${p.enabled ? 'ws-platform-btn--active' : ''}`}
               >
                 {PLATFORM_ICONS[p.platform]} {PLATFORM_LABELS[p.platform]}
               </button>
@@ -365,47 +335,33 @@ export function WorkspaceDashboard({ workspace }: Props) {
         </div>
       </div>
 
-      {/* Persona Library + Content Topics */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      {/* ── Persona & Content Topics ────────────────────────────────── */}
+      <div className="ws-two-col">
         {/* Persona Library */}
-        <div className="seo-card">
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
-            👥 Persona Library
-            {workspace.personas.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
-                {workspace.personas.length} personas
-              </span>
-            )}
-          </h3>
+        <div className="ws-panel">
+          <div className="ws-panel-header">
+            <h3 className="ws-panel-title">
+              <span className="ws-panel-icon">👥</span> Persona Library
+              {workspace.personas.length > 0 && (
+                <span className="ws-count-badge">{workspace.personas.length}</span>
+              )}
+            </h3>
+          </div>
           {workspace.personas.length > 0 ? (
             <div style={{ maxHeight: 420, overflow: 'auto' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="ws-items-list">
                 {workspace.personas.map((p) => (
-                  <div key={p.id} style={{
-                    padding: '8px 10px', borderRadius: 6,
-                    border: '1px solid var(--border-subtle)',
-                    fontSize: 12,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
-                      <span style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 3,
-                        background: p.claimRiskLevel === 'high' ? 'rgba(239,68,68,0.12)' : p.claimRiskLevel === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(0,200,117,0.12)',
-                        color: p.claimRiskLevel === 'high' ? '#f87171' : p.claimRiskLevel === 'medium' ? '#fdab3d' : '#00c875',
-                      }}>
+                  <div key={p.id} className="ws-item-card">
+                    <div className="ws-item-card-header">
+                      <span className="ws-item-card-name">{p.name}</span>
+                      <span className={`ws-risk-badge ws-risk-badge--${p.claimRiskLevel}`}>
                         {p.claimRiskLevel === 'high' ? '⚠️ high risk' : p.claimRiskLevel === 'medium' ? '⚡ med risk' : '✓ low risk'}
                       </span>
                     </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.4, marginBottom: 4 }}>
-                      {p.shortDescription}
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <div className="ws-item-card-desc">{p.shortDescription}</div>
+                    <div className="ws-item-card-tags">
                       {p.intentStages.map((s) => (
-                        <span key={s} style={{
-                          fontSize: 10, padding: '2px 7px', borderRadius: 3,
-                          background: '#3730a3', color: '#c7d2fe',
-                          textTransform: 'capitalize', fontWeight: 500,
-                        }}>{s}</span>
+                        <span key={s} className="ws-intent-tag">{s}</span>
                       ))}
                     </div>
                   </div>
@@ -413,24 +369,21 @@ export function WorkspaceDashboard({ workspace }: Props) {
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
-              No personas configured yet.
-            </div>
+            <div className="ws-panel-empty">No personas configured yet.</div>
           )}
         </div>
 
         {/* Content Topic Library */}
-        <div className="seo-card">
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 12px' }}>
-            📚 Content Topics
-            {workspace.contentTopics.length > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
-                {workspace.contentTopics.length} topics
-              </span>
-            )}
-          </h3>
+        <div className="ws-panel">
+          <div className="ws-panel-header">
+            <h3 className="ws-panel-title">
+              <span className="ws-panel-icon">📚</span> Content Topics
+              {workspace.contentTopics.length > 0 && (
+                <span className="ws-count-badge">{workspace.contentTopics.length}</span>
+              )}
+            </h3>
+          </div>
           {workspace.contentTopics.length > 0 ? (() => {
-            // Group by cluster
             const clusters: Record<string, typeof workspace.contentTopics> = {};
             workspace.contentTopics.forEach((t) => {
               const cluster = t.topicCluster ?? t.category ?? 'Other';
@@ -439,59 +392,32 @@ export function WorkspaceDashboard({ workspace }: Props) {
             });
             return (
               <div style={{ maxHeight: 420, overflow: 'auto' }}>
-                {/* Cluster pill summary */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                <div className="ws-cluster-pills">
                   {Object.entries(clusters).map(([cluster, topics]) => (
-                    <span key={cluster} style={{
-                      fontSize: 10, padding: '2px 7px', borderRadius: 3,
-                      background: 'rgba(129,140,248,0.08)', color: 'var(--text-muted)',
-                    }}>
-                      {cluster} ({topics.length})
-                    </span>
+                    <span key={cluster} className="ws-cluster-pill">{cluster} ({topics.length})</span>
                   ))}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="ws-items-list">
                   {workspace.contentTopics.map((t) => (
-                    <div key={t.topicId ?? t.id} style={{
-                      padding: '8px 10px', borderRadius: 6,
-                      border: '1px solid var(--border-subtle)',
-                      fontSize: 12,
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{t.topicName ?? t.topic}</span>
+                    <div key={t.topicId ?? t.id} className="ws-item-card">
+                      <div className="ws-item-card-header">
+                        <span className="ws-item-card-name" style={{ flex: 1 }}>{t.topicName ?? t.topic}</span>
                         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                           {t.claimRiskLevel && (
-                            <span style={{
-                              fontSize: 9, padding: '1px 5px', borderRadius: 3,
-                              background: t.claimRiskLevel === 'high' ? 'rgba(239,68,68,0.12)' : t.claimRiskLevel === 'medium' ? 'rgba(253,171,61,0.12)' : 'rgba(0,200,117,0.08)',
-                              color: t.claimRiskLevel === 'high' ? '#f87171' : t.claimRiskLevel === 'medium' ? '#fdab3d' : '#00c875',
-                            }}>
+                            <span className={`ws-risk-badge ws-risk-badge--${t.claimRiskLevel}`}>
                               {t.claimRiskLevel === 'high' ? '⚠️' : t.claimRiskLevel === 'medium' ? '⚡' : '✓'} {t.claimRiskLevel}
                             </span>
                           )}
-                          <span style={{
-                            fontSize: 10, padding: '2px 7px', borderRadius: 3,
-                            background: t.funnelStage === 'bottom' ? '#065f46' : t.funnelStage === 'middle' ? '#3730a3' : '#78350f',
-                            color: t.funnelStage === 'bottom' ? '#6ee7b7' : t.funnelStage === 'middle' ? '#c7d2fe' : '#fcd34d',
-                            fontWeight: 500,
-                          }}>
-                            {t.funnelStage}
-                          </span>
+                          <span className={`ws-funnel-badge ws-funnel-badge--${t.funnelStage}`}>{t.funnelStage}</span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 3, background: '#1e293b', color: '#94a3b8' }}>
-                          {t.topicCluster ?? t.category}
-                        </span>
+                      <div className="ws-item-card-tags">
+                        <span className="ws-cluster-pill">{t.topicCluster ?? t.category}</span>
                         {t.brandOrProductSignal && (
-                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: 'rgba(253,171,61,0.08)', color: '#fdab3d' }}>
-                            {t.brandOrProductSignal}
-                          </span>
+                          <span className="ws-signal-pill">{t.brandOrProductSignal}</span>
                         )}
                         {t.defaultSearchIntent && (
-                          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
-                            {t.defaultSearchIntent}
-                          </span>
+                          <span className="ws-item-card-desc" style={{ fontSize: 9, margin: 0 }}>{t.defaultSearchIntent}</span>
                         )}
                       </div>
                     </div>
@@ -500,27 +426,22 @@ export function WorkspaceDashboard({ workspace }: Props) {
               </div>
             );
           })() : (
-            <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
-              No content topics configured yet.
-            </div>
+            <div className="ws-panel-empty">No content topics configured yet.</div>
           )}
         </div>
       </div>
 
-      {/* Content Tracker */}
+      {/* ── Content Tracker ─────────────────────────────────────────── */}
       <ContentTracker workspaceId={workspace.id} workspaceName={workspace.brandName} content={workspace.generatedContent ?? []} />
 
-      {/* Content Projects */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-            📝 Content Projects
-          </h3>
+      {/* ── Content Projects ────────────────────────────────────────── */}
+      <div className="ws-section">
+        <div className="ws-section-header">
+          <h3 className="ws-section-title"><span className="ws-panel-icon">📝</span> Content Projects</h3>
           <button className="seo-btn seo-btn-primary seo-btn-sm" onClick={handleStartCreate}>
             <Plus size={12} /> New Content
           </button>
         </div>
-
 
         {(() => {
           const scheduled = wsProjects.filter(p => p.status === 'scheduled');
@@ -536,31 +457,21 @@ export function WorkspaceDashboard({ workspace }: Props) {
             <>
               {/* Scheduled Posts */}
               {scheduled.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 14 }}>📅</span>
-                    <h4 style={{ fontSize: 14, fontWeight: 700, color: '#818cf8', margin: 0 }}>Scheduled ({scheduled.length})</h4>
+                <div className="ws-project-group">
+                  <div className="ws-project-group-header">
+                    <span className="ws-project-group-icon">📅</span>
+                    <h4 className="ws-project-group-title" style={{ color: '#818cf8' }}>Scheduled ({scheduled.length})</h4>
                   </div>
                   <div className="seo-projects-grid">
                     {scheduled.map((project) => (
                       <div key={project.id} style={{ position: 'relative' }}>
-                        <div style={{
-                          position: 'absolute', top: 8, right: 8, zIndex: 2,
-                          display: 'flex', gap: 4, alignItems: 'center',
-                        }}>
-                          <span style={{
-                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                            background: '#3730a3', color: '#c7d2fe', fontWeight: 600,
-                          }}>
+                        <div className="ws-project-overlay-badges">
+                          <span className="ws-project-schedule-badge">
                             📅 {project.scheduledDate ? new Date(project.scheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD'}
                           </span>
                           <button
                             onClick={(e) => { e.stopPropagation(); handlePublish(project.id); }}
-                            style={{
-                              fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                              background: '#065f46', color: '#6ee7b7', fontWeight: 700,
-                              border: '1px solid #00c875', cursor: 'pointer',
-                            }}
+                            className="ws-project-publish-btn"
                           >
                             ✅ Publish
                           </button>
@@ -574,19 +485,15 @@ export function WorkspaceDashboard({ workspace }: Props) {
 
               {/* Published Posts */}
               {published.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 14 }}>✅</span>
-                    <h4 style={{ fontSize: 14, fontWeight: 700, color: '#00c875', margin: 0 }}>Published ({published.length})</h4>
+                <div className="ws-project-group">
+                  <div className="ws-project-group-header">
+                    <span className="ws-project-group-icon">✅</span>
+                    <h4 className="ws-project-group-title" style={{ color: '#34d399' }}>Published ({published.length})</h4>
                   </div>
                   <div className="seo-projects-grid">
                     {published.map((project) => (
                       <div key={project.id} style={{ position: 'relative' }}>
-                        <div style={{
-                          position: 'absolute', top: 8, right: 8, zIndex: 2,
-                          fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                          background: '#065f46', color: '#6ee7b7', fontWeight: 600,
-                        }}>
+                        <div className="ws-project-published-badge">
                           ✅ Published {project.publishedDate ? new Date(project.publishedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
                         </div>
                         <ProjectCard project={project} workspaceId={workspace.id} />
@@ -598,10 +505,10 @@ export function WorkspaceDashboard({ workspace }: Props) {
 
               {/* Draft / In-Progress */}
               {drafts.length > 0 ? (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 14 }}>📝</span>
-                    <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Drafts ({drafts.length})</h4>
+                <div className="ws-project-group">
+                  <div className="ws-project-group-header">
+                    <span className="ws-project-group-icon">📝</span>
+                    <h4 className="ws-project-group-title">Drafts ({drafts.length})</h4>
                   </div>
                   <div className="seo-projects-grid">
                     {drafts.map((project) => (
@@ -610,12 +517,12 @@ export function WorkspaceDashboard({ workspace }: Props) {
                   </div>
                 </div>
               ) : wsProjects.length === 0 ? (
-                <div className="seo-card" style={{ textAlign: 'center', padding: '32px 24px' }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                <div className="ws-panel" style={{ textAlign: 'center', padding: '40px 24px' }}>
+                  <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.6 }}>📄</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
                     No content yet
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
                     Create your first SEO content project for {workspace.brandName}
                   </div>
                   <button className="seo-btn seo-btn-primary" onClick={handleStartCreate}>

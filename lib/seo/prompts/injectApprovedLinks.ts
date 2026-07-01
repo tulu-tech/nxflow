@@ -68,6 +68,7 @@ PLACEMENT PRIORITY:
 1. First, replace any [INTERNAL_LINK_OPPORTUNITY: ...] or [EXTERNAL_LINK_OPPORTUNITY: ...] markers with actual approved links if a matching link exists.
 2. Then, for remaining approved links without markers, find the best natural placement in the content.
 3. If a link cannot be placed naturally, skip it and report in warnings.
+4. MANDATORY: At least 1 external link MUST be placed in the final content. If no external link can be placed naturally, slightly adjust the surrounding sentence to accommodate it. Never return content with zero external links for article-blog format.
 
 MANDATORY CLEANUP (do this AFTER all link insertion):
 - Remove ALL remaining [INTERNAL_LINK_OPPORTUNITY: ...] markers. If no matching link, keep only the anchor text portion.

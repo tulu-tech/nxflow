@@ -1,7 +1,7 @@
 /**
  * Content Creation Flow — Types & Config
  *
- * Defines the 12-step content creation wizard phases,
+ * Defines the 10-step content creation wizard phases,
  * content format options, and content goal presets.
  */
 
@@ -20,14 +20,11 @@ export const CONTENT_PHASES: ContentPhaseConfig[] = [
   { step: 3,  label: 'Platform / Format',     shortLabel: 'Platform',  icon: '📡' },
   { step: 4,  label: 'Content Goal',          shortLabel: 'Goal',      icon: '🎯' },
   { step: 5,  label: 'AI Keyword Selection',  shortLabel: 'Keywords',  icon: '🔑' },
-  { step: 6,  label: 'Content Brief',         shortLabel: 'Brief',     icon: '📋' },
+  { step: 6,  label: 'Content Brief & Outline', shortLabel: 'Brief',   icon: '📋' },
   { step: 7,  label: 'Generate Content',      shortLabel: 'Content',   icon: '📝' },
-  { step: 8,  label: 'Internal Link Plan',    shortLabel: 'Int Links', icon: '🔗' },
-  { step: 9,  label: 'External Link Plan',    shortLabel: 'Ext Links', icon: '🌐' },
-  { step: 10, label: 'Link Injection',        shortLabel: 'Inject',    icon: '💉' },
-  { step: 11, label: 'Image Plan',            shortLabel: 'Img Plan',  icon: '🖼️' },
-  { step: 12, label: 'Image Generation',      shortLabel: 'Images',    icon: '📸' },
-  { step: 13, label: 'Final Preview & Export', shortLabel: 'Export',   icon: '📦' },
+  { step: 8,  label: 'Link Plan',             shortLabel: 'Links',     icon: '🔗' },
+  { step: 9,  label: 'Link Injection',        shortLabel: 'Inject',    icon: '💉' },
+  { step: 10, label: 'Final Preview & Export', shortLabel: 'Export',   icon: '📦' },
 ];
 
 // ─── Content Format Options ──────────────────────────────────────────────────
