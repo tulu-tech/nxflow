@@ -157,6 +157,87 @@ export interface LushaSearchFilters {
   page?: number
 }
 
+// ─── Cold Calling Module ─────────────────────────────────────────────────────
+
+export type WorkflowStage =
+  | "raw"
+  | "needs_cleaning"
+  | "needs_enrichment"
+  | "lusha_lookup"
+  | "direct_phone"
+  | "operator_route"
+  | "ready_to_call"
+  | "called"
+  | "follow_up"
+  | "warm"
+  | "disqualified"
+
+export type PhoneStatus =
+  | "not_started"
+  | "lusha_pending"
+  | "direct_phone_found"
+  | "direct_phone_not_found"
+  | "company_phone_found"
+  | "operator_route_required"
+  | "invalid_number"
+  | "do_not_call"
+
+export type PriorityLevel = "A" | "B" | "C"
+
+export type CallStatus =
+  | "no_answer"
+  | "connected"
+  | "wrong_number"
+  | "invalid_number"
+  | "operator_blocked"
+  | "voicemail"
+  | "call_later"
+  | "not_relevant"
+
+export type CallOutcome =
+  | "interested"
+  | "send_email"
+  | "wrong_person"
+  | "no_authority"
+  | "existing_supplier"
+  | "future_need"
+  | "disqualified"
+  | "follow_up_required"
+
+export interface CallAttempt {
+  id: string
+  workspace_id: string
+  user_id: string
+  lead_id: string
+  call_date: string
+  call_time?: string | null
+  phone_number?: string | null
+  call_route?: string | null
+  call_status: CallStatus
+  call_outcome?: CallOutcome | null
+  notes?: string | null
+  objection?: string | null
+  next_action_type?: string | null
+  next_action_date?: string | null
+  created_at: string
+}
+
+export interface CallingLead extends LeadboardEntry {
+  priority_level?: PriorityLevel | null
+  priority_score?: number | null
+  priority_reason?: string | null
+  workflow_stage: WorkflowStage
+  phone_status: PhoneStatus
+  company_phone?: string | null
+  phone_source?: string | null
+  segment?: string | null
+  country?: string | null
+  linkedin_url?: string | null
+  website?: string | null
+  next_action_type?: string | null
+  next_action_date?: string | null
+}
+
 // Matched email from Gmail scan
 export interface MatchedEmail {
   messageId: string
