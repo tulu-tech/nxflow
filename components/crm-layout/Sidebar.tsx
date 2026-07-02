@@ -15,6 +15,7 @@ import {
   Bookmark,
   Newspaper,
   Smartphone,
+  PhoneCall,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher"
@@ -39,9 +40,10 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: "Prospecting",
     items: [
-      { href: "/prospecting", label: "Prospecting", icon: Search },
-      { href: "/saved-searches", label: "Saved Searches", icon: Bookmark },
-      { href: "/leadboard", label: "Leadboard", icon: Target },
+      { href: "/prospecting",   label: "Prospecting",    icon: Search    },
+      { href: "/saved-searches",label: "Saved Searches", icon: Bookmark  },
+      { href: "/leadboard",     label: "Leadboard",      icon: Target    },
+      { href: "/calling-plan",  label: "Cold Calling",   icon: PhoneCall },
     ],
   },
   {
